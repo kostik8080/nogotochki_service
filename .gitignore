@@ -147,3 +147,38 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# ---- Ноготочки: служебные папки, секреты, локальная БД ----
+
+# Локальные настройки и инструменты Claude Code (конфиг dev-сервера, личные настройки)
+.claude/
+
+# IDE JetBrains
+.idea/
+
+# Системные файлы Windows и macOS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Ключи и сертификаты (HTTPS, подписи JWT)
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Локальная база данных PostgreSQL: каталоги данных (в т.ч. тома Docker), пароли, дампы и бэкапы.
+# В дампах — персональные данные клиентов (152-ФЗ). Миграции (*.sql) НЕ игнорируются.
+pgdata/
+postgres-data/
+db-data/
+.pgpass
+*.dump
+*.backup
+*.sql.gz
+backups/
+
+# Файловые БД на случай локальных экспериментов
+*.sqlite
+*.sqlite3
+*.db
