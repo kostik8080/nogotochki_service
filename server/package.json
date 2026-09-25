@@ -11,6 +11,7 @@
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:seed": "tsx scripts/db-seed.ts",
     "db:reset": "tsx scripts/db-reset.ts",
+    "db:check-schema": "tsx scripts/db-check-schema.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

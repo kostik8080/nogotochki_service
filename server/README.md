@@ -18,6 +18,7 @@ npm run db:reset         # создать базу data/nogotochki.db с тес�
 | `npm run db:migrate` | Создает файл базы, если его нет, и применяет новые миграции |
 | `npm run db:seed` | Заполняет пустую базу тестовыми данными |
 | `npm run db:reset` | Удаляет файл базы и создает заново: миграции + тестовые данные |
+| `npm run db:check-schema` | Сверяет базу, которую строят миграции, с `docs/db-schema.md`: таблицы, поля, типы, ключи, индексы |
 | `npm run typecheck` | Проверка типов TypeScript |
 
 Тестовые входы: администратор `admin@example.com`, клиентка `maria@example.com` (пароли — из `.env`).
