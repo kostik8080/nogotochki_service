@@ -1,6 +1,6 @@
 # Сервер «Ноготочки»
 
-Node.js 24.7+ и TypeScript, база SQLite через встроенный модуль `node:sqlite`. Схема базы — `docs/db-schema.md`.
+Node.js 24.7+ и TypeScript, база SQLite через встроенный модуль `node:sqlite`. Схема базы — `docs/db-schema.md`, как она устроена в коде и правила ее изменения — `docs/database.md`.
 
 ## Первый запуск
 
