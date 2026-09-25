@@ -15,6 +15,15 @@ interface AppliedMigration {
   checksum: string;
 }
 
+/** Имена миграций, которые еще не применены к базе. Базу не меняет. */
+export function pendingMigrations(db: Db, dir: string = MIGRATIONS_DIR): string[] {
+  const hasTable = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'").get();
+  const applied = new Set(hasTable
+    ? (db.prepare('SELECT name FROM schema_migrations').all() as unknown as { name: string }[]).map((m) => m.name)
+    : []);
+  return readdirSync(dir).filter((f) => f.endsWith('.sql') && !applied.has(f)).sort();
+}
+
 /** Применяет новые миграции и возвращает их имена. */
 export function runMigrations(db: Db, dir: string = MIGRATIONS_DIR): string[] {
   db.exec(`

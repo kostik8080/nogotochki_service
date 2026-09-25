@@ -31,10 +31,20 @@ if (!['development', 'test', 'production'].includes(nodeEnv)) {
 }
 const isProduction = nodeEnv === 'production';
 
+const backupKeepRaw = env('BACKUP_KEEP') ?? '14';
+const backupKeep = Number(backupKeepRaw);
+if (!Number.isInteger(backupKeep) || backupKeep < 1) {
+  throw new Error(`BACKUP_KEEP=${backupKeepRaw}: нужно целое число от 1 — сколько последних копий хранить`);
+}
+
 export const config = {
   nodeEnv,
   isProduction,
   databasePath: path.resolve(SERVER_ROOT, env('DATABASE_PATH') ?? 'data/nogotochki.db'),
+  backup: {
+    dir: path.resolve(SERVER_ROOT, env('BACKUP_DIR') ?? 'backups'),
+    keep: backupKeep,
+  },
   seed: {
     adminPassword: env('SEED_ADMIN_PASSWORD'),
     clientPassword: env('SEED_CLIENT_PASSWORD'),
@@ -46,14 +56,11 @@ if (isProduction) checkProductionConfig();
 function checkProductionConfig(): void {
   const errors: string[] = [];
 
-  const dbPath = env('DATABASE_PATH');
-  if (!dbPath) {
-    errors.push('DATABASE_PATH не задан: в production путь к базе указывается явно');
-  } else if (!path.isAbsolute(dbPath)) {
-    errors.push(`DATABASE_PATH=${dbPath}: нужен абсолютный путь, например /var/lib/nogotochki/nogotochki.db`);
-  } else if (isInside(SERVER_ROOT, dbPath)) {
-    // Папку с кодом заменяют при каждом обновлении — база внутри нее будет потеряна.
-    errors.push(`DATABASE_PATH=${dbPath}: база лежит внутри папки с кодом (${SERVER_ROOT}), вынесите ее на постоянный диск`);
+  // База и резервные копии — на постоянном диске: папку с кодом заменяют при каждом обновлении.
+  checkPersistentPath('DATABASE_PATH', '/var/lib/nogotochki/nogotochki.db', errors);
+  checkPersistentPath('BACKUP_DIR', '/var/backups/nogotochki', errors);
+  if (config.backup.dir === path.dirname(config.databasePath)) {
+    errors.push('BACKUP_DIR совпадает с папкой базы: храните копии в отдельной папке');
   }
 
   if (config.seed.adminPassword || config.seed.clientPassword) {
@@ -62,6 +69,17 @@ function checkProductionConfig(): void {
 
   if (errors.length > 0) {
     throw new Error(`Настройки production неверны:\n  - ${errors.join('\n  - ')}`);
+  }
+}
+
+function checkPersistentPath(name: string, example: string, errors: string[]): void {
+  const value = env(name);
+  if (!value) {
+    errors.push(`${name} не задан: в production путь указывается явно, например ${example}`);
+  } else if (!path.isAbsolute(value)) {
+    errors.push(`${name}=${value}: нужен абсолютный путь, например ${example}`);
+  } else if (isInside(SERVER_ROOT, value)) {
+    errors.push(`${name}=${value}: путь внутри папки с кодом (${SERVER_ROOT}), вынесите его на постоянный диск`);
   }
 }
 

@@ -11,10 +11,12 @@
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:seed": "tsx scripts/db-seed.ts",
     "db:reset": "tsx scripts/db-reset.ts",
+    "db:backup": "tsx scripts/db-backup.ts",
     "db:check-schema": "tsx scripts/db-check-schema.ts",
     "admin:create": "tsx scripts/admin-create.ts",
     "build": "node scripts/build.mjs",
     "prod:migrate": "node dist/scripts/db-migrate.js",
+    "prod:backup": "node dist/scripts/db-backup.js",
     "prod:admin:create": "node dist/scripts/admin-create.js",
     "typecheck": "tsc --noEmit"
   },
