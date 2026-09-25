@@ -156,13 +156,13 @@
     <h2 style="font-family:'Playfair Display',serif; text-transform:uppercase; font-size:32px; margin:0 0 48px; text-align:center;">Наши работы</h2>
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-bottom:28px;">
       <sc-for list="{{ gallery }}" as="g" hint-placeholder-count="3">
-        <div style="position:relative; height:280px; border-radius:8px; overflow:hidden; background-image:repeating-linear-gradient(135deg, #B06F68 0 10px, #C98B84 10px 20px); cursor:pointer;" style-hover="box-shadow:0 16px 32px rgba(46,30,26,0.16);">
+        <div onClick="{{ g.onOpen }}" title="Профиль мастера" style="position:relative; height:280px; border-radius:8px; overflow:hidden; background-image:repeating-linear-gradient(135deg, #B06F68 0 10px, #C98B84 10px 20px); cursor:pointer;" style-hover="box-shadow:0 16px 32px rgba(46,30,26,0.16);">
           <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(15,11,12,0.85), rgba(15,11,12,0.05) 55%);"></div>
-          <div style="position:absolute; left:18px; right:18px; bottom:16px; color:#fff; font-family:'Playfair Display',serif; text-transform:uppercase; font-size:18px;"><span>{{ g.title }}</span></div>
+          <div style="position:absolute; left:18px; right:18px; bottom:16px; color:#fff;"><div style="font-family:'Playfair Display',serif; text-transform:uppercase; font-size:18px;">{{ g.title }}</div><div style="font-size:12px; opacity:0.85; margin-top:4px;">{{ g.masterName }} →</div></div>
         </div>
       </sc-for>
     </div>
-    <div style="text-align:center;"><a href="#" style="font-weight:700; font-size:14px;" style-hover="color:#B06F68;">Смотреть все работы →</a></div>
+    <div style="text-align:center;"><a href="#masters" style="font-weight:700; font-size:14px;" style-hover="color:#B06F68;">Работы каждого мастера — в его профиле →</a></div>
   </section>
 
   <!-- 8. ОТЗЫВЫ -->
@@ -192,8 +192,8 @@
       <div style="font-family:'Playfair Display',serif; text-transform:uppercase; font-size:24px; margin-bottom:12px;">Москва, ул. Цветочная, 12</div>
       <div style="font-size:15px; color:#4A423F; margin-bottom:20px; font-variant-numeric:tabular-nums;">+7 (999) 123-45-67</div>
       <button onClick="{{ callSalon }}" style="height:44px; padding:0 22px; background:#C98B84; color:#0F0B0C; border:none; border-radius:4px; font-weight:700; font-size:13px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer; margin-bottom:24px;" style-hover="background:#D9A099;">Позвонить</button>
-      <div style="display:flex; gap:16px; margin-bottom:24px; font-size:13px; color:#4A423F;"><span>VK</span><span>Telegram</span></div>
-      <div style="height:160px; border-radius:8px; background-image:repeating-linear-gradient(135deg, #C7BFBC 0 10px, #E2D8D4 10px 20px); display:flex; align-items:center; justify-content:center; font-family:monospace; font-size:11px; color:#4A423F;">карта: адрес студии</div>
+      <div style="display:flex; gap:16px; margin-bottom:24px; font-size:13px;"><a href="{{ vkUrl }}" target="_blank" rel="noopener" style="font-weight:700;">VK</a><a href="{{ telegramUrl }}" target="_blank" rel="noopener" style="font-weight:700;">Telegram</a></div>
+      <a href="{{ mapUrl }}" target="_blank" rel="noopener" style="height:160px; border-radius:8px; background-image:repeating-linear-gradient(135deg, #C7BFBC 0 10px, #E2D8D4 10px 20px); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#4A423F;">Открыть на карте →</a>
     </div>
     <div>
       <div style="color:#8E4B48; font-size:12px; text-transform:uppercase; letter-spacing:0.14em; font-weight:700; margin-bottom:14px;">Режим работы</div>
@@ -225,11 +225,11 @@
       </div>
       <div>
         <div style="color:#fff; font-weight:700; margin-bottom:10px; font-size:13px; text-transform:uppercase; letter-spacing:0.04em;">Контакты</div>
-        <div style="font-size:13px; line-height:1.8;">Москва, ул. Цветочная, 12<br/>+7 (999) 123-45-67<br/>вт–сб, 10:00–20:00</div>
+        <div style="font-size:13px; line-height:1.8;"><a href="{{ mapUrl }}" target="_blank" rel="noopener" style="color:rgba(251,247,245,0.75);">Москва, ул. Цветочная, 12</a><br/><a href="{{ phoneHref }}" style="color:rgba(251,247,245,0.75);">+7 (999) 123-45-67</a><br/>вт–сб, 10:00–20:00</div>
       </div>
       <div>
         <div style="color:#fff; font-weight:700; margin-bottom:10px; font-size:13px; text-transform:uppercase; letter-spacing:0.04em;">Соцсети</div>
-        <div style="display:flex; flex-direction:column; gap:8px; font-size:13px;"><span>VK</span><span>Telegram</span></div>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:13px;"><a href="{{ vkUrl }}" target="_blank" rel="noopener" style="color:rgba(251,247,245,0.75);">VK</a><a href="{{ telegramUrl }}" target="_blank" rel="noopener" style="color:rgba(251,247,245,0.75);">Telegram</a></div>
       </div>
     </div>
     <div style="border-top:1px solid rgba(251,247,245,0.12); padding-top:16px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px 24px; font-size:12px;">
@@ -245,6 +245,14 @@
 </x-dc>
 <script type="text/x-dc" data-dc-script>
 const PROTO_URL = './Прототип%20-%20Ноготочки.dc.html';
+// Контакты студии (settings.phone, map_url, vk_url, telegram_url). Адреса соцсетей — заглушки:
+// ведут на главные страницы VK и Telegram, заменить на страницы студии.
+const STUDIO_LINKS = {
+  phone: 'tel:+79991234567',
+  map: 'https://yandex.ru/maps/?text=' + encodeURIComponent('Москва, ул. Цветочная, 12'),
+  vk: 'https://vk.com/',
+  telegram: 'https://t.me/',
+};
 
 class Component extends DCLogic {
   state = { scrolled: false, authed: sessionStorage.getItem('nog_authed') === '1', dropdownOpen: false };
@@ -284,7 +292,8 @@ class Component extends DCLogic {
       goBooking: (e) => { if (e && e.preventDefault) e.preventDefault(); window.location.href = PROTO_URL + '#/booking/services'; },
       scrollToTop: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
       scrollToGallery: () => { const el = document.getElementById('gallery'); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY, behavior: 'smooth' }); },
-      callSalon: () => { window.location.href = 'tel:+79991234567'; },
+      callSalon: () => { window.location.href = STUDIO_LINKS.phone; },
+      phoneHref: STUDIO_LINKS.phone, mapUrl: STUDIO_LINKS.map, vkUrl: STUDIO_LINKS.vk, telegramUrl: STUDIO_LINKS.telegram,
       loginUrl: PROTO_URL + '#/login',
       registerUrl: PROTO_URL + '#/register',
       staffLoginUrl: PROTO_URL + '#/staff/login',
@@ -323,11 +332,12 @@ class Component extends DCLogic {
         sessionStorage.setItem('nog_draft', JSON.stringify({ serviceIds: [], masterId: m.id, lockedMasterId: m.id, time: null, date: null }));
         window.location.href = PROTO_URL + '#/booking/services';
       } })),
+      // Опубликованные фото работ (work_photos): клик ведет в профиль мастера.
       gallery: [
-        { title: 'Нюдовый маникюр' },
-        { title: 'Френч с дизайном' },
-        { title: 'Ламинирование бровей' },
-      ],
+        { title: 'Нюдовый маникюр', masterId: 'm1', masterName: 'Анна Ковалева' },
+        { title: 'Френч с дизайном', masterId: 'm1', masterName: 'Анна Ковалева' },
+        { title: 'Ламинирование бровей', masterId: 'm2', masterName: 'Марина Орлова' },
+      ].map((g) => ({ ...g, onOpen: () => { window.location.href = PROTO_URL + '#/masters/' + g.masterId; } })),
       reviews: [
         { text: 'Записалась онлайн вечером, а утром уже знала точное время. Очень удобно, никаких звонков.', initials: 'МК', name: 'Мария К.', master: 'Анна Ковалева' },
         { text: 'Брови сделали именно так, как я хотела показать по фото. Мастер внимательно слушает.', initials: 'ОП', name: 'Ольга П.', master: 'Марина Орлова' },

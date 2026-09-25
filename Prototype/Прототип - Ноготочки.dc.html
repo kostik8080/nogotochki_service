@@ -661,7 +661,7 @@
                   <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; background:{{ detailBooking.badge.bg }}; color:{{ detailBooking.badge.fg }}; font-size:11px; font-weight:700;"><span style="width:6px; height:6px; border-radius:50%; background:{{ detailBooking.badge.dot }};"></span>{{ detailBooking.badge.label }}</span>
                 </div>
                 <div style="font-size:14px; font-variant-numeric:tabular-nums; margin-bottom:6px;">{{ detailBooking.dateLabel }}, {{ detailTimeRange }}</div>
-                <div style="font-size:14px; margin-bottom:6px;">Мастер: {{ detailBooking.master }}</div>
+                <div style="font-size:14px; margin-bottom:6px;">Мастер: <a href="#/masters/{{ detailBooking.masterId }}" style="font-weight:700;">{{ detailBooking.master }}</a></div>
                 <div style="font-size:14px; font-weight:700; margin-bottom:6px;">{{ detailBooking.price }}</div>
                 <sc-if value="{{ detailBooking.comment }}" hint-placeholder-val="{{ false }}">
                   <div style="font-size:13px; color:#6B615D; background:#F1EAE7; padding:10px 12px; border-radius:6px; margin-bottom:10px;">Комментарий: {{ detailBooking.comment }}</div>
@@ -1325,7 +1325,19 @@
               <div onClick="{{ setAdminViewDay }}" style="padding:7px 16px; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; background:{{ adminViewDayBg }};">День</div>
               <div onClick="{{ setAdminViewWeek }}" style="padding:7px 16px; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; background:{{ adminViewWeekBg }};">Неделя</div>
             </div>
-            <input value="{{ adminSearch }}" onChange="{{ onAdminSearch }}" placeholder="Поиск клиента" style="flex:1; min-width:160px; height:38px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:6px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif;"/>
+            <div style="position:relative; flex:1; min-width:160px;">
+            <sc-if value="{{ adminSearchHasResults }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute; top:42px; left:0; right:0; background:#fff; border:1px solid #E2D8D4; border-radius:8px; box-shadow:0 12px 28px rgba(46,30,26,0.16); z-index:30; overflow:hidden;">
+                <sc-for list="{{ adminSearchResults }}" as="sr" hint-placeholder-count="2">
+                  <div onClick="{{ sr.onOpen }}" style="display:flex; justify-content:space-between; gap:12px; padding:9px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid #F1EAE7;"><span style="font-weight:700;">{{ sr.name }}</span><span style="color:#857B77; white-space:nowrap;">{{ sr.phone }}</span></div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ adminSearchNoResults }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute; top:42px; left:0; right:0; background:#fff; border:1px solid #E2D8D4; border-radius:8px; padding:10px 12px; font-size:13px; color:#857B77; z-index:30;">Клиентов не найдено</div>
+            </sc-if>
+            <input value="{{ adminSearch }}" onChange="{{ onAdminSearch }}" placeholder="Поиск клиента" style="width:100%; height:38px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:6px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif;"/>
+            </div>
             <button onClick="{{ newAppointmentAction }}" style="height:38px; padding:0 16px; border-radius:4px; border:none; background:#C98B84; color:#0F0B0C; font-weight:700; font-size:13px; cursor:pointer; white-space:nowrap;">+ Новая запись</button>
             <div style="position:relative;">
               <div onClick="{{ toggleStaffHeaderMenu }}" style="display:flex; align-items:center; gap:8px; cursor:pointer; padding:5px 8px; border-radius:6px;">
@@ -1569,8 +1581,10 @@
           <div style="display:flex; flex-direction:column; gap:6px;">
             <sc-if value="{{ apptPopoverData.isActive }}" hint-placeholder-val="{{ true }}">
               <button onClick="{{ apptPopoverData.onReschedule }}" style="height:36px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-weight:700; font-size:12px; cursor:pointer;">Перенести</button>
-              <button onClick="{{ apptPopoverData.onDone }}" style="height:36px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-weight:700; font-size:12px; cursor:pointer;">Визит завершён</button>
-              <button onClick="{{ apptPopoverData.onNoShow }}" style="height:36px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-weight:700; font-size:12px; cursor:pointer;">Отметить неявку</button>
+              <sc-if value="{{ apptPopoverData.canFinish }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ apptPopoverData.onDone }}" style="height:36px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-weight:700; font-size:12px; cursor:pointer;">Визит завершён</button>
+                <button onClick="{{ apptPopoverData.onNoShow }}" style="height:36px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-weight:700; font-size:12px; cursor:pointer;">Отметить неявку</button>
+              </sc-if>
             </sc-if>
             <sc-if value="{{ apptPopoverData.isDone }}" hint-placeholder-val="{{ false }}">
               <button onClick="{{ apptPopoverData.onPhotos }}" style="height:36px; border-radius:4px; border:1px solid #C98B84; background:#fff; font-weight:700; font-size:12px; cursor:pointer;">{{ apptPopoverData.photosLabel }}</button>
@@ -1955,7 +1969,7 @@
                     <div style="font-size:13px; color:#857B77;">Предстоящих записей нет</div>
                   </sc-if>
                   <sc-for list="{{ adminClientDetail.upcoming }}" as="u" hint-placeholder-count="1">
-                    <div style="background:#fff; border:1px solid #E2D8D4; border-radius:8px; padding:14px 16px; margin-bottom:10px;">
+                    <div onClick="{{ u.onOpen }}" title="Открыть запись" style="background:#fff; border:1px solid #E2D8D4; border-radius:8px; padding:14px 16px; margin-bottom:10px; cursor:pointer;">
                       <div style="font-weight:700; font-size:13px; margin-bottom:2px;">{{ u.date }} · {{ u.time }}</div>
                       <div style="font-size:13px; color:#4A423F;">{{ u.service }} · {{ u.master }}</div>
                     </div>
@@ -2698,18 +2712,24 @@ function initAdminData(data) {
 // Статусы записи — по паспорту: active, cancelledClient, cancelledStudio, done, noShow.
 // Отменённые записи не занимают время мастера и не показываются в шахматке.
 const ADMIN_LIVE = (a) => a.status !== 'cancelledClient' && a.status !== 'cancelledStudio';
+// Дата записи: у записей демо-дня (шахматка, четверг 24 сентября) дата не указана.
+const apptDate = (a) => a.date || ADMIN_TODAY;
+const isDemoDay = (a) => apptDate(a) === ADMIN_TODAY;
 const ADMIN_APPTS_SEED = [
   { id: 'ap1', masterId: 'm1', start: 10 * 60, dur: 90, client: 'Мария Кузнецова', serviceId: 's1', service: 'Маникюр с покрытием гель-лаком', price: 1800, status: 'done', newClient: false },
   { id: 'ap2', masterId: 'm1', start: 12 * 60, dur: 60, client: 'Ольга Петрова', serviceId: 's6', service: 'Педикюр без покрытия', price: 1600, status: 'done', newClient: false },
   { id: 'ap3', masterId: 'm1', start: 14 * 60, dur: 150, client: 'Анна Соколова', serviceId: 's7', service: 'Маникюр и педикюр', price: 3200, status: 'active', newClient: false },
   { id: 'ap4', masterId: 'm1', start: 17 * 60, dur: 45, client: 'Виктория Лебедева', serviceId: 's2', service: 'Маникюр без покрытия', price: 1200, status: 'active', newClient: false },
   { id: 'ap5', masterId: 'm2', start: 11 * 60, dur: 60, client: 'Дарья Игнатьева', serviceId: 's12', service: 'Ламинирование бровей', price: 1800, status: 'noShow', newClient: true },
-  { id: 'ap6', masterId: 'm2', start: 12 * 60 + 30, dur: 40, client: 'Елена Фомина', serviceId: 's11', service: 'Коррекция и окрашивание бровей', price: 1200, status: 'done', newClient: false },
+  // ap6: визит уже прошёл, но администратор ещё не отметил его завершённым — в поповере доступны «Визит завершён» и «Отметить неявку».
+  { id: 'ap6', masterId: 'm2', start: 12 * 60 + 30, dur: 40, client: 'Елена Фомина', serviceId: 's11', service: 'Коррекция и окрашивание бровей', price: 1200, status: 'active', newClient: false },
   { id: 'ap7', masterId: 'm2', start: 13 * 60 + 30, dur: 20, client: 'Полина Гуляева', serviceId: 's13', service: 'Коррекция бровей', price: 700, status: 'cancelledClient', newClient: false },
   { id: 'ap8', masterId: 'm2', start: 15 * 60, dur: 30, client: 'Инна Захарова', serviceId: 's14', service: 'Окрашивание бровей хной', price: 900, status: 'active', newClient: false },
   { id: 'ap9', masterId: 'm2', start: 17 * 60, dur: 60, client: 'Татьяна Мельник', serviceId: 's12', service: 'Ламинирование бровей', price: 1800, status: 'active', newClient: false },
   { id: 'ap10', masterId: 'm3', start: 10 * 60, dur: 150, client: 'Регина Белова', serviceId: 's8', service: 'Наращивание ногтей', price: 2800, status: 'done', newClient: false },
   { id: 'ap11', masterId: 'm3', start: 14 * 60, dur: 90, client: 'Кристина Новак', serviceId: 's1', service: 'Маникюр с покрытием гель-лаком', price: 1800, status: 'active', newClient: true },
+  // Предстоящая запись на другую дату — видна в карточке клиента (вкладка «Предстоящие»).
+  { id: 'ap20', date: '2026-10-06', masterId: 'm1', start: 14 * 60, dur: 90, client: 'Ольга Петрова', serviceId: 's1', service: 'Маникюр с покрытием гель-лаком', price: 1800, status: 'active', newClient: false },
   { id: 'ap12', masterId: 'm3', start: 16 * 60, dur: 60, client: 'Светлана Комарова', serviceId: 's12', service: 'Ламинирование бровей', price: 1800, status: 'active', newClient: true },
 ];
 // Неделя 22–26 сентября (вт–сб). Четверг берётся из ADMIN_APPTS_SEED (живое состояние шахматки),
@@ -2766,7 +2786,6 @@ const ADMIN_CLIENT_FULL = {
       { date: '14.08.2026', service: 'Маникюр с покрытием гель-лаком', master: 'Анна Ковалева', amount: 1800, status: 'done', photos: 2 },
       { date: '20.06.2026', service: 'Педикюр с покрытием', master: 'Анна Ковалева', amount: 0, status: 'cancelledClient', cancelReason: 'Клиент отменил — заболела' },
     ],
-    upcoming: [{ date: '05.10.2026', time: '14:00', service: 'Маникюр с покрытием гель-лаком', master: 'Анна Ковалева' }],
     notes: [{ author: 'Анна Ковалева (мастер)', date: '14.08.2026', text: 'Тонкая, ломкая ногтевая пластина — укреплять базой.' }, { author: 'Администратор', date: '02.03.2026', text: 'Предпочитает утреннее время.' }],
     important: 'Аллергия на некоторые гель-лаки — уточнять бренд перед покрытием.',
   },
@@ -2777,7 +2796,6 @@ const ADMIN_CLIENT_FULL = {
       { date: '01.08.2026', service: 'Наращивание ногтей', master: 'Елена Смирнова', amount: 0, status: 'noShow' },
       { date: '10.07.2026', service: 'Маникюр с покрытием гель-лаком', master: 'Елена Смирнова', amount: 1800, status: 'done', photos: 0 },
     ],
-    upcoming: [],
     notes: [{ author: 'Администратор', date: '01.08.2026', text: 'Четвёртая неявка подряд без предупреждения — добавлена в чёрный список.' }],
     important: '',
   },
@@ -4321,18 +4339,18 @@ class Component extends DCLogic {
   apptCleanupOf = (a) => { const s = this.state.services.find((x) => x.id === a.serviceId); return s ? Number(s.cleanup) || 0 : 0; };
   // Пересекается ли визит [start, start+dur) вместе с уборкой после него с другими записями мастера (с учётом их уборки).
   // Блокировки мастера на день из шахматки (обед и т. п.): визит на них заходить не может, уборка — может.
-  adminDayBlocks = (masterId) => ADMIN_WEEK_BLOCKS.filter((b) => b.masterId === masterId && b.weekday === ADMIN_DAY_WEEKDAY && !b.allDay);
-  adminBusyOverlap = (masterId, start, dur, cleanup, excludeId) => this.state.adminAppointments.some((a) => ADMIN_LIVE(a) && a.id !== excludeId && a.masterId === masterId
+  adminDayBlocks = (masterId, date = ADMIN_TODAY) => ADMIN_WEEK_BLOCKS.filter((b) => b.masterId === masterId && b.weekday === parseDateStr(date).getDay() && !b.allDay);
+  adminBusyOverlap = (masterId, start, dur, cleanup, excludeId, date = ADMIN_TODAY) => this.state.adminAppointments.some((a) => ADMIN_LIVE(a) && apptDate(a) === date && a.id !== excludeId && a.masterId === masterId
     && start < a.start + a.dur + this.apptCleanupOf(a) && start + dur + cleanup > a.start)
-    || this.adminDayBlocks(masterId).some((b) => start < b.start + b.dur && start + dur > b.start);
+    || this.adminDayBlocks(masterId, date).some((b) => start < b.start + b.dur && start + dur > b.start);
   // Ближайшие окна, куда помещается визит: уборка после визита не должна задевать следующую запись,
   // но может выходить за конец смены.
   // Считается в момент запроса из смены, записей (с уборкой) и блокировок: первое время каждого свободного окна.
-  adminFreeStarts = (master, dur, cleanup, excludeId, limit) => {
+  adminFreeStarts = (master, dur, cleanup, excludeId, limit, date = ADMIN_TODAY) => {
     const out = [];
     let prevOk = false;
     for (let t = master.shiftStart; t + dur <= master.shiftEnd && out.length < limit; t += 15) {
-      const ok = !this.adminBusyOverlap(master.id, t, dur, cleanup, excludeId);
+      const ok = !this.adminBusyOverlap(master.id, t, dur, cleanup, excludeId, date);
       if (ok && !prevOk) out.push(t);
       prevOk = ok;
     }
@@ -4485,13 +4503,17 @@ class Component extends DCLogic {
 
   // ---- Демо-записи на дату (для проверки затронутых записей) ----
   demoLiveApptsOnDate = (date) => {
+    if (date < ADMIN_TODAY) return [];
+    const dated = this.state.adminAppointments.filter((a) => a.date === date && a.status === 'active');
     const wd = DEMO_WEEK_DATES[date];
-    if (wd == null || date < ADMIN_TODAY) return [];
+    if (wd == null) return dated;
     const list = wd === ADMIN_DAY_WEEKDAY
-      ? this.state.adminAppointments.filter((a) => a.status === 'active')
+      ? this.state.adminAppointments.filter((a) => isDemoDay(a) && a.status === 'active')
       : ADMIN_WEEK_OTHER_APPTS.filter((a) => a.weekday === wd && a.status === 'active');
-    return list.map((a) => ({ ...a, date }));
+    return list.map((a) => ({ ...a, date })).concat(dated);
   };
+  // Даты, на которые в демо есть записи: неделя шахматки и записи с явной датой.
+  demoDates = () => [...new Set(Object.keys(DEMO_WEEK_DATES).concat(this.state.adminAppointments.filter((a) => a.date).map((a) => a.date)))].sort();
   apptShortLabel = (a) => {
     const t = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
     const master = ADMIN_MASTERS.find((m) => m.id === a.masterId);
@@ -4541,10 +4563,10 @@ class Component extends DCLogic {
   // Записи с даты начала нового графика, которые в него не попадают.
   masterPlanAffected = (plan) => {
     const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
-    return Object.keys(DEMO_WEEK_DATES).filter((date) => date >= plan.from)
+    return this.demoDates().filter((date) => date >= plan.from)
       .flatMap((date) => this.demoLiveApptsOnDate(date))
       .filter((a) => a.masterId === plan.masterId)
-      .filter((a) => !plan.days.includes(DEMO_WEEK_DATES[a.date]) || a.start < toMin(plan.start) || a.start + a.dur > toMin(plan.end));
+      .filter((a) => !plan.days.includes(parseDateStr(a.date).getDay()) || a.start < toMin(plan.start) || a.start + a.dur > toMin(plan.end));
   };
   submitMasterPlan = () => {
     const f = this.state.masterPlanForm;
@@ -4864,7 +4886,7 @@ class Component extends DCLogic {
     const adminNowTopPx = adminNowTop + 'px';
     const drop = this.state.adminDropPreview;
     const adminMasterCols = ADMIN_MASTERS.map((m) => {
-      const liveAppts = this.state.adminAppointments.filter((a) => a.masterId === m.id && ADMIN_LIVE(a));
+      const liveAppts = this.state.adminAppointments.filter((a) => a.masterId === m.id && ADMIN_LIVE(a) && isDemoDay(a));
       const bookedMin = liveAppts.reduce((sum, a) => sum + a.dur + Math.min(this.apptCleanupOf(a), Math.max(0, m.shiftEnd - a.start - a.dur)), 0);
       const appts = liveAppts.map((a) => ({
         ...a,
@@ -4901,7 +4923,7 @@ class Component extends DCLogic {
     const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
     const weekItemsFor = (masterId, weekday) => {
       const appts = weekday === ADMIN_DAY_WEEKDAY
-        ? this.state.adminAppointments.filter((a) => a.masterId === masterId && ADMIN_LIVE(a))
+        ? this.state.adminAppointments.filter((a) => a.masterId === masterId && ADMIN_LIVE(a) && isDemoDay(a))
         : ADMIN_WEEK_OTHER_APPTS.filter((a) => a.masterId === masterId && a.weekday === weekday);
       const items = appts.map((a) => ({
         start: a.start, timeLabel: hhmm(a.start), client: a.client, service: a.service,
@@ -4936,7 +4958,7 @@ class Component extends DCLogic {
         onOpen: isToday ? () => this.setAdminViewMode('day') : () => this.showToast('В демо подробный день есть только для четверга, 24 сентября'),
       };
     });
-    const adminAllAppts = this.state.adminAppointments.filter(ADMIN_LIVE);
+    const adminAllAppts = this.state.adminAppointments.filter((a) => ADMIN_LIVE(a) && isDemoDay(a));
     const adminSidebarItems = [
       { id: 'schedule', icon: 'calendar-days', tooltip: 'Расписание', active: isAdminHome, locked: false },
       { id: 'clients', icon: 'users', tooltip: 'Клиенты', active: isAdminClients || isAdminClientDetail, locked: false },
@@ -4951,8 +4973,15 @@ class Component extends DCLogic {
       freeHours: (ADMIN_MASTERS.reduce((sum, m) => sum + (m.dayOff ? 0 : (m.shiftEnd - m.shiftStart - this.adminDayBlocks(m.id).reduce((x, b) => x + b.dur, 0))), 0) - adminAllAppts.reduce((s, a) => s + a.dur + this.apptCleanupOf(a), 0)) / 60,
       active: adminAllAppts.filter((a) => a.status === 'active').length,
       noShow: adminAllAppts.filter((a) => a.status === 'noShow').length,
-      cancelled: this.state.adminAppointments.filter((a) => !ADMIN_LIVE(a)).length,
+      cancelled: this.state.adminAppointments.filter((a) => !ADMIN_LIVE(a) && isDemoDay(a)).length,
     };
+
+    // ---- Администратор · поиск клиента в шапке (N-49) ----
+    const adminSearchQuery = this.state.adminSearch.trim().toLowerCase();
+    const adminSearchDigits = adminSearchQuery.replace(/\D/g, '');
+    const adminSearchResults = adminSearchQuery.length >= 2 ? ADMIN_CLIENTS_TABLE
+      .filter((c) => c.name.toLowerCase().includes(adminSearchQuery) || (adminSearchDigits.length >= 3 && c.phone.replace(/\D/g, '').includes(adminSearchDigits)))
+      .slice(0, 6).map((c) => ({ ...c, onOpen: () => this.setState({ adminClientQuickView: c.id, adminSearch: '' }) })) : [];
 
     // ---- Администратор · панель "Новая запись" ----
     const af = this.state.apptForm;
@@ -4997,10 +5026,12 @@ class Component extends DCLogic {
     const apptPopoverData = popoverAppt ? {
       x: popover.x, y: popover.y,
       client: popoverAppt.client, service: popoverAppt.service, master: popoverMaster.name,
-      timeLabel: fmtTime(popoverAppt.start) + '–' + fmtTime(popoverAppt.start + popoverAppt.dur) + (this.apptCleanupOf(popoverAppt) ? ' · уборка до ' + fmtTime(popoverAppt.start + popoverAppt.dur + this.apptCleanupOf(popoverAppt)) : ''),
+      timeLabel: (isDemoDay(popoverAppt) ? '' : dateLabelRu(apptDate(popoverAppt)).replace(/ \d{4} г\.?$/, '') + ', ') + fmtTime(popoverAppt.start) + '–' + fmtTime(popoverAppt.start + popoverAppt.dur) + (this.apptCleanupOf(popoverAppt) ? ' · уборка до ' + fmtTime(popoverAppt.start + popoverAppt.dur + this.apptCleanupOf(popoverAppt)) : ''),
       statusLabel: STATUS_STYLE[popoverAppt.status].label, statusBg: STATUS_STYLE[popoverAppt.status].bg, statusFg: STATUS_STYLE[popoverAppt.status].fg,
       amount: popoverAppt.price.toLocaleString('ru-RU') + ' ₽ · оплата в студии',
       isActive: popoverAppt.status === 'active',
+      // «Завершена» и «Клиент не пришёл» — только для визита, который уже начался.
+      canFinish: apptDate(popoverAppt) < ADMIN_TODAY || (isDemoDay(popoverAppt) && popoverAppt.start <= adminNowMin),
       onDone: this.adminMarkDone(popoverAppt.id),
       onReschedule: this.openRescheduleDialog(popoverAppt.id),
       onCancel: this.openCancelDialog(popoverAppt.id),
@@ -5009,7 +5040,7 @@ class Component extends DCLogic {
       isDone: popoverAppt.status === 'done',
       photosLabel: 'Фото работ' + (this.photosCountLabel('ap:' + popoverAppt.id, '') ? ' · ' + this.photosCountLabel('ap:' + popoverAppt.id, '') : ''),
       onPhotos: this.openPhotoDialog({ visitKey: 'ap:' + popoverAppt.id, masterId: popoverAppt.masterId,
-        subtitle: popoverAppt.client + ' · ' + popoverAppt.service + ' · ' + popoverMaster.name + ' · 24 сентября' }),
+        subtitle: popoverAppt.client + ' · ' + popoverAppt.service + ' · ' + popoverMaster.name + ' · ' + dateLabelRu(apptDate(popoverAppt)).replace(/ \d{4} г\.?$/, '') }),
     } : null;
 
     const dlg = this.state.adminApptDialog;
@@ -5019,12 +5050,12 @@ class Component extends DCLogic {
     const isNoShowDialog = dlg && dlg.type === 'noshow';
 
     const rf = this.state.rescheduleForm;
-    const rescheduleMasterOptions = dlgAppt ? ADMIN_MASTERS.filter((m) => !m.dayOff && (this.state.services.find((s) => s.id === dlgAppt.serviceId) || { masters: [m.id] }).masters.includes(m.id)).map((m) => {
+    const rescheduleMasterOptions = dlgAppt ? ADMIN_MASTERS.filter((m) => m.workdays.includes(parseDateStr(apptDate(dlgAppt)).getDay()) && (this.state.services.find((s) => s.id === dlgAppt.serviceId) || { masters: [m.id] }).masters.includes(m.id)).map((m) => {
       const selected = rf.newMasterId === m.id;
       return { ...m, selected, border: selected ? '#C98B84' : '#E2D8D4', bg: selected ? '#F4E6E3' : '#fff', onSelect: () => this.setRescheduleMaster(m.id) };
     }) : [];
-    const rescheduleHasConflict = dlgAppt && rf.newMasterId ? this.adminBusyOverlap(rf.newMasterId, rf.newTime, dlgAppt.dur, this.apptCleanupOf(dlgAppt), dlgAppt.id) : false;
-    const rescheduleAlts = dlgAppt && rf.newMasterId ? this.adminFreeStarts(ADMIN_MASTERS.find((m) => m.id === rf.newMasterId), dlgAppt.dur, this.apptCleanupOf(dlgAppt), dlgAppt.id, 3) : [];
+    const rescheduleHasConflict = dlgAppt && rf.newMasterId ? this.adminBusyOverlap(rf.newMasterId, rf.newTime, dlgAppt.dur, this.apptCleanupOf(dlgAppt), dlgAppt.id, apptDate(dlgAppt)) : false;
+    const rescheduleAlts = dlgAppt && rf.newMasterId ? this.adminFreeStarts(ADMIN_MASTERS.find((m) => m.id === rf.newMasterId), dlgAppt.dur, this.apptCleanupOf(dlgAppt), dlgAppt.id, 3, apptDate(dlgAppt)) : [];
     const rescheduleAltChips = rescheduleAlts.map((t) => ({ time: fmtTime(t), onClick: () => this.setRescheduleTime(t) }));
 
     const CANCEL_REASONS = [
@@ -5108,6 +5139,13 @@ class Component extends DCLogic {
     const acdRaw = isAdminClientDetail ? ADMIN_CLIENTS_TABLE.find((c) => c.id === params.id) : null;
     const acdFull = acdRaw ? ADMIN_CLIENT_FULL[acdRaw.id] || ADMIN_CLIENT_FULL.ct1 : null;
     const HIST_STATUS = { done: { label: 'Завершена', bg: '#C7D6BF', fg: '#4E6B47' }, cancelledClient: { label: 'Отменена клиентом', bg: '#F1EAE7', fg: '#6C6663' }, cancelledStudio: { label: 'Отменена студией', bg: '#F1EAE7', fg: '#6C6663' }, noShow: { label: 'Клиент не пришёл', bg: '#EFC8C6', fg: '#8F2A2A' } };
+    // Предстоящие записи клиента — из записей (как в БД), а не отдельным списком.
+    const hhmmA = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    const clientUpcoming = acdRaw ? this.state.adminAppointments
+      .filter((a) => a.client === acdRaw.name && a.status === 'active' && (apptDate(a) > ADMIN_TODAY || (isDemoDay(a) && a.start > adminNowMin)))
+      .sort((a, b) => (apptDate(a) + hhmmA(a.start) < apptDate(b) + hhmmA(b.start) ? -1 : 1))
+      .map((a) => ({ id: a.id, date: apptDate(a).split('-').reverse().join('.'), time: hhmmA(a.start), service: a.service,
+        master: (ADMIN_MASTERS.find((m) => m.id === a.masterId) || {}).name, onOpen: this.openApptPopover(a.id) })) : [];
     const adminClientDetail = acdRaw ? {
       id: acdRaw.id, name: acdRaw.name, initials: acdRaw.name.split(' ').map((w) => w[0]).join(''),
       phone: acdRaw.phone, email: acdFull.email, birthday: acdFull.birthday,
@@ -5122,7 +5160,7 @@ class Component extends DCLogic {
           subtitle: acdRaw.name + ' · ' + h.service + ' · ' + h.master + ' · ' + h.date }),
         statusLabel: HIST_STATUS[h.status].label, statusBg: HIST_STATUS[h.status].bg, statusFg: HIST_STATUS[h.status].fg, amountText: h.amount ? h.amount.toLocaleString('ru-RU') + ' ₽' : '—', isCancelled: h.status === 'cancelledClient' || h.status === 'cancelledStudio' })),
       hasHistory: acdFull.history.length > 0, hasNoHistory: acdFull.history.length === 0,
-      upcoming: acdFull.upcoming, hasUpcoming: acdFull.upcoming.length > 0, hasNoUpcoming: acdFull.upcoming.length === 0,
+      upcoming: clientUpcoming, hasUpcoming: clientUpcoming.length > 0, hasNoUpcoming: clientUpcoming.length === 0,
       notes: acdFull.notes, hasNotes: acdFull.notes.length > 0, hasNoNotes: acdFull.notes.length === 0,
       hasImportant: !!acdFull.important, hasNoImportant: !acdFull.important, important: acdFull.important,
     } : null;
@@ -5142,7 +5180,7 @@ class Component extends DCLogic {
       const st = MASTER_STATUS[m.active ? 'active' : 'inactive'];
       return { ...m, initials: m.name.split(' ').map((w) => w[0]).join(''), specialization: m.specialty, levelLabel: LEVEL_LABEL[this.masterLevel(m)],
         statusLabel: st.label, statusBg: st.bg, statusFg: st.fg,
-        todayCount: this.state.adminAppointments.filter((a) => a.masterId === m.id && ADMIN_LIVE(a)).length,
+        todayCount: this.state.adminAppointments.filter((a) => a.masterId === m.id && ADMIN_LIVE(a) && isDemoDay(a)).length,
         onOpen: this.goToMasterDetail(m.id) };
     });
 
@@ -5392,6 +5430,8 @@ class Component extends DCLogic {
       adminDateLabel: adminIsWeekView ? '22–26 сентября' : 'Чт, 24 сентября',
       adminWeekDays, adminWeekRows,
       adminSearch: this.state.adminSearch, onAdminSearch: this.setAdminSearch,
+      adminSearchResults, adminSearchHasResults: adminSearchResults.length > 0,
+      adminSearchNoResults: adminSearchQuery.length >= 2 && adminSearchResults.length === 0,
       adminSummaryTotal: adminSummary.total,
       adminSummaryFreeHours: Math.round(adminSummary.freeHours * 10) / 10,
       adminSummaryActive: adminSummary.active,
@@ -5426,7 +5466,7 @@ class Component extends DCLogic {
       closeApptDialog: this.closeApptDialog,
       dlgApptClient: dlgAppt ? dlgAppt.client : '',
       dlgApptService: dlgAppt ? dlgAppt.service : '',
-      dlgApptCurrentTimeLabel: dlgAppt ? fmtTime(dlgAppt.start) + '–' + fmtTime(dlgAppt.start + dlgAppt.dur) : '',
+      dlgApptCurrentTimeLabel: dlgAppt ? (isDemoDay(dlgAppt) ? '' : dateLabelRu(apptDate(dlgAppt)).replace(/ \d{4} г\.?$/, '') + ', ') + fmtTime(dlgAppt.start) + '–' + fmtTime(dlgAppt.start + dlgAppt.dur) : '',
       rescheduleNewTimeLabel: rf.newTime != null ? fmtTime(rf.newTime) : '',
       rescheduleMasterOptions,
       rescheduleAltChips, rescheduleHasAlts: rescheduleAltChips.length > 0,
