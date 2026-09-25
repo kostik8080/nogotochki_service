@@ -7,7 +7,7 @@ Node.js 24.7+ и TypeScript, база SQLite через встроенный м�
 ```bash
 cd server
 npm install
-cp .env.example .env     # заполнить SEED_ADMIN_PASSWORD и SEED_CLIENT_PASSWORD
+cp .env.example .env     # заполнить SEED_ADMIN_PASSWORD, SEED_MASTER_PASSWORD и SEED_CLIENT_PASSWORD
 npm run db:reset         # создать базу data/nogotochki.db с тестовыми данными
 ```
 
@@ -16,7 +16,7 @@ npm run db:reset         # создать базу data/nogotochki.db с тес�
 | Команда | Что делает |
 |---|---|
 | `npm run db:migrate` | Создает файл базы, если его нет, и применяет новые миграции |
-| `npm run db:seed` | Заполняет пустую базу тестовыми данными |
+| `npm run db:seed` | Заполняет базу тестовыми данными. Повторный запуск добавляет только то, чего нет, — без дублей |
 | `npm run db:reset` | Удаляет файл базы и создает заново: миграции + тестовые данные |
 | `npm run db:backup` | Резервная копия базы в `BACKUP_DIR` с проверкой; старые копии сверх `BACKUP_KEEP` удаляются |
 | `npm run db:check-schema` | Сверяет базу, которую строят миграции, с `docs/db-schema.md`: таблицы, поля, типы, ключи, индексы |
@@ -27,11 +27,13 @@ npm run db:reset         # создать базу data/nogotochki.db с тес�
 | `npm run prod:admin:create` | То же, что `admin:create`, из сборки `dist/` |
 | `npm run typecheck` | Проверка типов TypeScript |
 
-Тестовые входы: администратор `admin@example.com`, клиентка `maria@example.com` (пароли — из `.env`).
+Тестовые входы (пароли — из `.env`): администратор `admin@example.com`, мастер `anna@example.com`, клиентка `maria@example.com`. Ольга Белова (`+79035556677`) — клиентка без пароля, ее записал администратор по телефону.
 
 ## Миграции
 
 Файлы `src/db/migrations/NNN_description.sql` применяются по порядку номеров, каждый один раз. Примененную миграцию не правят (сервер это заметит по контрольной сумме): изменение схемы — новый файл со следующим номером.
+
+Изменить `CHECK`, внешний ключ или тип поля в SQLite можно только пересозданием таблицы. Такая миграция начинается строкой `-- migrator: foreign_keys=off`: мигратор выключает проверку внешних ключей на время миграции и проверяет все ссылки перед фиксацией. Пример — `003_master_role.sql`.
 
 ## Выкладка на сервер
 

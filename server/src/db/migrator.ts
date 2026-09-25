@@ -60,11 +60,7 @@ export function runMigrations(db: Db, dir: string = MIGRATIONS_DIR): string[] {
       continue;
     }
 
-    // Файл целиком в одной транзакции: при ошибке база остается в прежнем состоянии.
-    transaction(db, () => {
-      db.exec(sql);
-      db.prepare('INSERT INTO schema_migrations (name, checksum) VALUES (?, ?)').run(name, checksum);
-    });
+    applyMigration(db, name, sql, checksum);
     newlyApplied.push(name);
   }
 
@@ -75,4 +71,38 @@ export function runMigrations(db: Db, dir: string = MIGRATIONS_DIR): string[] {
     throw new Error(`После миграций нарушены внешние ключи: ${JSON.stringify(violations)}`);
   }
   return newlyApplied;
+}
+
+/**
+ * Пометка в тексте миграции, которая пересоздает таблицу. Так в SQLite меняют CHECK, внешние ключи
+ * и типы полей: создать новую таблицу, скопировать строки, удалить старую, переименовать новую
+ * (https://sqlite.org/lang_altertable.html#otheralter). Пока старая таблица удалена, ссылки на нее
+ * формально нарушены, поэтому проверка внешних ключей выключается на время миграции,
+ * а перед фиксацией все ссылки проверяются разом.
+ */
+const FOREIGN_KEYS_OFF = /^--\s*migrator:\s*foreign_keys\s*=\s*off\s*$/m;
+
+/** Файл целиком в одной транзакции: при ошибке база остается в прежнем состоянии. */
+function applyMigration(db: Db, name: string, sql: string, checksum: string): void {
+  const foreignKeysOff = FOREIGN_KEYS_OFF.test(sql);
+  // Внутри транзакции PRAGMA foreign_keys не действует, поэтому выключается до BEGIN.
+  if (foreignKeysOff) db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    transaction(db, () => {
+      db.exec(sql);
+      if (foreignKeysOff) {
+        const violations = db.prepare('PRAGMA foreign_key_check').all();
+        if (violations.length > 0) {
+          throw new Error(`Миграция ${name} нарушает внешние ключи: ${JSON.stringify(violations)}`);
+        }
+      }
+      db.prepare('INSERT INTO schema_migrations (name, checksum) VALUES (?, ?)').run(name, checksum);
+    });
+  } finally {
+    if (foreignKeysOff) {
+      // Миграция включает legacy_alter_table для переименования; если она упала, флаг остался бы включен.
+      db.exec('PRAGMA legacy_alter_table = OFF');
+      db.exec('PRAGMA foreign_keys = ON');
+    }
+  }
 }

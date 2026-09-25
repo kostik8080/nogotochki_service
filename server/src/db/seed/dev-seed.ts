@@ -1,23 +1,34 @@
-// Тестовые данные для разработки: студия, услуги, мастера, график, клиенты и записи
+// Тестовые данные для разработки: студия, услуги, мастера, график, пользователи и записи
 // из паспорта (docs/pasport-produkta.md) и моковых данных прототипа (Prototype/data.js).
 // Записи и блокировки считаются от сегодняшнего дня, чтобы в календаре всегда были
 // и прошедшие визиты, и предстоящие. Только для разработки: в production не запускается.
-import { hashPassword } from '../../auth/password.js';
+//
+// Скрипт повторяемый: каждая строка ищется по своему ключу (e-mail пользователя, id услуги,
+// мастер + день недели графика…) и добавляется, только если ее нет. Существующие строки не меняются.
+// Сценарные данные — история визитов, будущие записи, отпуск и выходной Елены — добавляются
+// один раз, пока у тестовой клиентки нет записей: они привязаны к дате первого запуска,
+// и повторный запуск в другой день сдвинул бы их и наложил на прежние.
 import type { SQLInputValue } from 'node:sqlite';
+import { hashPassword } from '../../auth/password.js';
 import { type Db, transaction } from '../connection.js';
 
 export interface SeedOptions {
   adminPassword: string;
+  masterPassword: string;
   clientPassword: string;
   /** Текущий момент; параметр нужен, чтобы тесты могли зафиксировать дату. */
   now?: Date;
 }
 
+/** Сколько строк каждой таблицы добавлено и сколько уже было. */
+export interface SeedReport {
+  tables: Map<string, { created: number; existing: number }>;
+  /** Добавлены ли сценарные данные в этот запуск. */
+  scenarioCreated: boolean;
+}
+
 const TIMEZONE = 'Europe/Moscow';
 const HORIZON_DAYS = 90;
-const ADMIN_ID = 1;
-const MARIA_ID = 2;
-const OLGA_ID = 3;
 
 // ---------------------------------------------------------------------------
 // Справочные данные
@@ -161,20 +172,50 @@ const addMinutes = (d: Date, min: number) => new Date(d.getTime() + min * 60_000
 // Заполнение
 // ---------------------------------------------------------------------------
 
-export function seedDevData(db: Db, options: SeedOptions): void {
+export function seedDevData(db: Db, options: SeedOptions): SeedReport {
   const now = options.now ?? new Date();
   const today = studioDate(now);
+  const report: SeedReport = { tables: new Map(), scenarioCreated: false };
 
-  const { usersCount } = db.prepare('SELECT count(*) AS usersCount FROM users').get() as { usersCount: number };
-  if (usersCount > 0) {
-    throw new Error('В базе уже есть данные. Чтобы пересоздать базу с тестовыми данными: npm run db:reset');
-  }
+  const count = (table: string, created: boolean) => {
+    const stat = report.tables.get(table) ?? { created: 0, existing: 0 };
+    stat[created ? 'created' : 'existing']++;
+    report.tables.set(table, stat);
+  };
 
   // Пустое значение передается как null: node:sqlite не принимает undefined.
-  const insert = (table: string, row: Record<string, SQLInputValue>) => {
+  const insert = (table: string, row: Record<string, SQLInputValue>): number => {
     const cols = Object.keys(row);
     const sql = `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((c) => '@' + c).join(', ')})`;
-    return Number(db.prepare(sql).run(row).lastInsertRowid);
+    const id = Number(db.prepare(sql).run(row).lastInsertRowid);
+    count(table, true);
+    return id;
+  };
+
+  /**
+   * Добавляет строку, если строки с такими же значениями полей `keys` еще нет; возвращает rowid
+   * (у таблиц с INTEGER PRIMARY KEY это id). Проверка идет запросом, а не INSERT OR IGNORE:
+   * триггеры BEFORE INSERT срабатывают до проверки уникальности и отклонили бы повтор с ошибкой.
+   */
+  const ensure = (table: string, row: Record<string, SQLInputValue>, keys: string[]): number => {
+    const where = keys.map((k) => `${k} = @${k}`).join(' AND ');
+    const params = Object.fromEntries(keys.map((k) => [k, row[k]!]));
+    const found = db.prepare(`SELECT rowid AS id FROM ${table} WHERE ${where}`).get(params) as { id: number } | undefined;
+    if (found) {
+      count(table, false);
+      return Number(found.id);
+    }
+    return insert(table, row);
+  };
+
+  /** Пользователь по e-mail или телефону. Строка (и хеш пароля) собирается, только если пользователя нет. */
+  const ensureUser = (key: 'email' | 'phone', value: string, row: () => Record<string, SQLInputValue>): number => {
+    const found = db.prepare(`SELECT id FROM users WHERE ${key} = ?`).get(value) as { id: number } | undefined;
+    if (found) {
+      count('users', false);
+      return found.id;
+    }
+    return insert('users', { [key]: value, ...row() });
   };
 
   transaction(db, () => {
@@ -187,91 +228,117 @@ export function seedDevData(db: Db, options: SeedOptions): void {
     `).run('https://yandex.ru/maps/?text=' + encodeURIComponent('Москва, ул. Цветочная, 12')).changes;
     if (settingsUpdated !== 1) throw new Error('Нет строки настроек студии: примените миграции (npm run db:migrate)');
 
-    // --- Пользователи ---
+    // --- Пользователи: по одному на каждую роль и клиентка без учетной записи ---
+    // Пароль хешируется так же, как при настоящей регистрации (argon2id), и только для нового пользователя.
     const consentAt = iso(addMinutes(now, -60 * 24 * 90));
-    insert('users', {
-      id: ADMIN_ID, role: 'admin', name: 'Администратор студии', email: 'admin@example.com',
+    const adminId = ensureUser('email', 'admin@example.com', () => ({
+      role: 'admin', name: 'Администратор студии',
       password_hash: hashPassword(options.adminPassword), email_verified_at: consentAt,
-    });
+    }));
+    // Учетная запись мастера Анны Ковалевой (роль «мастер», миграция 003).
+    const annaUserId = ensureUser('email', 'anna@example.com', () => ({
+      role: 'master', name: 'Анна Ковалева',
+      password_hash: hashPassword(options.masterPassword), email_verified_at: consentAt,
+    }));
     // Тестовая клиентка прототипа: зарегистрировалась сама, дала согласие на обработку данных.
-    insert('users', {
-      id: MARIA_ID, role: 'client', name: 'Мария Кузнецова', phone: '+79112223344', email: 'maria@example.com',
+    const mariaId = ensureUser('email', 'maria@example.com', () => ({
+      role: 'client', name: 'Мария Кузнецова', phone: '+79112223344',
       password_hash: hashPassword(options.clientPassword), phone_verified_at: consentAt,
       pd_consent_at: consentAt, pd_consent_version: '2026-09-01', created_at: consentAt,
-    });
+    }));
     // Сценарий 16: клиентку записал администратор по телефону, учетной записи и пароля у нее нет.
-    insert('users', { id: OLGA_ID, role: 'client', name: 'Ольга Белова', phone: '+79035556677' });
+    const olgaId = ensureUser('phone', '+79035556677', () => ({ role: 'client', name: 'Ольга Белова' }));
 
-    insert('client_profiles', {
-      user_id: MARIA_ID, birth_date: '1994-05-12', acquisition_source: 'Инстаграм студии',
+    ensure('client_profiles', {
+      user_id: mariaId, birth_date: '1994-05-12', acquisition_source: 'Инстаграм студии',
       // Без медицинских сведений: для них нужно отдельное согласие (решение 22).
       important_note: 'Предпочитает короткую форму ногтей',
-    });
+    }, ['user_id']);
 
     for (const d of studioDays) {
-      insert('studio_day_overrides', {
-        work_date: d.date, is_open: d.isOpen, open_time: d.open, close_time: d.close, reason: d.reason, created_by: ADMIN_ID,
-      });
+      ensure('studio_day_overrides', {
+        work_date: d.date, is_open: d.isOpen, open_time: d.open, close_time: d.close, reason: d.reason, created_by: adminId,
+      }, ['work_date']);
     }
 
     // --- Каталог ---
-    categories.forEach((c, i) => insert('service_categories', { id: c.id, name: c.name, sort_order: i + 1 }));
-    services.forEach((s, i) => insert('services', {
+    categories.forEach((c, i) => ensure('service_categories', { id: c.id, name: c.name, sort_order: i + 1 }, ['id']));
+    services.forEach((s, i) => ensure('services', {
       id: s.id, category_id: s.categoryId, kind: s.addon ? 'addon' : 'main', name: s.name, description: s.description,
       duration_min: s.durationMin, cleanup_min: s.cleanupMin, price_master_rub: s.priceMaster, price_top_rub: s.priceTop,
       price_unit: s.addon ? 'за 2 ногтя' : null, max_quantity: s.addon ? 5 : 1,
       is_featured: s.featured ? 1 : 0, sort_order: i + 1,
-    }));
+    }, ['id']));
     for (const mainId of designMainServiceIds) {
-      insert('service_addon_rules', { addon_service_id: DESIGN_ID, main_service_id: mainId });
+      ensure('service_addon_rules', { addon_service_id: DESIGN_ID, main_service_id: mainId }, ['addon_service_id', 'main_service_id']);
     }
-    insert('service_incompatibilities', {
+    ensure('service_incompatibilities', {
       service_a_id: 1, service_b_id: 8,
       reason: 'Маникюр с покрытием и наращивание ногтей выполняются на одних и тех же ногтях — выберите одну из услуг.',
-    });
+    }, ['service_a_id', 'service_b_id']);
 
     // --- Мастера и график ---
     masters.forEach((m, i) => {
-      insert('masters', {
+      ensure('masters', {
         id: m.id, name: m.name, level: m.level, specialty: m.specialty,
         experience_years: m.experienceYears, bio: m.bio, sort_order: i + 1,
-      });
-      for (const serviceId of m.serviceIds) insert('master_services', { master_id: m.id, service_id: serviceId });
+      }, ['id']);
+      for (const serviceId of m.serviceIds) {
+        ensure('master_services', { master_id: m.id, service_id: serviceId }, ['master_id', 'service_id']);
+      }
       // Прежний график закрывается днем накануне нового: периоды не пересекаются (триггер 10.6).
       m.schedules.forEach((schedule, j) => {
         const next = m.schedules[j + 1];
         for (const weekday of schedule.weekdays) {
-          insert('master_weekly_hours', {
+          ensure('master_weekly_hours', {
             master_id: m.id, weekday, valid_from: schedule.validFrom, valid_to: next ? addDays(next.validFrom, -1) : null,
             start_time: schedule.start, end_time: schedule.end,
-          });
+          }, ['master_id', 'weekday', 'valid_from']);
         }
       });
     });
+    // Профиль Анны связывается с ее учетной записью, если связи еще нет.
+    db.prepare('UPDATE masters SET user_id = ? WHERE id = 1 AND user_id IS NULL').run(annaUserId);
 
-    // Заметка со слов мастера: у мастеров нет учетных записей, вносит администратор.
-    insert('client_notes', { client_id: MARIA_ID, author_id: ADMIN_ID, master_id: 1, text: 'Любит нюдовые оттенки' });
+    // Заметка со слов мастера: вносит администратор, мастер указывается отдельно.
+    ensure('client_notes', { client_id: mariaId, author_id: adminId, master_id: 1, text: 'Любит нюдовые оттенки' }, ['client_id', 'text']);
+    // Фото в галерею без визита. Файлов на диске нет, в базе только пути.
+    ensure('work_photos', {
+      master_id: 1, service_id: 1, file_path: 'photos/seed/nude-manicure.jpg',
+      title: 'Нюдовый маникюр', is_published: 1, sort_order: 2, uploaded_by: adminId,
+    }, ['file_path']);
 
-    // Елена выходит в ближайшую среду, хотя по графику работает вт, чт, сб (как в прототипе).
-    insert('master_day_overrides', {
-      master_id: 3, work_date: findWeekday(today, 3, 1), is_working: 1, start_time: '12:00', end_time: '19:00', created_by: ADMIN_ID,
-    });
-
-    // --- Блокировки (сценарии 1, 3, 8) ---
+    // --- Регулярные блокировки (сценарии 1 и 3) на горизонт записи ---
+    // Ключ — мастер, тип и начало: повторный запуск в другой день дополнит новые даты, не повторяя старые.
     const block = (masterId: number, type: string, startsAt: Date, endsAt: Date, comment: string | null = null) =>
-      insert('time_blocks', {
-        master_id: masterId, block_type: type, starts_at: iso(startsAt), ends_at: iso(endsAt), comment, created_by: ADMIN_ID,
-      });
+      ensure('time_blocks', {
+        master_id: masterId, block_type: type, starts_at: iso(startsAt), ends_at: iso(endsAt), comment, created_by: adminId,
+      }, ['master_id', 'block_type', 'starts_at']);
     for (let i = 0; i < HORIZON_DAYS; i++) {
       const date = addDays(today, i);
       if (isoWeekday(date) === 4) block(1, 'lunch', studioTime(date, '13:00'), studioTime(date, '14:00'), 'Обед');
       if (isoWeekday(date) === 5) block(2, 'personal', studioTime(date, '15:00'), studioTime(date, '17:00'), 'Личное время');
     }
-    const elenaDayOff = findWeekday(today, 6, 0);
-    block(3, 'day_off', studioTime(elenaDayOff, '00:00'), studioTime(addDays(elenaDayOff, 1), '00:00'));
-    block(3, 'vacation', studioTime(addDays(today, 10), '00:00'), studioTime(addDays(today, 17), '00:00'), 'Отпуск');
 
-    // --- Записи ---
+    // --- Сценарные данные: только в первый запуск ---
+    if (db.prepare('SELECT 1 FROM bookings WHERE client_id = ?').get(mariaId)) return;
+    report.scenarioCreated = true;
+
+    // Елена выходит в ближайшую среду, хотя по графику работает вт, чт, сб (как в прототипе).
+    insert('master_day_overrides', {
+      master_id: 3, work_date: findWeekday(today, 3, 1), is_working: 1, start_time: '12:00', end_time: '19:00', created_by: adminId,
+    });
+    // Сценарии 3 и 8: выходной Елены в ближайшую субботу и отпуск на неделю.
+    const elenaDayOff = findWeekday(today, 6, 0);
+    insert('time_blocks', {
+      master_id: 3, block_type: 'day_off', starts_at: iso(studioTime(elenaDayOff, '00:00')),
+      ends_at: iso(studioTime(addDays(elenaDayOff, 1), '00:00')), comment: null, created_by: adminId,
+    });
+    insert('time_blocks', {
+      master_id: 3, block_type: 'vacation', starts_at: iso(studioTime(addDays(today, 10), '00:00')),
+      ends_at: iso(studioTime(addDays(today, 17), '00:00')), comment: 'Отпуск', created_by: adminId,
+    });
+
     const serviceById = new Map(services.map((s) => [s.id, s]));
     const masterById = new Map(masters.map((m) => [m.id, m]));
 
@@ -322,7 +389,7 @@ export function seedDevData(db: Db, options: SeedOptions): void {
         } else {
           at = iso(endsAt);
           insert('booking_events', {
-            booking_id: bookingId, event_type: 'status_changed', actor_id: ADMIN_ID,
+            booking_id: bookingId, event_type: 'status_changed', actor_id: adminId,
             old_status: 'active', new_status: o.status, created_at: at,
           });
         }
@@ -334,37 +401,37 @@ export function seedDevData(db: Db, options: SeedOptions): void {
 
     // Прошедшие визиты Марии.
     addBooking({
-      clientId: MARIA_ID, masterId: 3, date: findWeekday(today, 4, -6, -1), time: '11:00',
+      clientId: mariaId, masterId: 3, date: findWeekday(today, 4, -6, -1), time: '11:00',
       items: [{ serviceId: 7 }], outcome: { status: 'completed' },
     });
     const lamination = addBooking({
-      clientId: MARIA_ID, masterId: 2, date: findWeekday(today, 3, -21, -1), time: '12:00',
+      clientId: mariaId, masterId: 2, date: findWeekday(today, 3, -21, -1), time: '12:00',
       items: [{ serviceId: 12 }], outcome: { status: 'completed' },
     });
     addBooking({
-      clientId: MARIA_ID, masterId: 2, date: findWeekday(today, 5, -49, -1), time: '11:00',
+      clientId: mariaId, masterId: 2, date: findWeekday(today, 5, -49, -1), time: '11:00',
       items: [{ serviceId: 13 }], outcome: { status: 'no_show' },
     });
     addBooking({
-      clientId: MARIA_ID, masterId: 3, date: findWeekday(today, 2, -12, -1), time: '15:00',
+      clientId: mariaId, masterId: 3, date: findWeekday(today, 2, -12, -1), time: '15:00',
       items: [{ serviceId: 2 }],
-      outcome: { status: 'cancelled_by_client', actorId: MARIA_ID, reason: 'Изменились планы' },
+      outcome: { status: 'cancelled_by_client', actorId: mariaId, reason: 'Изменились планы' },
     });
     addBooking({
-      clientId: MARIA_ID, masterId: 1, date: findWeekday(today, 3, -30, -1), time: '14:00',
+      clientId: mariaId, masterId: 1, date: findWeekday(today, 3, -30, -1), time: '14:00',
       items: [{ serviceId: 5 }],
-      outcome: { status: 'cancelled_by_studio', actorId: ADMIN_ID, reason: 'Мастер заболела' },
+      outcome: { status: 'cancelled_by_studio', actorId: adminId, reason: 'Мастер заболела' },
     });
 
     // Предстоящие визиты. Сценарий 1: маникюр у Анны, клиентка выбрала «Любой свободный мастер».
     const manicureDate = findWeekday(today, 3, 2);
     const manicure = addBooking({
-      clientId: MARIA_ID, masterId: 1, date: manicureDate, time: '10:00', isAnyMaster: true,
+      clientId: mariaId, masterId: 1, date: manicureDate, time: '10:00', isAnyMaster: true,
       items: [{ serviceId: 1 }], comment: 'Пожалуйста, покороче форму',
     });
     // Сценарий 5: клиентка сама перенесла эту запись с 12:00 на 10:00.
     insert('booking_events', {
-      booking_id: manicure.bookingId, event_type: 'rescheduled', actor_id: MARIA_ID,
+      booking_id: manicure.bookingId, event_type: 'rescheduled', actor_id: mariaId,
       old_master_id: 1, new_master_id: 1,
       old_starts_at: iso(studioTime(manicureDate, '12:00')), new_starts_at: iso(studioTime(manicureDate, '10:00')),
       reason: 'Удобнее утром',
@@ -373,23 +440,20 @@ export function seedDevData(db: Db, options: SeedOptions): void {
 
     // Сценарий 2: наращивание с дизайном на четыре ногтя: 2800 + 2 × 300 = 3400 ₽, 180 минут.
     addBooking({
-      clientId: MARIA_ID, masterId: 1, date: findWeekday(today, 5, 2), time: '11:00',
+      clientId: mariaId, masterId: 1, date: findWeekday(today, 5, 2), time: '11:00',
       items: [{ serviceId: 8 }, { serviceId: DESIGN_ID, quantity: 2 }],
     });
     // Сценарий 16: администратор записал Ольгу по звонку.
     addBooking({
-      clientId: OLGA_ID, masterId: 1, date: findWeekday(today, 4, 2), time: '10:00', createdBy: ADMIN_ID,
+      clientId: olgaId, masterId: 1, date: findWeekday(today, 4, 2), time: '10:00', createdBy: adminId,
       items: [{ serviceId: 2 }],
     });
 
-    // --- Фото работ (сценарий 13). Файлов на диске нет, в базе только пути. ---
+    // Фото с визита (сценарий 13), клиентка разрешила публикацию.
     insert('work_photos', {
       booking_item_id: lamination.itemIds[0]!, file_path: 'photos/seed/brows-lamination.jpg',
-      title: 'Ламинирование бровей', is_published: 1, publish_consent_at: iso(now), sort_order: 1, uploaded_by: ADMIN_ID,
-    });
-    insert('work_photos', {
-      master_id: 1, service_id: 1, file_path: 'photos/seed/nude-manicure.jpg',
-      title: 'Нюдовый маникюр', is_published: 1, sort_order: 2, uploaded_by: ADMIN_ID,
+      title: 'Ламинирование бровей', is_published: 1, publish_consent_at: iso(now), sort_order: 1, uploaded_by: adminId,
     });
   });
+  return report;
 }

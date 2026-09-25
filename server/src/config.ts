@@ -47,6 +47,7 @@ export const config = {
   },
   seed: {
     adminPassword: env('SEED_ADMIN_PASSWORD'),
+    masterPassword: env('SEED_MASTER_PASSWORD'),
     clientPassword: env('SEED_CLIENT_PASSWORD'),
   },
 };
@@ -63,8 +64,8 @@ function checkProductionConfig(): void {
     errors.push('BACKUP_DIR совпадает с папкой базы: храните копии в отдельной папке');
   }
 
-  if (config.seed.adminPassword || config.seed.clientPassword) {
-    errors.push('SEED_ADMIN_PASSWORD и SEED_CLIENT_PASSWORD нужны только для тестовых данных — уберите их из окружения production');
+  if (config.seed.adminPassword || config.seed.masterPassword || config.seed.clientPassword) {
+    errors.push('SEED_ADMIN_PASSWORD, SEED_MASTER_PASSWORD и SEED_CLIENT_PASSWORD нужны только для тестовых данных — уберите их из окружения production');
   }
 
   if (errors.length > 0) {
