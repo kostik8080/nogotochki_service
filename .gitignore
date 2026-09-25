@@ -182,3 +182,18 @@ backups/
 *.sqlite
 *.sqlite3
 *.db
+
+# ---- Бэкенд (server/) ----
+
+# Файл базы SQLite и его служебные файлы (журнал, режим WAL): в базе персональные данные клиентов.
+server/data/
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Переменные окружения с паролями и ключами. Шаблон .env.example остается в репозитории.
+server/.env
+!server/.env.example
+
+# Будущие фото работ (UPLOADS_DIR)
+server/uploads/

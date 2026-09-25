@@ -1,0 +1,67 @@
+// Применение миграций: SQL-файлы из папки migrations/ выполняются по порядку имен,
+// каждый один раз. Какие уже применены, база помнит в таблице schema_migrations.
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import type { Db } from './connection.js';
+
+export const MIGRATIONS_DIR = path.join(import.meta.dirname, 'migrations');
+
+/** Имя файла миграции: номер из трех цифр и описание, например 001_initial_schema.sql. */
+const FILE_PATTERN = /^\d{3}_[a-z0-9_]+\.sql$/;
+
+interface AppliedMigration {
+  name: string;
+  checksum: string;
+}
+
+/** Применяет новые миграции и возвращает их имена. */
+export function runMigrations(db: Db, dir: string = MIGRATIONS_DIR): string[] {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      name       TEXT PRIMARY KEY,
+      checksum   TEXT NOT NULL,
+      applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    ) STRICT;
+  `);
+
+  const applied = new Map(
+    (db.prepare('SELECT name, checksum FROM schema_migrations').all() as AppliedMigration[])
+      .map((m) => [m.name, m.checksum]),
+  );
+  const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+  const newlyApplied: string[] = [];
+
+  for (const name of files) {
+    if (!FILE_PATTERN.test(name)) {
+      throw new Error(`Миграция ${name}: имя должно быть вида 001_description.sql`);
+    }
+    const sql = readFileSync(path.join(dir, name), 'utf8');
+    const checksum = createHash('sha256').update(sql).digest('hex');
+
+    const appliedChecksum = applied.get(name);
+    if (appliedChecksum !== undefined) {
+      // Примененную миграцию нельзя править: база уже построена по старому тексту.
+      // Изменение схемы оформляется новым файлом со следующим номером.
+      if (appliedChecksum !== checksum) {
+        throw new Error(`Миграция ${name} изменена после применения. Добавьте изменения новой миграцией.`);
+      }
+      continue;
+    }
+
+    // Файл целиком в одной транзакции: при ошибке база остается в прежнем состоянии.
+    db.transaction(() => {
+      db.exec(sql);
+      db.prepare('INSERT INTO schema_migrations (name, checksum) VALUES (?, ?)').run(name, checksum);
+    }).immediate();
+    newlyApplied.push(name);
+  }
+
+  // Контрольная проверка всех ссылок: в SQLite внешний ключ меняют пересозданием таблицы,
+  // и ошибка в такой миграции могла оставить строки со ссылками в никуда.
+  const violations = db.pragma('foreign_key_check') as unknown[];
+  if (violations.length > 0) {
+    throw new Error(`После миграций нарушены внешние ключи: ${JSON.stringify(violations)}`);
+  }
+  return newlyApplied;
+}
