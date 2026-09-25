@@ -480,7 +480,6 @@
             <div style="font-size:14px; font-variant-numeric:tabular-nums;">{{ successDateLabel }}, {{ successTimeRange }}</div>
             <div style="font-size:13px; color:rgba(251,247,245,0.75); margin-top:4px;">{{ successServices }} · {{ successMaster }}</div>
           </div>
-          <div style="font-size:13px; color:#6B615D; text-align:center; margin-bottom:20px;">Напомним о визите за сутки по SMS</div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
             <button onClick="{{ addToCalendar }}" style="height:44px; border-radius:4px; border:1px solid #C98B84; background:transparent; font-weight:700; font-size:12px; text-transform:uppercase; cursor:pointer;">Добавить в календарь</button>
             <button onClick="{{ showDirections }}" style="height:44px; border-radius:4px; border:1px solid #C98B84; background:transparent; font-weight:700; font-size:12px; text-transform:uppercase; cursor:pointer;">Как добраться</button>
@@ -1054,11 +1053,19 @@
             <button onClick="{{ bookWithMasterClick }}" style="height:44px; padding:0 22px; border-radius:4px; border:none; background:#C98B84; color:#0F0B0C; font-weight:700; font-size:13px; text-transform:uppercase; cursor:pointer;">Записаться</button>
           </div>
 
-          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:24px;">
-            <sc-for list="{{ galleryPlaceholders }}" as="g" hint-placeholder-count="3">
-              <div style="height:100px; border-radius:8px; background-image:repeating-linear-gradient(135deg, #B06F68 0 8px, #C98B84 8px 16px);"></div>
-            </sc-for>
-          </div>
+          <sc-if value="{{ profileHasWorks }}" hint-placeholder-val="{{ true }}">
+            <div style="font-weight:700; font-size:14px; margin-bottom:10px;">Работы мастера</div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:24px;">
+              <sc-for list="{{ profileWorks }}" as="g" hint-placeholder-count="3">
+                <div style="position:relative; height:110px; border-radius:8px; overflow:hidden; background-image:repeating-linear-gradient(135deg, #B06F68 0 8px, #C98B84 8px 16px);">
+                  <sc-if value="{{ g.hasUrl }}" hint-placeholder-val="{{ false }}">
+                    <div role="img" aria-label="{{ g.title }}" style="position:absolute; inset:0; background-image:{{ g.bgImage }}; background-size:cover; background-position:center;"></div>
+                  </sc-if>
+                  <div style="position:absolute; left:0; right:0; bottom:0; padding:6px 8px; background:linear-gradient(transparent, rgba(15,11,12,0.6)); color:#fff; font-size:11px; font-weight:600;">{{ g.title }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
 
           <div style="font-weight:700; font-size:14px; margin-bottom:10px;">Услуги мастера</div>
           <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:24px;">
@@ -1388,6 +1395,9 @@
                         <sc-if value="{{ a.newClient }}" hint-placeholder-val="{{ false }}"><i data-lucide="sparkle" style="width:10px; height:10px; flex-shrink:0;"></i></sc-if>
                       </div>
                       <div style="font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ a.service }}</div>
+                      <sc-if value="{{ a.hasCleanup }}" hint-placeholder-val="{{ false }}">
+                        <div title="Перерыв на уборку и дезинфекцию" style="position:absolute; left:0; right:0; bottom:0; height:{{ a.cleanupHeight }}px; background-image:repeating-linear-gradient(45deg, #F1EAE7, #F1EAE7 4px, #FBF7F5 4px, #FBF7F5 8px); color:#857B77; font-size:9px; line-height:{{ a.cleanupHeight }}px; padding-left:6px; overflow:hidden; white-space:nowrap;">уборка {{ a.cleanup }} мин</div>
+                      </sc-if>
                     </div>
                   </sc-for>
                 </div>
@@ -1559,10 +1569,67 @@
               <button onClick="{{ apptPopoverData.onDone }}" style="height:36px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-weight:700; font-size:12px; cursor:pointer;">Визит завершён</button>
               <button onClick="{{ apptPopoverData.onNoShow }}" style="height:36px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-weight:700; font-size:12px; cursor:pointer;">Отметить неявку</button>
             </sc-if>
+            <sc-if value="{{ apptPopoverData.isDone }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ apptPopoverData.onPhotos }}" style="height:36px; border-radius:4px; border:1px solid #C98B84; background:#fff; font-weight:700; font-size:12px; cursor:pointer;">{{ apptPopoverData.photosLabel }}</button>
+            </sc-if>
             <button onClick="{{ apptPopoverData.onOpenClient }}" style="height:36px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-weight:700; font-size:12px; cursor:pointer;">Открыть карточку клиента</button>
             <sc-if value="{{ apptPopoverData.isActive }}" hint-placeholder-val="{{ true }}">
               <button onClick="{{ apptPopoverData.onCancel }}" style="height:36px; border-radius:4px; border:1px solid #C13B3B; background:#fff; color:#C13B3B; font-weight:700; font-size:12px; cursor:pointer;">Отменить</button>
             </sc-if>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+
+    <!-- ДИАЛОГ: ФОТО РАБОТ (A-12) -->
+    <sc-if value="{{ photoDialogOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ closePhotoDialog }}" style="position:fixed; inset:0; background:rgba(15,11,12,0.45); z-index:40; display:flex; align-items:center; justify-content:center; padding:20px;">
+        <div onClick="{{ stopProp }}" style="width:660px; max-width:100%; max-height:90vh; overflow-y:auto; background:#fff; border-radius:14px; padding:24px; box-sizing:border-box;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:4px;">
+            <div style="font-family:'Playfair Display',serif; text-transform:uppercase; font-size:18px;">Фото работ</div>
+            <button onClick="{{ closePhotoDialog }}" style="width:32px; height:32px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; cursor:pointer;">✕</button>
+          </div>
+          <div style="font-size:12px; color:#857B77; margin-bottom:16px;">{{ photoDialog.subtitle }}</div>
+
+          <label style="display:flex; align-items:center; justify-content:center; gap:8px; height:56px; border:1.5px dashed #C98B84; border-radius:8px; background:#FBF7F5; color:#8E4B48; font-weight:700; font-size:13px; cursor:pointer; margin-bottom:16px;">
+            + Загрузить фото
+            <input type="file" accept="image/*" multiple onChange="{{ onPhotoFiles }}" style="display:none;"/>
+          </label>
+
+          <sc-if value="{{ photoDialogEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px; color:#857B77; text-align:center; padding:12px 0 20px;">Фото пока нет. Загрузите снимки работы — они сохранятся в истории визитов клиента.</div>
+          </sc-if>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:14px;">
+            <sc-for list="{{ photoDialogPhotos }}" as="ph" hint-placeholder-count="2">
+              <div style="border:1px solid #E2D8D4; border-radius:10px; padding:10px;">
+                <sc-if value="{{ ph.hasUrl }}" hint-placeholder-val="{{ false }}">
+                  <div role="img" aria-label="{{ ph.title }}" style="height:140px; border-radius:6px; margin-bottom:8px; background-image:{{ ph.bgImage }}; background-size:cover; background-position:center;"></div>
+                </sc-if>
+                <sc-if value="{{ ph.noUrl }}" hint-placeholder-val="{{ true }}">
+                  <div style="height:140px; border-radius:6px; margin-bottom:8px; background-image:repeating-linear-gradient(135deg, #B06F68 0 8px, #C98B84 8px 16px);"></div>
+                </sc-if>
+                <input value="{{ ph.title }}" onChange="{{ ph.onTitle }}" placeholder="Подпись для галереи" style="width:100%; height:34px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 10px; font-size:12px; font-family:'Manrope',sans-serif; margin-bottom:8px;"/>
+                <label onClick="{{ ph.onToggleConsent }}" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:12px; margin-bottom:6px;">
+                  <span style="width:18px; height:18px; flex-shrink:0; border-radius:4px; border:1.5px solid {{ ph.consentBorder }}; background:{{ ph.consentBg }}; display:flex; align-items:center; justify-content:center; font-size:11px;">{{ ph.consentMark }}</span>
+                  Клиент разрешил публикацию
+                </label>
+                <label onClick="{{ ph.onTogglePublish }}" title="{{ ph.publishHint }}" style="display:flex; align-items:center; gap:8px; cursor:{{ ph.publishCursor }}; font-size:12px; color:{{ ph.publishFg }}; margin-bottom:6px;">
+                  <span style="width:18px; height:18px; flex-shrink:0; border-radius:4px; border:1.5px solid {{ ph.publishBorder }}; background:{{ ph.publishBg }}; display:flex; align-items:center; justify-content:center; font-size:11px;">{{ ph.publishMark }}</span>
+                  В галерее «Наши работы»
+                </label>
+                <sc-if value="{{ ph.showConsentHint }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:11px; color:#857B77; margin-bottom:6px;">Публикация — только с согласия клиента.</div>
+                </sc-if>
+                <button onClick="{{ ph.onRemove }}" style="height:28px; padding:0 10px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-size:11px; font-weight:700; color:#C13B3B; cursor:pointer;">Удалить</button>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:18px; flex-wrap:wrap;">
+            <div style="font-size:12px; color:#857B77;">В галерее: {{ photoDialogPublishedCount }} · <a href="{{ photoDialog.profileHref }}" onClick="{{ closePhotoDialog }}" style="font-weight:700;">Профиль мастера →</a></div>
+            <button onClick="{{ closePhotoDialog }}" style="height:42px; padding:0 22px; border-radius:4px; border:none; background:#C98B84; color:#0F0B0C; font-weight:700; font-size:13px; cursor:pointer;">Готово</button>
           </div>
         </div>
       </div>
@@ -1869,8 +1936,8 @@
                         <sc-if value="{{ h.isCancelled }}" hint-placeholder-val="{{ false }}">
                           <span style="font-size:12px; color:#857B77;">Причина: {{ h.cancelReason }}</span>
                         </sc-if>
-                        <sc-if value="{{ h.isCancelled }}" hint-placeholder-val="{{ true }}">
-                          <span style="font-size:12px; color:#857B77;"><sc-if value="{{ h.photos }}" hint-placeholder-val="{{ false }}">{{ h.photos }} фото · </sc-if></span>
+                        <sc-if value="{{ h.canPhotos }}" hint-placeholder-val="{{ false }}">
+                          <span onClick="{{ h.onPhotos }}" style="font-size:12px; color:#8E4B48; font-weight:700; cursor:pointer;">{{ h.photosLabel }}</span>
                         </sc-if>
                         <span style="font-weight:700; font-size:13px;">{{ h.amountText }}</span>
                       </div>
@@ -1971,7 +2038,7 @@
                   <div style="width:48px; height:48px; border-radius:50%; background:#E3BDB7; color:#8E4B48; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; flex-shrink:0;">{{ m.initials }}</div>
                   <div style="min-width:0;">
                     <div style="font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ m.name }}</div>
-                    <div style="font-size:12px; color:#857B77; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ m.specialization }}</div>
+                    <div style="font-size:12px; color:#857B77; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ m.specialization }} · {{ m.levelLabel }}</div>
                   </div>
                 </div>
                 <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -1999,7 +2066,7 @@
         <div style="flex:1; min-width:0; padding:20px 24px;">
           <button onClick="{{ goBackToMastersList }}" style="height:36px; padding:0 14px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-size:12px; font-weight:700; cursor:pointer; margin-bottom:14px;">← Мастера</button>
           <div style="font-family:'Playfair Display',serif; text-transform:uppercase; font-size:24px; margin-bottom:16px;">График смен · сентябрь</div>
-          <div style="font-size:12px; color:#857B77; margin-bottom:14px;">Клик по ячейке переключает рабочий день / выходной мастера. Воскресенье и понедельник — студия закрыта.</div>
+          <div style="font-size:12px; color:#857B77; margin-bottom:14px;">Клик по ячейке переключает рабочий день / выходной мастера. Воскресенье и понедельник — студия закрыта. Праздники и другие особые дни студии — ниже.</div>
 
           <div style="overflow-x:auto; background:#fff; border:1px solid #E2D8D4; border-radius:8px;">
             <sc-for list="{{ scheduleRows }}" as="r" hint-placeholder-count="6">
@@ -2007,7 +2074,7 @@
                 <div style="width:150px; flex-shrink:0; font-weight:600; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ r.name }}</div>
                 <div style="display:flex; gap:2px;">
                   <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="28">
-                    <div onClick="{{ c.onClick }}" title="{{ c.day }}" style="width:18px; height:24px; border-radius:2px; cursor:pointer; background:{{ c.cellBg }};"></div>
+                    <div onClick="{{ c.onClick }}" title="{{ c.title }}" style="width:18px; height:24px; border-radius:2px; cursor:{{ c.cursor }}; background:{{ c.cellBg }}; box-shadow:inset 0 0 0 {{ c.ringWidth }} #C99A3F;"></div>
                   </sc-for>
                 </div>
               </div>
@@ -2017,6 +2084,61 @@
             <span style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; border-radius:2px; background:#C7D6BF; display:inline-block;"></span>Рабочий день</span>
             <span style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; border-radius:2px; background:#F1EAE7; display:inline-block;"></span>Выходной</span>
             <span style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; border-radius:2px; background:#FBF7F5; border:1px solid #E2D8D4; box-sizing:border-box; display:inline-block;"></span>Студия закрыта</span>
+            <span style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; border-radius:2px; background:#fff; box-shadow:inset 0 0 0 1.5px #C99A3F; display:inline-block;"></span>Особый день студии</span>
+          </div>
+
+          <!-- ОСОБЫЕ ДНИ СТУДИИ -->
+          <div style="margin-top:28px; display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start;">
+            <div style="flex:1.3; min-width:360px; background:#fff; border:1px solid #E2D8D4; border-radius:10px; padding:18px;">
+              <div style="font-family:'Playfair Display',serif; text-transform:uppercase; font-size:18px; margin-bottom:4px;">Особые дни студии</div>
+              <div style="font-size:12px; color:#857B77; margin-bottom:14px; line-height:1.5;">Праздники, санитарные, сокращённые и дополнительные рабочие дни. Правило действует сразу на всех мастеров и важнее их графика: в закрытый день студии мастер не работает, даже если у него рабочая смена.</div>
+              <sc-if value="{{ studioDaysEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:13px; color:#857B77; padding:12px 0; border-top:1px solid #F1EAE7;">Особых дней нет — студия работает по обычному режиму.</div>
+              </sc-if>
+              <sc-for list="{{ studioDayRows }}" as="d" hint-placeholder-count="4">
+                <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid #F1EAE7; flex-wrap:wrap;">
+                  <div style="width:140px; flex-shrink:0;">
+                    <div style="font-weight:700; font-size:13px;">{{ d.dateLabel }}</div>
+                    <div style="font-size:11px; color:#857B77;">{{ d.weekdayLabel }}</div>
+                  </div>
+                  <span style="padding:3px 10px; border-radius:999px; background:{{ d.badgeBg }}; color:{{ d.badgeFg }}; font-size:11px; font-weight:700; white-space:nowrap;">{{ d.kindLabel }}</span>
+                  <div style="flex:1; min-width:120px; font-size:12px; color:#4A423F;">{{ d.reason }}</div>
+                  <button onClick="{{ d.onRemove }}" style="height:30px; padding:0 12px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-size:11px; font-weight:700; cursor:pointer;">Удалить</button>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="flex:1; min-width:320px; background:#fff; border:1px solid #E2D8D4; border-radius:10px; padding:18px;">
+              <div style="font-weight:700; font-size:14px; margin-bottom:12px;">Добавить особый день</div>
+              <label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Дата</label>
+              <input type="date" min="{{ adminTodayStr }}" value="{{ studioDayForm.date }}" onChange="{{ onStudioDayDate }}" style="width:100%; height:40px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif; background:#fff; margin-bottom:12px;"/>
+              <div style="display:flex; gap:8px; margin-bottom:12px;">
+                <sc-for list="{{ studioDayKinds }}" as="k" hint-placeholder-count="2">
+                  <button onClick="{{ k.onSelect }}" style="flex:1; height:38px; border-radius:4px; border:1px solid {{ k.border }}; background:{{ k.bg }}; font-size:12px; font-weight:700; cursor:pointer;">{{ k.label }}</button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ studioDayFormIsHours }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex; gap:10px; margin-bottom:12px;">
+                  <div style="flex:1;"><label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Открытие</label><input type="time" value="{{ studioDayForm.from }}" onChange="{{ onStudioDayFrom }}" style="width:100%; height:40px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif; background:#fff;"/></div>
+                  <div style="flex:1;"><label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Закрытие</label><input type="time" value="{{ studioDayForm.to }}" onChange="{{ onStudioDayTo }}" style="width:100%; height:40px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif; background:#fff;"/></div>
+                </div>
+              </sc-if>
+              <label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Причина (видна клиентам в календаре записи)</label>
+              <input value="{{ studioDayForm.reason }}" onChange="{{ onStudioDayReason }}" placeholder="Например: санитарный день" style="width:100%; height:40px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif; background:#fff;"/>
+              <sc-if value="{{ studioDayHasError }}" hint-placeholder-val="{{ false }}">
+                <div style="color:#C13B3B; font-size:12px; margin-top:10px;">{{ studioDayForm.error }}</div>
+              </sc-if>
+              <sc-if value="{{ studioDayHasAffected }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:12px; background:#FBF3E4; border:1px solid #E7CF9E; border-radius:8px; padding:12px;">
+                  <div style="font-weight:700; font-size:12px; margin-bottom:6px;">{{ studioDayAffectedTitle }}</div>
+                  <sc-for list="{{ studioDayAffected }}" as="x" hint-placeholder-count="2">
+                    <div style="font-size:12px; color:#4A423F; padding:2px 0;">{{ x.label }}</div>
+                  </sc-for>
+                  <div style="font-size:11px; color:#857B77; margin-top:6px;">Записи не изменятся сами: после сохранения перенесите их или отмените со статусом «Отменена студией».</div>
+                </div>
+              </sc-if>
+              <button onClick="{{ submitStudioDay }}" style="width:100%; margin-top:14px; height:44px; border-radius:4px; border:none; background:#C98B84; color:#0F0B0C; font-weight:700; font-size:13px; cursor:pointer;">Добавить день</button>
+            </div>
           </div>
         </div>
       </div>
@@ -2044,6 +2166,15 @@
               </div>
               <div style="font-size:13px; color:#857B77;">{{ masterDetail.specialization }}</div>
             </div>
+            <div style="margin-left:auto; text-align:right;">
+              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#857B77; margin-bottom:6px;">Уровень</div>
+              <div style="display:inline-flex; border:1px solid #E2D8D4; border-radius:6px; overflow:hidden;">
+                <sc-for list="{{ masterLevelOptions }}" as="lv" hint-placeholder-count="2">
+                  <button onClick="{{ lv.onSelect }}" style="height:32px; padding:0 12px; border:none; background:{{ lv.bg }}; color:{{ lv.fg }}; font-size:12px; font-weight:700; cursor:pointer;">{{ lv.label }}</button>
+                </sc-for>
+              </div>
+              <div style="font-size:11px; color:#857B77; margin-top:6px; max-width:240px;">От уровня зависит цена услуг. Созданные записи сохраняют цену на момент записи.</div>
+            </div>
           </div>
 
           <div style="display:flex; gap:20px; flex-wrap:wrap;">
@@ -2051,13 +2182,54 @@
               <div style="background:#fff; border:1px solid #E2D8D4; border-radius:10px; padding:18px;">
                 <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#857B77; margin-bottom:10px;">Услуги</div>
                 <sc-for list="{{ masterDetail.services }}" as="s" hint-placeholder-count="3">
-                  <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F1EAE7; font-size:13px;"><span>{{ s.name }}</span><span style="color:#857B77;">{{ s.dur }}</span></div>
+                  <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F1EAE7; font-size:13px;"><span>{{ s.name }}</span><span style="color:#857B77;">{{ s.dur }} · <strong style="color:#0F0B0C;">{{ s.priceText }}</strong></span></div>
                 </sc-for>
               </div>
               <div style="background:#fff; border:1px solid #E2D8D4; border-radius:10px; padding:18px;">
-                <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#857B77; margin-bottom:10px;">График работы</div>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;">
+                  <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#857B77;">График работы</div>
+                  <sc-if value="{{ masterPlanCanStart }}" hint-placeholder-val="{{ true }}">
+                    <button onClick="{{ openMasterPlanForm }}" style="height:30px; padding:0 12px; border-radius:4px; border:1px solid #C98B84; background:#fff; font-size:11px; font-weight:700; cursor:pointer;">Новый график с даты</button>
+                  </sc-if>
+                </div>
                 <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F1EAE7; font-size:13px;"><span style="color:#857B77;">Рабочие дни</span><span style="font-weight:700;">{{ masterDetail.workDaysLabel }}</span></div>
                 <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:13px;"><span style="color:#857B77;">Часы работы</span><span style="font-weight:700;">{{ masterDetail.workHoursLabel }}</span></div>
+
+                <sc-if value="{{ masterPlanExists }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top:12px; background:#F4E6E3; border-radius:8px; padding:12px;">
+                    <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#8E4B48; font-weight:700; margin-bottom:4px;">Новый график с {{ masterPlan.fromLabel }}</div>
+                    <div style="font-size:13px; font-weight:700;">{{ masterPlan.daysLabel }} · {{ masterPlan.hoursLabel }}</div>
+                    <div style="font-size:11px; color:#857B77; margin-top:4px;">До этой даты свободное время и записи считаются по текущему графику.</div>
+                    <div style="font-size:12px; color:{{ masterPlan.affectedColor }}; margin-top:6px;">{{ masterPlan.affectedText }}</div>
+                    <button onClick="{{ cancelMasterPlan }}" style="margin-top:10px; height:30px; padding:0 12px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-size:11px; font-weight:700; cursor:pointer;">Отменить изменение</button>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ masterPlanFormOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top:12px; border-top:1px solid #F1EAE7; padding-top:12px;">
+                    <label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Действует с</label>
+                    <input type="date" min="{{ adminTomorrowStr }}" value="{{ masterPlanForm.from }}" onChange="{{ onMasterPlanFrom }}" style="width:100%; height:40px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif; background:#fff; margin-bottom:12px;"/>
+                    <label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Рабочие дни</label>
+                    <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">
+                      <sc-for list="{{ masterPlanDayChips }}" as="d" hint-placeholder-count="7">
+                        <button onClick="{{ d.onToggle }}" disabled="{{ d.disabled }}" title="{{ d.title }}" style="width:42px; height:34px; border-radius:4px; border:1px solid {{ d.border }}; background:{{ d.bg }}; color:{{ d.fg }}; font-size:12px; font-weight:700; cursor:{{ d.cursor }};">{{ d.label }}</button>
+                      </sc-for>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-bottom:6px;">
+                      <div style="flex:1;"><label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Начало смены</label><input type="time" value="{{ masterPlanForm.start }}" onChange="{{ onMasterPlanStart }}" style="width:100%; height:40px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif; background:#fff;"/></div>
+                      <div style="flex:1;"><label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Конец смены</label><input type="time" value="{{ masterPlanForm.end }}" onChange="{{ onMasterPlanEnd }}" style="width:100%; height:40px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif; background:#fff;"/></div>
+                    </div>
+                    <div style="font-size:11px; color:#857B77;">Студия работает вт–сб, 10:00–20:00. До выбранной даты мастер работает по текущему графику.</div>
+                    <sc-if value="{{ masterPlanHasError }}" hint-placeholder-val="{{ false }}">
+                      <div style="color:#C13B3B; font-size:12px; margin-top:10px;">{{ masterPlanForm.error }}</div>
+                    </sc-if>
+                    <div style="font-size:12px; color:{{ masterPlanPreviewColor }}; margin-top:10px;">{{ masterPlanPreviewText }}</div>
+                    <div style="display:flex; gap:10px; margin-top:14px;">
+                      <button onClick="{{ closeMasterPlanForm }}" style="flex:1; height:40px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-weight:700; font-size:12px; cursor:pointer;">Отмена</button>
+                      <button onClick="{{ submitMasterPlan }}" style="flex:1; height:40px; border-radius:4px; border:none; background:#C98B84; color:#0F0B0C; font-weight:700; font-size:12px; cursor:pointer;">Сохранить график</button>
+                    </div>
+                  </div>
+                </sc-if>
               </div>
             </div>
           </div>
@@ -2097,11 +2269,11 @@
                 <i data-lucide="chevron-down" onClick="{{ cat.onMoveDown }}" style="width:14px; height:14px; stroke:#857B77; cursor:pointer;"></i>
               </div>
               <div style="background:#fff; border:1px solid #E2D8D4; border-radius:8px; overflow:hidden;">
-                <div style="display:grid; grid-template-columns:minmax(0,1.6fr) 110px 100px minmax(0,1.4fr) 90px; gap:8px; padding:8px 16px; border-bottom:1px solid #E2D8D4; font-size:11px; text-transform:uppercase; color:#857B77;">
-                  <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Название</div><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Длительность</div><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Цена</div><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Мастера</div><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Статус</div>
+                <div style="display:grid; grid-template-columns:minmax(0,1.6fr) 150px 150px minmax(0,1.4fr) 90px; gap:8px; padding:8px 16px; border-bottom:1px solid #E2D8D4; font-size:11px; text-transform:uppercase; color:#857B77;">
+                  <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Название</div><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Длительность</div><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Цена: мастер / топ</div><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Мастера</div><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Статус</div>
                 </div>
                 <sc-for list="{{ cat.services }}" as="s" hint-placeholder-count="2">
-                  <div onClick="{{ s.onOpen }}" style="display:grid; grid-template-columns:minmax(0,1.6fr) 110px 100px minmax(0,1.4fr) 90px; gap:8px; align-items:center; padding:10px 16px; border-bottom:1px solid #F1EAE7; cursor:pointer;">
+                  <div onClick="{{ s.onOpen }}" style="display:grid; grid-template-columns:minmax(0,1.6fr) 150px 150px minmax(0,1.4fr) 90px; gap:8px; align-items:center; padding:10px 16px; border-bottom:1px solid #F1EAE7; cursor:pointer;">
                     <div style="font-weight:600; font-size:13px;">{{ s.name }}</div>
                     <div style="font-size:12px; color:#4A423F;">{{ s.durText }}</div>
                     <div style="font-size:13px; font-weight:700;">{{ s.priceText }}</div>
@@ -2146,16 +2318,27 @@
             </select>
           </div>
 
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:14px;">
             <div style="background:#fff; border:1px solid #E2D8D4; border-radius:10px; padding:18px;">
               <label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Длительность, мин</label>
               <input type="number" value="{{ serviceForm.dur }}" onChange="{{ onServiceFormDur }}" style="width:100%; height:42px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif;"/>
             </div>
             <div style="background:#fff; border:1px solid #E2D8D4; border-radius:10px; padding:18px;">
-              <label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Цена, ₽</label>
-              <input type="number" value="{{ serviceForm.price }}" onChange="{{ onServiceFormPrice }}" style="width:100%; height:42px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif;"/>
+              <label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Уборка после услуги, мин</label>
+              <input type="number" min="0" value="{{ serviceForm.cleanup }}" onChange="{{ onServiceFormCleanup }}" style="width:100%; height:42px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif;"/>
+              <div style="font-size:11px; color:#857B77; margin-top:6px;">Клиент не видит. Следующая запись к мастеру — не раньше конца уборки.</div>
+            </div>
+            <div style="background:#fff; border:1px solid #E2D8D4; border-radius:10px; padding:18px;">
+              <label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Цена у мастера, ₽</label>
+              <input type="number" min="0" value="{{ serviceForm.price }}" onChange="{{ onServiceFormPrice }}" style="width:100%; height:42px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif; margin-bottom:10px;"/>
+              <label style="font-size:12px; color:#857B77; display:block; margin-bottom:4px;">Цена у топ-мастера, ₽</label>
+              <input type="number" min="0" value="{{ serviceForm.priceTop }}" onChange="{{ onServiceFormPriceTop }}" style="width:100%; height:42px; box-sizing:border-box; border:1px solid #E2D8D4; border-radius:4px; padding:0 12px; font-size:13px; font-family:'Manrope',sans-serif;"/>
+              <div style="font-size:11px; color:#857B77; margin-top:6px;">Не ниже цены у мастера. «Цена от» в каталоге — цена у мастера.</div>
             </div>
           </div>
+          <sc-if value="{{ serviceFormHasError }}" hint-placeholder-val="{{ false }}">
+            <div style="color:#C13B3B; font-size:13px; margin:-4px 0 14px;">{{ serviceFormError }}</div>
+          </sc-if>
 
 
           <div style="background:#fff; border:1px solid #E2D8D4; border-radius:10px; padding:18px; margin-bottom:14px;">
@@ -2465,6 +2648,23 @@ const ROUTES = [
 const STAFF_TEST_USER = { phone: '+7 (999) 000-11-22', password: 'Admin1234', name: 'Администратор студии', roles: ['administrator'] };
 // Раздел администратора. Шахматка показывает четверг, 24 сентября; время — в минутах от полуночи.
 const ADMIN_DAY_WEEKDAY = 4;
+// «Сегодня» в разделе администратора и даты демо-недели 22–26 сентября (вт–сб).
+const ADMIN_TODAY = '2026-09-24';
+const ADMIN_TOMORROW = '2026-09-25';
+const DEMO_WEEK_DATES = { '2026-09-22': 2, '2026-09-23': 3, '2026-09-24': 4, '2026-09-25': 5, '2026-09-26': 6 };
+const WEEKDAY_FULL = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+const STUDIO_OPEN = '10:00', STUDIO_CLOSE = '20:00';
+// Фото работ (таблица work_photos). visitKey — визит, к которому относится фото: 'ct1|14.08.2026' — строка
+// истории в карточке клиента, 'ap:ap1' — запись в шахматке, null — фото загружено в галерею без визита.
+const WORK_PHOTOS_SEED = [
+  { id: 'ph1', visitKey: 'ct1|24.09.2026', masterId: 'm1', title: 'Педикюр без покрытия', url: '', consent: false, published: false },
+  { id: 'ph2', visitKey: 'ct1|14.08.2026', masterId: 'm1', title: 'Нюдовый маникюр', url: '', consent: true, published: true },
+  { id: 'ph3', visitKey: 'ct1|14.08.2026', masterId: 'm1', title: 'Френч с дизайном', url: '', consent: true, published: true },
+  { id: 'ph4', visitKey: null, masterId: 'm2', title: 'Ламинирование бровей', url: '', consent: true, published: true },
+];
+const LEVEL_LABEL = { master: 'Мастер', topMaster: 'Топ-мастер' };
+const parseDateStr = (str) => { const [y, m, d] = str.split('-').map(Number); return new Date(y, m - 1, d); };
+const dateLabelRu = (str) => parseDateStr(str).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 const ADMIN_GRID_START = 10 * 60, ADMIN_GRID_END = 20 * 60, ADMIN_PX_PER_MIN = 1.4;
 // Мастера, услуги и категории берутся из data.js (единый источник моковых данных), см. initAdminData().
 let ADMIN_MASTERS = [];
@@ -2474,7 +2674,7 @@ const WEEKDAY_SHORT = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 const toMinutes = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
 function initAdminData(data) {
   ADMIN_MASTERS = data.masters.map((m) => ({
-    id: m.id, name: m.name, specialty: m.specialty, workdays: m.workdays, active: true,
+    id: m.id, name: m.name, specialty: m.specialty, workdays: m.workdays, active: true, level: m.level,
     workDaysLabel: m.workdays.map((d) => WEEKDAY_SHORT[d]).join(', '),
     workHoursLabel: m.workHours.from + '–' + m.workHours.to,
     shiftStart: toMinutes(m.workHours.from), shiftEnd: toMinutes(m.workHours.to),
@@ -2482,18 +2682,20 @@ function initAdminData(data) {
   }));
   ADMIN_SERVICE_CATEGORIES = data.serviceCategories.map((c, i) => ({ id: c.id, name: c.name, order: i + 1 }));
   ADMIN_SERVICES_SEED = data.services.map((s) => ({
-    id: s.id, categoryId: s.categoryId, name: s.name, description: s.desc, dur: s.durationMin, price: s.priceFrom,
+    id: s.id, categoryId: s.categoryId, name: s.name, description: s.desc, dur: s.durationMin, cleanup: s.cleanupMin || 0, price: s.priceByLevel.master, priceTop: s.priceByLevel.topMaster,
     masters: data.masters.filter((m) => m.serviceIds.includes(s.id)).map((m) => m.id), active: true,
   }));
 }
+// Время записей учитывает перерыв на уборку после визита (services.cleanup): следующая запись
+// к мастеру начинается не раньше, чем закончится уборка после предыдущей.
 // Статусы записи — по паспорту: active, cancelledClient, cancelledStudio, done, noShow.
 // Отменённые записи не занимают время мастера и не показываются в шахматке.
 const ADMIN_LIVE = (a) => a.status !== 'cancelledClient' && a.status !== 'cancelledStudio';
 const ADMIN_APPTS_SEED = [
   { id: 'ap1', masterId: 'm1', start: 10 * 60, dur: 90, client: 'Мария Кузнецова', serviceId: 's1', service: 'Маникюр с покрытием гель-лаком', price: 1800, status: 'done', newClient: false },
-  { id: 'ap2', masterId: 'm1', start: 11 * 60 + 30, dur: 60, client: 'Ольга Петрова', serviceId: 's6', service: 'Педикюр без покрытия', price: 1600, status: 'done', newClient: false },
+  { id: 'ap2', masterId: 'm1', start: 12 * 60, dur: 60, client: 'Ольга Петрова', serviceId: 's6', service: 'Педикюр без покрытия', price: 1600, status: 'done', newClient: false },
   { id: 'ap3', masterId: 'm1', start: 14 * 60, dur: 150, client: 'Анна Соколова', serviceId: 's7', service: 'Маникюр и педикюр', price: 3200, status: 'active', newClient: false },
-  { id: 'ap4', masterId: 'm1', start: 16 * 60 + 30, dur: 45, client: 'Виктория Лебедева', serviceId: 's2', service: 'Маникюр без покрытия', price: 1200, status: 'active', newClient: false },
+  { id: 'ap4', masterId: 'm1', start: 17 * 60, dur: 45, client: 'Виктория Лебедева', serviceId: 's2', service: 'Маникюр без покрытия', price: 1200, status: 'active', newClient: false },
   { id: 'ap5', masterId: 'm2', start: 11 * 60, dur: 60, client: 'Дарья Игнатьева', serviceId: 's12', service: 'Ламинирование бровей', price: 1800, status: 'noShow', newClient: true },
   { id: 'ap6', masterId: 'm2', start: 12 * 60 + 30, dur: 40, client: 'Елена Фомина', serviceId: 's11', service: 'Коррекция и окрашивание бровей', price: 1200, status: 'done', newClient: false },
   { id: 'ap7', masterId: 'm2', start: 13 * 60 + 30, dur: 20, client: 'Полина Гуляева', serviceId: 's13', service: 'Коррекция бровей', price: 700, status: 'cancelledClient', newClient: false },
@@ -2710,6 +2912,14 @@ class Component extends DCLogic {
     blacklistReasonInput: '',
     mastersScheduleMonth: {},
     mastersScheduleCellEdit: null,
+    studioDays: [],
+    studioDayForm: { date: '', isOpen: false, from: '10:00', to: '16:00', reason: '', error: '' },
+    masterPlans: {},
+    masterPlanForm: null,
+    workPhotos: WORK_PHOTOS_SEED,
+    photoDialog: null,
+    masterLevels: {},
+    serviceFormError: '',
     serviceCategories: [],
     services: [],
     serviceFormId: null,
@@ -2723,7 +2933,8 @@ class Component extends DCLogic {
     import('./data.js').then((mod) => {
       this._data = mod;
       initAdminData(mod);
-      this.setState({ serviceCategories: ADMIN_SERVICE_CATEGORIES, services: ADMIN_SERVICES_SEED });
+      // Особые дни студии — из data.js; в разделе администратора их можно добавлять и удалять (демо, без сохранения).
+      this.setState({ serviceCategories: ADMIN_SERVICE_CATEGORIES, services: ADMIN_SERVICES_SEED, studioDays: mod.studioDays.map((d) => ({ ...d })) });
     });
     this._onHash = () => this.setState({ hash: window.location.hash || '#/', cancelConfirmId: null, cancelSuccessId: null });
     window.addEventListener('hashchange', this._onHash);
@@ -2840,7 +3051,7 @@ class Component extends DCLogic {
     if (!data || !draft) { this.setState({ holdExpiredModalOpen: false }); return; }
     const masterId = draft.masterId || draft.assignedMasterId;
     const ids = masterId ? [masterId] : data.findCoveringMasters(draft.serviceIds).map((m) => m.id);
-    const stillFree = ids.some((id) => data.getFreeStartTimes(id, draft.date, this.getCartDurationMin()).some((s) => s.start === draft.time));
+    const stillFree = ids.some((id) => data.getFreeStartTimes(id, draft.date, this.getCartDurationMin(), this.getCartCleanupMin()).some((s) => s.start === draft.time));
     if (stillFree) {
       const nd = { ...draft, holdUntil: Date.now() + 10 * 60 * 1000 };
       sessionStorage.setItem('nog_draft', JSON.stringify(nd));
@@ -2856,7 +3067,7 @@ class Component extends DCLogic {
     if (!data || !draft) return;
     const masterId = draft.masterId || draft.assignedMasterId;
     const ids = masterId ? [masterId] : data.findCoveringMasters(draft.serviceIds).map((m) => m.id);
-    const alts = data.getAlternativeSlots(ids, draft.date, this.getCartDurationMin(), draft.time, 5);
+    const alts = data.getAlternativeSlots(ids, draft.date, this.getCartDurationMin(), draft.time, 5, this.getCartCleanupMin());
     this.setState({ slotTakenModalOpen: true, slotTakenAlternatives: alts });
   };
   pickAlternativeSlot = (alt) => {
@@ -3010,7 +3221,7 @@ class Component extends DCLogic {
       if (scenario === 'slotConflict') {
         const b = this.getEffectiveBookings().find((x) => x.id === bookingId);
         const masterId = this.state.rescheduleMasterOverrideId || (b && b.masterId);
-        const alts = data.getAlternativeSlots([masterId], this.state.rescheduleSelectedDate, b.durationMin, this.state.rescheduleSelectedSlot.start, 5);
+        const alts = data.getAlternativeSlots([masterId], this.state.rescheduleSelectedDate, b.durationMin, this.state.rescheduleSelectedSlot.start, 5, data.cleanupForServices([b.serviceId]));
         this.setState({ rescheduleSubmitting: false, rescheduleErrorType: 'slotTaken', rescheduleAlternatives: alts });
         return;
       }
@@ -3078,7 +3289,7 @@ class Component extends DCLogic {
     const cartServices = draft.serviceIds.map((id) => data.services.find((s) => s.id === id)).filter(Boolean);
     const masterId = draft.masterId || draft.assignedMasterId;
     const master = masterId ? data.masters.find((m) => m.id === masterId) : null;
-    const level = master ? master.level : 'master';
+    const level = master ? this.masterLevel(master) : 'master';
     const confirmServiceLines = cartServices.map((s) => ({ name: s.name, priceText: s.priceByLevel[level].toLocaleString('ru-RU') + ' ₽' }));
     const totalPrice = cartServices.reduce((sum, s) => sum + s.priceByLevel[level], 0);
     const totalMin = cartServices.reduce((sum, s) => sum + s.durationMin, 0);
@@ -3362,8 +3573,9 @@ class Component extends DCLogic {
     const master = data.masters.find((m) => m.id === masterId);
     const service = data.services.find((s) => s.id === booking.serviceId);
     const durationMin = booking.durationMin;
+    const cleanupMin = data.cleanupForServices([booking.serviceId]);
     const eligible = [masterId];
-    const anyAvailability = data.hasAnyAvailability(eligible, durationMin);
+    const anyAvailability = data.hasAnyAvailability(eligible, durationMin, cleanupMin);
     const coveringMasters = data.findCoveringMasters([booking.serviceId]).filter((m) => m.id !== masterId);
 
     if (this.state.rescheduleErrorType === 'serverError') {
@@ -3410,11 +3622,10 @@ class Component extends DCLogic {
       const dateStr = this.localDateStr(dateObj);
       if (dateObj < today) return 'past';
       if (dateObj > horizonEnd) return 'beyond';
-      const weekday = dateObj.getDay();
-      if (data.salonSettings.closedWeekdays.includes(weekday)) return 'salonClosed';
+      if (data.isSalonClosedOn(dateStr)) return 'salonClosed';
       const vac = data.getVacationInfo(master, dateObj);
       if (vac && vac.active) return 'vacation';
-      return data.dayHasAvailability(eligible, dateStr, durationMin) ? 'available' : 'noSlots';
+      return data.dayHasAvailability(eligible, dateStr, durationMin, cleanupMin) ? 'available' : 'noSlots';
     };
 
     const calendarDays = [];
@@ -3446,13 +3657,13 @@ class Component extends DCLogic {
       hasSelectedDate = true;
       const dateStr = this.state.rescheduleSelectedDate;
       const isOriginalDate = dateStr === originalDateStr;
-      const slots = data.getFreeStartTimes(masterId, dateStr, durationMin);
+      const slots = data.getFreeStartTimes(masterId, dateStr, durationMin, cleanupMin);
       const augmented = slots.slice();
       if (isOriginalDate && !augmented.some((s) => s.start === oldTime)) augmented.push({ start: oldTime, end: oldTime, isOwn: true });
       augmented.sort((a, b) => a.start.localeCompare(b.start));
       if (!slots.length && !isOriginalDate) {
         noSlotsThisDay = true;
-        nextDateSuggestions = data.nextAvailableDates(eligible, durationMin, dateStr, 3).map((ds) => ({
+        nextDateSuggestions = data.nextAvailableDates(eligible, durationMin, dateStr, 3, cleanupMin).map((ds) => ({
           dateStr: ds, label: new Date(ds + 'T00:00:00').toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' }),
           onClick: () => this.reschedulePickDate(ds),
         }));
@@ -3564,9 +3775,17 @@ class Component extends DCLogic {
     if (!data || !draft) return;
     const ids = this.getEligibleMasterIds();
     const totalMin = this.getCartDurationMin();
-    const slot = data.nearestAvailableSlot(ids, totalMin);
+    const slot = data.nearestAvailableSlot(ids, totalMin, this.getCartCleanupMin());
     if (!slot) return;
     this.setState({ timeSelectedDate: slot.date, timeSelectedSlot: { start: slot.start, end: slot.end }, timeAssignedMasterId: slot.masterId });
+  };
+
+  // Перерыв на уборку после визита: наибольший среди услуг корзины.
+  getCartCleanupMin = () => {
+    const data = this._data;
+    const draft = this.state.draft;
+    if (!data || !draft) return 0;
+    return data.cleanupForServices(draft.serviceIds);
   };
 
   getCartDurationMin = () => {
@@ -3609,7 +3828,7 @@ class Component extends DCLogic {
     const draft = this.state.draft || { serviceIds: this.state.bookingCart };
     let time = null, date = null, timeEnd = null;
     if (masterId && draft.date && draft.time && this._data) {
-      const stillFree = this._data.getFreeStartTimes(masterId, draft.date, this.getCartDurationMin()).some((s) => s.start === draft.time);
+      const stillFree = this._data.getFreeStartTimes(masterId, draft.date, this.getCartDurationMin(), this.getCartCleanupMin()).some((s) => s.start === draft.time);
       if (stillFree) { time = draft.time; date = draft.date; timeEnd = draft.timeEnd; }
       else this.showToast('Время недоступно у нового мастера, выберите заново');
     }
@@ -3672,11 +3891,11 @@ class Component extends DCLogic {
     });
 
     const availableMasterCards = full.map((m) => {
-      const total = cart.reduce((sum, id) => { const s = allServices.find((x) => x.id === id); return sum + (s ? s.priceByLevel[m.level] : 0); }, 0);
+      const total = cart.reduce((sum, id) => { const s = allServices.find((x) => x.id === id); return sum + (s ? s.priceByLevel[this.masterLevel(m)] : 0); }, 0);
       const vac = data.getVacationInfo(m);
       const slot = data.nearestFreeSlot(m.id);
       return {
-        id: m.id, name: m.name, specialty: m.specialty, levelLabel: this.levelLabel(m.level),
+        id: m.id, name: m.name, specialty: m.specialty, levelLabel: this.levelLabel(this.masterLevel(m)),
         priceText: total.toLocaleString('ru-RU') + ' ₽',
         nearestLabel: this.formatNearestLabel(slot),
         onVacation: !!(vac && vac.active),
@@ -3709,15 +3928,16 @@ class Component extends DCLogic {
     const profileServices = m.serviceIds.map((id) => {
       const s = allServices.find((x) => x.id === id);
       if (!s) return null;
-      return { id, name: s.name, priceText: (s.addon ? '' : '') + s.priceByLevel[m.level].toLocaleString('ru-RU') + ' ₽' };
+      return { id, name: s.name, priceText: (s.addon ? '' : '') + s.priceByLevel[this.masterLevel(m)].toLocaleString('ru-RU') + ' ₽' };
     }).filter(Boolean);
     return {
       profileFound: true, profileNotFound: false,
-      profileName: m.name, profileSpecialty: m.specialty, profileLevelLabel: this.levelLabel(m.level),
+      profileName: m.name, profileSpecialty: m.specialty, profileLevelLabel: this.levelLabel(this.masterLevel(m)),
       profileExperience: `${m.experienceYears} лет`,
       profileOnVacation: !!(vac && vac.active),
       profileVacationText: vac && vac.active ? `В отпуске до ${vac.end.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}` : '',
-      galleryPlaceholders: [0, 1, 2],
+      profileWorks: this.state.workPhotos.filter((ph) => ph.masterId === m.id && ph.published).map((ph) => ({ ...ph, hasUrl: !!ph.url, bgImage: ph.url ? 'url(' + ph.url + ')' : 'none' })),
+      profileHasWorks: this.state.workPhotos.some((ph) => ph.masterId === m.id && ph.published),
       profileServices,
       bookWithMasterClick: () => this.bookWithMaster(m.id),
     };
@@ -3742,6 +3962,7 @@ class Component extends DCLogic {
     if (!data || !draft) return base;
 
     const totalMin = cart.reduce((sum, id) => { const s = allServices.find((x) => x.id === id); return sum + (s ? s.durationMin : 0); }, 0);
+    const cleanupMin = data.cleanupForServices(cart);
     const eligibleIds = draft.masterId ? [draft.masterId] : data.findCoveringMasters(draft.serviceIds).map((m) => m.id);
     const isAnyMaster = !draft.masterId;
 
@@ -3753,7 +3974,7 @@ class Component extends DCLogic {
     if (!eligibleIds.length) return { ...base, timeSummaryServices: cartServiceNames, timeSummaryMaster: masterName, timeSummaryDuration: durationLabel };
 
     // Проверка «нет окна вообще» / «визит слишком длинный»
-    const anyOverall = data.hasAnyAvailability(eligibleIds, totalMin);
+    const anyOverall = data.hasAnyAvailability(eligibleIds, totalMin, cleanupMin);
     if (!anyOverall) {
       const durationTooLong = totalMin >= 180;
       return {
@@ -3776,13 +3997,12 @@ class Component extends DCLogic {
       const dateStr = this.localDateStr(dateObj);
       if (dateObj < today) return 'past';
       if (dateObj > horizonEnd) return 'beyond';
-      const weekday = dateObj.getDay();
-      if (data.salonSettings.closedWeekdays.includes(weekday)) return 'salonClosed';
+      if (data.isSalonClosedOn(dateStr)) return 'salonClosed';
       if (!isAnyMaster) {
         const vac = data.getVacationInfo(data.masters.find((mm) => mm.id === draft.masterId), dateObj);
         if (vac && vac.active) return 'vacation';
       }
-      return data.dayHasAvailability(eligibleIds, dateStr, totalMin) ? 'available' : 'noSlots';
+      return data.dayHasAvailability(eligibleIds, dateStr, totalMin, cleanupMin) ? 'available' : 'noSlots';
     };
 
     const statusStyle = (status, selected) => {
@@ -3842,7 +4062,7 @@ class Component extends DCLogic {
       const dateStr = this.state.timeSelectedDate;
       const merged = new Map();
       eligibleIds.forEach((id) => {
-        data.getFreeStartTimes(id, dateStr, totalMin).forEach((s) => {
+        data.getFreeStartTimes(id, dateStr, totalMin, cleanupMin).forEach((s) => {
           if (!merged.has(s.start)) merged.set(s.start, { start: s.start, end: s.end, mastersAvailable: [] });
           merged.get(s.start).mastersAvailable.push(id);
         });
@@ -3851,7 +4071,7 @@ class Component extends DCLogic {
       const slotsArr = Array.from(merged.values()).sort((a, b) => a.start.localeCompare(b.start));
       if (!slotsArr.length) {
         noSlotsThisDay = true;
-        nextDateSuggestions = data.nextAvailableDates(eligibleIds, totalMin, dateStr, 3).map((ds) => ({
+        nextDateSuggestions = data.nextAvailableDates(eligibleIds, totalMin, dateStr, 3, cleanupMin).map((ds) => ({
           dateStr: ds, label: new Date(ds + 'T00:00:00').toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' }),
           onClick: () => this.pickDate(ds),
         }));
@@ -4064,7 +4284,7 @@ class Component extends DCLogic {
     const rawStart = ADMIN_GRID_START + minutesFromTop;
     const snapped = Math.round(rawStart / 15) * 15;
     const startMin = Math.max(ADMIN_GRID_START, Math.min(ADMIN_GRID_END - appt.dur, snapped));
-    const overlaps = this.state.adminAppointments.some((a) => ADMIN_LIVE(a) && a.id !== id && a.masterId === master.id && startMin < a.start + a.dur && startMin + appt.dur > a.start);
+    const overlaps = this.adminBusyOverlap(master.id, startMin, appt.dur, this.apptCleanupOf(appt), id);
     const outsideShift = master.dayOff || startMin < master.shiftStart || startMin + appt.dur > master.shiftEnd;
     this.setState({ adminDropPreview: { masterId: master.id, startMin, dur: appt.dur, conflict: overlaps || outsideShift } });
   };
@@ -4078,6 +4298,25 @@ class Component extends DCLogic {
       adminDraggingId: null, adminDropPreview: null,
     }));
     this.showToast('Запись перенесена');
+  };
+
+  // Перерыв на уборку после записи — из услуги записи.
+  apptCleanupOf = (a) => { const s = this.state.services.find((x) => x.id === a.serviceId); return s ? Number(s.cleanup) || 0 : 0; };
+  // Пересекается ли визит [start, start+dur) вместе с уборкой после него с другими записями мастера (с учётом их уборки).
+  adminBusyOverlap = (masterId, start, dur, cleanup, excludeId) => this.state.adminAppointments.some((a) => ADMIN_LIVE(a) && a.id !== excludeId && a.masterId === masterId
+    && start < a.start + a.dur + this.apptCleanupOf(a) && start + dur + cleanup > a.start);
+  // Ближайшие окна, куда помещается визит: уборка после визита не должна задевать следующую запись,
+  // но может выходить за конец смены.
+  adminFreeStarts = (master, dur, cleanup, excludeId, limit) => {
+    const out = [];
+    const busy = this.state.adminAppointments.filter((a) => ADMIN_LIVE(a) && a.masterId === master.id && a.id !== excludeId).sort((a, b) => a.start - b.start);
+    let cursor = master.shiftStart;
+    for (const b of busy) {
+      if (b.start - cursor >= dur + cleanup && out.length < limit) out.push(cursor);
+      cursor = Math.max(cursor, b.start + b.dur + this.apptCleanupOf(b));
+    }
+    if (master.shiftEnd - cursor >= dur && out.length < limit) out.push(cursor);
+    return out;
   };
 
   openNewApptPanel = (slot) => this.setState({
@@ -4183,6 +4422,126 @@ class Component extends DCLogic {
   }));
   goToMasterDetail = (id) => () => this.goTo('/staff/admin/masters/' + id);
 
+  // ---- Уровень мастера: изменение из карточки мастера действует и на цены в записи клиента ----
+  masterLevel = (m) => this.state.masterLevels[m.id] || m.level || 'master';
+  setMasterLevel = (masterId, level) => () => {
+    this.setState((s) => ({ masterLevels: { ...s.masterLevels, [masterId]: level } }));
+    this.showToast('Уровень мастера: ' + LEVEL_LABEL[level] + '. Новые записи — по ценам этого уровня');
+  };
+
+  // ---- Фото работ (A-12) ----
+  openPhotoDialog = (visit) => () => this.setState({ photoDialog: visit, adminApptPopover: null });
+  closePhotoDialog = () => this.setState({ photoDialog: null });
+  onPhotoFiles = (e) => {
+    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith('image/'));
+    e.target.value = '';
+    const visit = this.state.photoDialog;
+    if (!files.length || !visit) return;
+    const added = files.map((f, i) => ({ id: 'ph' + Date.now() + '-' + i, visitKey: visit.visitKey, masterId: visit.masterId,
+      title: '', url: URL.createObjectURL(f), consent: false, published: false }));
+    this.setState((s) => ({ workPhotos: [...s.workPhotos, ...added] }));
+    this.showToast('Загружено фото: ' + added.length);
+  };
+  updatePhoto = (id, patch) => this.setState((s) => ({ workPhotos: s.workPhotos.map((p) => p.id === id ? { ...p, ...patch } : p) }));
+  setPhotoTitle = (id) => (e) => this.updatePhoto(id, { title: e.target.value });
+  togglePhotoConsent = (id) => () => {
+    const ph = this.state.workPhotos.find((p) => p.id === id);
+    // Без согласия фото нельзя держать в галерее — снимаем с публикации.
+    this.updatePhoto(id, ph.consent ? { consent: false, published: false } : { consent: true });
+  };
+  togglePhotoPublish = (id) => () => {
+    const ph = this.state.workPhotos.find((p) => p.id === id);
+    if (!ph.published && ph.visitKey && !ph.consent) { this.showToast('Сначала отметьте согласие клиента на публикацию'); return; }
+    this.updatePhoto(id, { published: !ph.published });
+  };
+  removePhoto = (id) => () => {
+    this.setState((s) => ({ workPhotos: s.workPhotos.filter((p) => p.id !== id) }));
+    this.showToast('Фото удалено');
+  };
+  photosCountLabel = (visitKey, emptyLabel) => {
+    const n = this.state.workPhotos.filter((p) => p.visitKey === visitKey).length;
+    return n ? n + ' фото' : emptyLabel;
+  };
+
+  // ---- Демо-записи на дату (для проверки затронутых записей) ----
+  demoLiveApptsOnDate = (date) => {
+    const wd = DEMO_WEEK_DATES[date];
+    if (wd == null || date < ADMIN_TODAY) return [];
+    const list = wd === ADMIN_DAY_WEEKDAY
+      ? this.state.adminAppointments.filter((a) => a.status === 'active')
+      : ADMIN_WEEK_OTHER_APPTS.filter((a) => a.weekday === wd && a.status === 'active');
+    return list.map((a) => ({ ...a, date }));
+  };
+  apptShortLabel = (a) => {
+    const t = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    const master = ADMIN_MASTERS.find((m) => m.id === a.masterId);
+    return dateLabelRu(a.date).replace(/ \d{4} г\.?$/, '') + ', ' + t(a.start) + '–' + t(a.start + a.dur) + ' · ' + a.client + ' · ' + (master ? master.name : '');
+  };
+  // Записи, которые не помещаются в часы студии особого дня (или весь день, если студия закрыта).
+  studioDayAffected = (f) => {
+    if (!f.date) return [];
+    const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+    return this.demoLiveApptsOnDate(f.date).filter((a) => !f.isOpen || (f.from && f.to && (a.start < toMin(f.from) || a.start + a.dur > toMin(f.to))));
+  };
+
+  // ---- Особые дни студии ----
+  setStudioDayField = (field) => (e) => { const v = e.target.value; this.setState((s) => ({ studioDayForm: { ...s.studioDayForm, [field]: v, error: '' } })); };
+  setStudioDayKind = (isOpen) => () => this.setState((s) => ({ studioDayForm: { ...s.studioDayForm, isOpen, error: '' } }));
+  submitStudioDay = () => {
+    const f = this.state.studioDayForm;
+    const fail = (error) => this.setState((s) => ({ studioDayForm: { ...s.studioDayForm, error } }));
+    if (!f.date) return fail('Укажите дату.');
+    if (f.date < ADMIN_TODAY) return fail('Эта дата уже прошла.');
+    if (this.state.studioDays.some((d) => d.date === f.date)) return fail('На эту дату уже есть особый день. Удалите его, чтобы задать другой.');
+    if (f.isOpen && (!f.from || !f.to || f.from >= f.to)) return fail('Время закрытия должно быть позже времени открытия.');
+    if (!f.reason.trim()) return fail('Укажите причину — её увидят клиенты в календаре записи.');
+    const affected = this.studioDayAffected(f).length;
+    const day = { date: f.date, isOpen: f.isOpen, from: f.isOpen ? f.from : '', to: f.isOpen ? f.to : '', reason: f.reason.trim() };
+    this.setState((s) => ({
+      studioDays: [...s.studioDays, day].sort((a, b) => (a.date < b.date ? -1 : 1)),
+      studioDayForm: { date: '', isOpen: false, from: '10:00', to: '16:00', reason: '', error: '' },
+    }));
+    this.showToast(affected ? 'Особый день добавлен. Записей, требующих решения: ' + affected : 'Особый день добавлен');
+  };
+  removeStudioDay = (date) => () => {
+    this.setState((s) => ({ studioDays: s.studioDays.filter((d) => d.date !== date) }));
+    this.showToast('Особый день удалён — студия работает по обычному режиму');
+  };
+
+  // ---- Новый график мастера с даты ----
+  openMasterPlanForm = (master) => () => this.setState({
+    masterPlanForm: { masterId: master.id, from: '2026-10-01', days: [...master.workdays], start: master.workHoursLabel.split('–')[0], end: master.workHoursLabel.split('–')[1], error: '' },
+  });
+  closeMasterPlanForm = () => this.setState({ masterPlanForm: null });
+  setMasterPlanField = (field) => (e) => { const v = e.target.value; this.setState((s) => ({ masterPlanForm: { ...s.masterPlanForm, [field]: v, error: '' } })); };
+  toggleMasterPlanDay = (wd) => () => this.setState((s) => {
+    const days = s.masterPlanForm.days.includes(wd) ? s.masterPlanForm.days.filter((d) => d !== wd) : [...s.masterPlanForm.days, wd].sort();
+    return { masterPlanForm: { ...s.masterPlanForm, days, error: '' } };
+  });
+  // Записи с даты начала нового графика, которые в него не попадают.
+  masterPlanAffected = (plan) => {
+    const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+    return Object.keys(DEMO_WEEK_DATES).filter((date) => date >= plan.from)
+      .flatMap((date) => this.demoLiveApptsOnDate(date))
+      .filter((a) => a.masterId === plan.masterId)
+      .filter((a) => !plan.days.includes(DEMO_WEEK_DATES[a.date]) || a.start < toMin(plan.start) || a.start + a.dur > toMin(plan.end));
+  };
+  submitMasterPlan = () => {
+    const f = this.state.masterPlanForm;
+    const fail = (error) => this.setState((s) => ({ masterPlanForm: { ...s.masterPlanForm, error } }));
+    if (!f.from) return fail('Укажите дату, с которой действует новый график.');
+    if (f.from < ADMIN_TOMORROW) return fail('Новый график можно задать только с завтрашнего дня или позже. Изменения на сегодня — через «График смен».');
+    if (!f.days.length) return fail('Выберите хотя бы один рабочий день.');
+    if (!f.start || !f.end || f.start >= f.end) return fail('Конец смены должен быть позже начала.');
+    if (f.start < STUDIO_OPEN || f.end > STUDIO_CLOSE) return fail('Смена должна быть в часах работы студии: 10:00–20:00.');
+    this.setState((s) => ({ masterPlans: { ...s.masterPlans, [f.masterId]: { ...f, error: undefined } }, masterPlanForm: null }));
+    this.showToast('Новый график начнёт действовать с ' + dateLabelRu(f.from).replace(/ \d{4} г\.?$/, ''));
+  };
+  cancelMasterPlan = (masterId) => () => {
+    this.setState((s) => { const next = { ...s.masterPlans }; delete next[masterId]; return { masterPlans: next }; });
+    this.showToast('Запланированный график отменён');
+  };
+
   addServiceCategory = () => {
     const name = 'Новая категория';
     this.setState((s) => ({ serviceCategories: [...s.serviceCategories, { id: 'cat' + Date.now(), name, order: s.serviceCategories.length + 1 }] }));
@@ -4201,11 +4560,11 @@ class Component extends DCLogic {
     const a = list[idx].order, b = list[swapIdx].order;
     return { serviceCategories: s.serviceCategories.map((c) => c.id === list[idx].id ? { ...c, order: b } : c.id === list[swapIdx].id ? { ...c, order: a } : c) };
   });
-  newServiceDraft = () => ({ categoryId: (this.state.serviceCategories[0] || {}).id, name: '', description: '', dur: 45, price: 0, masters: [], active: true });
+  newServiceDraft = () => ({ categoryId: (this.state.serviceCategories[0] || {}).id, name: '', description: '', dur: 45, cleanup: 15, price: 0, priceTop: 0, masters: [], active: true });
   // Форма услуги — отдельный маршрут: открытие и закрытие меняют адрес, чтобы работали «назад» и карта прототипа.
   openServiceForm = (id) => () => {
     const svc = id ? this.state.services.find((s) => s.id === id) : this.newServiceDraft();
-    this.setState({ serviceFormId: id, serviceForm: { ...svc } });
+    this.setState({ serviceFormId: id, serviceForm: { ...svc }, serviceFormError: '' });
     this.goTo('/staff/admin/services/form');
   };
   closeServiceForm = () => { this.setState({ serviceFormId: null, serviceForm: null }); this.goTo('/staff/admin/services'); };
@@ -4215,7 +4574,7 @@ class Component extends DCLogic {
       this.setState({ serviceFormId: null, serviceForm: this.newServiceDraft() });
     }
   };
-  setServiceFormField = (field) => (e) => this.setState((s) => ({ serviceForm: { ...s.serviceForm, [field]: e.target.value } }));
+  setServiceFormField = (field) => (e) => { const v = e.target.value; this.setState((s) => ({ serviceForm: { ...s.serviceForm, [field]: v }, serviceFormError: '' })); };
   toggleServiceFormBool = (field) => () => this.setState((s) => ({ serviceForm: { ...s.serviceForm, [field]: !s.serviceForm[field] } }));
   toggleServiceFormMaster = (id) => () => this.setState((s) => {
     const has = s.serviceForm.masters.includes(id);
@@ -4223,6 +4582,8 @@ class Component extends DCLogic {
   });
   submitServiceForm = () => {
     const f = this.state.serviceForm;
+    if (Number(f.price) < 0 || Number(f.priceTop) < 0) { this.setState({ serviceFormError: 'Цена не может быть отрицательной.' }); return; }
+    if (Number(f.priceTop) < Number(f.price)) { this.setState({ serviceFormError: 'Цена у топ-мастера не может быть ниже цены у мастера.' }); return; }
     this.setState((s) => {
       const exists = s.services.some((sv) => sv.id === s.serviceFormId);
       const services = exists ? s.services.map((sv) => sv.id === s.serviceFormId ? { ...sv, ...f } : sv) : [...s.services, { ...f, id: 'srv' + Date.now() }];
@@ -4479,10 +4840,12 @@ class Component extends DCLogic {
     const drop = this.state.adminDropPreview;
     const adminMasterCols = ADMIN_MASTERS.map((m) => {
       const liveAppts = this.state.adminAppointments.filter((a) => a.masterId === m.id && ADMIN_LIVE(a));
-      const bookedMin = liveAppts.reduce((sum, a) => sum + a.dur, 0);
+      const bookedMin = liveAppts.reduce((sum, a) => sum + a.dur + Math.min(this.apptCleanupOf(a), Math.max(0, m.shiftEnd - a.start - a.dur)), 0);
       const appts = liveAppts.map((a) => ({
         ...a,
-        top: timeToTop(a.start), height: Math.max(18, a.dur * ADMIN_PX_PER_MIN - 2),
+        cleanup: this.apptCleanupOf(a), hasCleanup: this.apptCleanupOf(a) > 0,
+        cleanupHeight: Math.round(this.apptCleanupOf(a) * ADMIN_PX_PER_MIN),
+        top: timeToTop(a.start), height: Math.max(18, (a.dur + this.apptCleanupOf(a)) * ADMIN_PX_PER_MIN - 2),
         timeLabel: String(Math.floor(a.start / 60)).padStart(2, '0') + ':' + String(a.start % 60).padStart(2, '0'),
         statusBg: STATUS_STYLE[a.status].bg, statusFg: STATUS_STYLE[a.status].fg, statusBorder: STATUS_STYLE[a.status].fg,
         onDragStart: this.adminDragStart(a.id), onDragEnd: this.adminDragEnd,
@@ -4558,7 +4921,7 @@ class Component extends DCLogic {
     });
     const adminSummary = {
       total: adminAllAppts.length,
-      freeHours: (ADMIN_MASTERS.reduce((sum, m) => sum + (m.dayOff ? 0 : (m.shiftEnd - m.shiftStart)), 0) - adminAllAppts.reduce((s, a) => s + a.dur, 0)) / 60,
+      freeHours: (ADMIN_MASTERS.reduce((sum, m) => sum + (m.dayOff ? 0 : (m.shiftEnd - m.shiftStart)), 0) - adminAllAppts.reduce((s, a) => s + a.dur + this.apptCleanupOf(a), 0)) / 60,
       active: adminAllAppts.filter((a) => a.status === 'active').length,
       noShow: adminAllAppts.filter((a) => a.status === 'noShow').length,
       cancelled: this.state.adminAppointments.filter((a) => !ADMIN_LIVE(a)).length,
@@ -4573,10 +4936,13 @@ class Component extends DCLogic {
     const apptCatalog = this.state.services.filter((s) => s.active);
     const apptSelectedServices = apptCatalog.filter((s) => af.serviceIds.includes(s.id));
     const apptTotalDur = apptSelectedServices.reduce((s, x) => s + x.dur, 0);
-    const apptSubtotal = apptSelectedServices.reduce((s, x) => s + x.price, 0);
+    const apptLevelMasterId = af.masterId !== 'any' ? af.masterId : (this.state.adminNewApptSlot ? this.state.adminNewApptSlot.masterId : null);
+    const apptLevelMaster = apptLevelMasterId ? ADMIN_MASTERS.find((m) => m.id === apptLevelMasterId) : null;
+    const apptPriceOf = (x) => Number(apptLevelMaster && this.masterLevel(apptLevelMaster) === 'topMaster' ? x.priceTop : x.price);
+    const apptSubtotal = apptSelectedServices.reduce((s, x) => s + apptPriceOf(x), 0);
     const apptServiceRows = apptCatalog.map((s) => {
       const checked = af.serviceIds.includes(s.id);
-      return { ...s, checked, checkBg: checked ? '#C98B84' : 'transparent', checkBorder: checked ? '#C98B84' : '#E2D8D4', checkMark: checked ? '✓' : '', priceText: s.price.toLocaleString('ru-RU') + ' ₽', onToggle: () => this.toggleApptService(s.id) };
+      return { ...s, checked, checkBg: checked ? '#C98B84' : 'transparent', checkBorder: checked ? '#C98B84' : '#E2D8D4', checkMark: checked ? '✓' : '', priceText: apptPriceOf(s).toLocaleString('ru-RU') + ' ₽', onToggle: () => this.toggleApptService(s.id) };
     });
     const favMasterId = af.selectedClient ? af.selectedClient.favMasterId : null;
     const apptMasterRows = [{ id: 'any', name: 'Любой мастер' }, ...ADMIN_MASTERS.filter((m) => !m.dayOff && apptSelectedServices.every((s) => s.masters.includes(m.id)))].map((m) => {
@@ -4588,18 +4954,9 @@ class Component extends DCLogic {
     const fmtTime = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
     const effMasterId = af.masterId !== 'any' ? af.masterId : apptSlotMasterId;
     const dur = apptTotalDur || 45;
-    const apptHasConflict = !!effMasterId && this.state.adminAppointments.some((a) => ADMIN_LIVE(a) && a.masterId === effMasterId && apptSlotStart < a.start + a.dur && apptSlotStart + dur > a.start);
-    const apptAlternatives = [];
-    if (effMasterId) {
-      const master = ADMIN_MASTERS.find((m) => m.id === effMasterId);
-      const busy = this.state.adminAppointments.filter((a) => ADMIN_LIVE(a) && a.masterId === effMasterId).sort((a, b) => a.start - b.start);
-      let cursor = master.shiftStart;
-      for (const b of busy) {
-        if (b.start - cursor >= dur && apptAlternatives.length < 3) apptAlternatives.push(cursor);
-        cursor = Math.max(cursor, b.start + b.dur);
-      }
-      if (master.shiftEnd - cursor >= dur && apptAlternatives.length < 3) apptAlternatives.push(cursor);
-    }
+    const apptCleanup = apptSelectedServices.reduce((mx, x) => Math.max(mx, Number(x.cleanup) || 0), 0);
+    const apptHasConflict = !!effMasterId && this.adminBusyOverlap(effMasterId, apptSlotStart, dur, apptCleanup, null);
+    const apptAlternatives = effMasterId ? this.adminFreeStarts(ADMIN_MASTERS.find((m) => m.id === effMasterId), dur, apptCleanup, null, 3) : [];
     const apptAlternativeChips = apptAlternatives.map((t) => ({ time: fmtTime(t), onClick: () => this.pickApptAlternative(t) }));
     const apptNearbyChips = apptAlternativeChips;
     const apptTotal = apptSubtotal;
@@ -4613,7 +4970,7 @@ class Component extends DCLogic {
     const apptPopoverData = popoverAppt ? {
       x: popover.x, y: popover.y,
       client: popoverAppt.client, service: popoverAppt.service, master: popoverMaster.name,
-      timeLabel: fmtTime(popoverAppt.start) + '–' + fmtTime(popoverAppt.start + popoverAppt.dur),
+      timeLabel: fmtTime(popoverAppt.start) + '–' + fmtTime(popoverAppt.start + popoverAppt.dur) + (this.apptCleanupOf(popoverAppt) ? ' · уборка до ' + fmtTime(popoverAppt.start + popoverAppt.dur + this.apptCleanupOf(popoverAppt)) : ''),
       statusLabel: STATUS_STYLE[popoverAppt.status].label, statusBg: STATUS_STYLE[popoverAppt.status].bg, statusFg: STATUS_STYLE[popoverAppt.status].fg,
       amount: popoverAppt.price.toLocaleString('ru-RU') + ' ₽ · оплата в студии',
       isActive: popoverAppt.status === 'active',
@@ -4622,6 +4979,10 @@ class Component extends DCLogic {
       onCancel: this.openCancelDialog(popoverAppt.id),
       onNoShow: this.openNoShowDialog(popoverAppt.id),
       onOpenClient: this.adminOpenClientCard(popoverAppt.client),
+      isDone: popoverAppt.status === 'done',
+      photosLabel: 'Фото работ' + (this.photosCountLabel('ap:' + popoverAppt.id, '') ? ' · ' + this.photosCountLabel('ap:' + popoverAppt.id, '') : ''),
+      onPhotos: this.openPhotoDialog({ visitKey: 'ap:' + popoverAppt.id, masterId: popoverAppt.masterId,
+        subtitle: popoverAppt.client + ' · ' + popoverAppt.service + ' · ' + popoverMaster.name + ' · 24 сентября' }),
     } : null;
 
     const dlg = this.state.adminApptDialog;
@@ -4635,15 +4996,8 @@ class Component extends DCLogic {
       const selected = rf.newMasterId === m.id;
       return { ...m, selected, border: selected ? '#C98B84' : '#E2D8D4', bg: selected ? '#F4E6E3' : '#fff', onSelect: () => this.setRescheduleMaster(m.id) };
     }) : [];
-    const rescheduleHasConflict = dlgAppt && rf.newMasterId ? this.state.adminAppointments.some((a) => ADMIN_LIVE(a) && a.id !== dlgAppt.id && a.masterId === rf.newMasterId && rf.newTime < a.start + a.dur && rf.newTime + dlgAppt.dur > a.start) : false;
-    const rescheduleAlts = [];
-    if (dlgAppt && rf.newMasterId) {
-      const master = ADMIN_MASTERS.find((m) => m.id === rf.newMasterId);
-      const busy = this.state.adminAppointments.filter((a) => ADMIN_LIVE(a) && a.masterId === rf.newMasterId && a.id !== dlgAppt.id).sort((a, b) => a.start - b.start);
-      let cursor = master.shiftStart;
-      for (const b of busy) { if (b.start - cursor >= dlgAppt.dur && rescheduleAlts.length < 3) rescheduleAlts.push(cursor); cursor = Math.max(cursor, b.start + b.dur); }
-      if (master.shiftEnd - cursor >= dlgAppt.dur && rescheduleAlts.length < 3) rescheduleAlts.push(cursor);
-    }
+    const rescheduleHasConflict = dlgAppt && rf.newMasterId ? this.adminBusyOverlap(rf.newMasterId, rf.newTime, dlgAppt.dur, this.apptCleanupOf(dlgAppt), dlgAppt.id) : false;
+    const rescheduleAlts = dlgAppt && rf.newMasterId ? this.adminFreeStarts(ADMIN_MASTERS.find((m) => m.id === rf.newMasterId), dlgAppt.dur, this.apptCleanupOf(dlgAppt), dlgAppt.id, 3) : [];
     const rescheduleAltChips = rescheduleAlts.map((t) => ({ time: fmtTime(t), onClick: () => this.setRescheduleTime(t) }));
 
     const CANCEL_REASONS = [
@@ -4734,7 +5088,12 @@ class Component extends DCLogic {
       visits: acdRaw.visits, totalSpentText: acdRaw.totalSpent.toLocaleString('ru-RU') + ' ₽', avgCheckText: acdRaw.avgCheck.toLocaleString('ru-RU') + ' ₽',
       cancellations: acdFull.cancellations, noShows: acdFull.noShows, firstVisit: acdFull.firstVisit, lastVisit: acdRaw.lastVisit, source: acdFull.source,
       blacklisted: acdRaw.blacklisted, notBlacklisted: !acdRaw.blacklisted, blacklistReason: acdRaw.blacklistReason,
-      history: acdFull.history.map((h) => ({ ...h, statusLabel: HIST_STATUS[h.status].label, statusBg: HIST_STATUS[h.status].bg, statusFg: HIST_STATUS[h.status].fg, amountText: h.amount ? h.amount.toLocaleString('ru-RU') + ' ₽' : '—', isCancelled: h.status === 'cancelledClient' || h.status === 'cancelledStudio' })),
+      history: acdFull.history.map((h) => ({ ...h,
+        canPhotos: h.status === 'done',
+        photosLabel: this.photosCountLabel(acdRaw.id + '|' + h.date, '+ Добавить фото') + (this.photosCountLabel(acdRaw.id + '|' + h.date, '') ? ' ·' : ''),
+        onPhotos: this.openPhotoDialog({ visitKey: acdRaw.id + '|' + h.date, masterId: (ADMIN_MASTERS.find((m) => m.name === h.master) || {}).id,
+          subtitle: acdRaw.name + ' · ' + h.service + ' · ' + h.master + ' · ' + h.date }),
+        statusLabel: HIST_STATUS[h.status].label, statusBg: HIST_STATUS[h.status].bg, statusFg: HIST_STATUS[h.status].fg, amountText: h.amount ? h.amount.toLocaleString('ru-RU') + ' ₽' : '—', isCancelled: h.status === 'cancelledClient' || h.status === 'cancelledStudio' })),
       hasHistory: acdFull.history.length > 0, hasNoHistory: acdFull.history.length === 0,
       upcoming: acdFull.upcoming, hasUpcoming: acdFull.upcoming.length > 0, hasNoUpcoming: acdFull.upcoming.length === 0,
       notes: acdFull.notes, hasNotes: acdFull.notes.length > 0, hasNoNotes: acdFull.notes.length === 0,
@@ -4754,7 +5113,7 @@ class Component extends DCLogic {
     const MASTER_STATUS = { active: { label: 'Активен', bg: '#C7D6BF', fg: '#4E6B47' }, inactive: { label: 'Отключён', bg: '#F1EAE7', fg: '#6C6663' } };
     const mastersListRows = ADMIN_MASTERS.map((m) => {
       const st = MASTER_STATUS[m.active ? 'active' : 'inactive'];
-      return { ...m, initials: m.name.split(' ').map((w) => w[0]).join(''), specialization: m.specialty,
+      return { ...m, initials: m.name.split(' ').map((w) => w[0]).join(''), specialization: m.specialty, levelLabel: LEVEL_LABEL[this.masterLevel(m)],
         statusLabel: st.label, statusBg: st.bg, statusFg: st.fg,
         todayCount: this.state.adminAppointments.filter((a) => a.masterId === m.id && ADMIN_LIVE(a)).length,
         onOpen: this.goToMasterDetail(m.id) };
@@ -4763,16 +5122,78 @@ class Component extends DCLogic {
     // ---- график смен на месяц ----
     // Сентябрь 2026: 1-е число — вторник. Студия работает вт–сб, в воскресенье и понедельник закрыта.
     const MONTH_DAYS = Array.from({ length: 30 }, (_, i) => i + 1);
+    // Порядок правил (схема БД, раздел 7.2): особый день студии → режим студии по дню недели →
+    // изменение смены мастера на дату → недельный график мастера, действующий на эту дату.
     const scheduleRows = ADMIN_MASTERS.map((m) => {
+      const plan = this.state.masterPlans[m.id];
       const cells = MONTH_DAYS.map((day, idx) => {
         const weekday = (2 + idx) % 7;
-        const closed = weekday === 0 || weekday === 1;
+        const dateStr = '2026-09-' + String(day).padStart(2, '0');
+        const special = this.state.studioDays.find((d) => d.date === dateStr);
+        const closed = special ? !special.isOpen : (weekday === 0 || weekday === 1);
         const override = this.state.mastersScheduleMonth[m.id + '-' + idx];
-        const working = !closed && (override != null ? !!override : m.workdays.includes(weekday));
-        return { day, working, cellBg: closed ? '#FBF7F5' : (working ? '#C7D6BF' : '#F1EAE7'), onClick: closed ? null : this.toggleScheduleCell(m.id, idx, working) };
+        const planWorks = plan && dateStr >= plan.from ? plan.days.includes(weekday) : m.workdays.includes(weekday);
+        const working = !closed && (override != null ? !!override : planWorks);
+        const title = day + ' сентября' + (special ? ' · ' + special.reason + (special.isOpen ? ' (' + special.from + '–' + special.to + ')' : ' — студия закрыта') : (closed ? ' · студия закрыта' : (working ? ' · рабочий день' : ' · выходной')));
+        return { day, working, title, ringWidth: special ? '1.5px' : '0', cursor: closed ? 'default' : 'pointer',
+          cellBg: closed ? '#FBF7F5' : (working ? '#C7D6BF' : '#F1EAE7'), onClick: closed ? null : this.toggleScheduleCell(m.id, idx, working) };
       });
       return { id: m.id, name: m.name, cells };
     });
+
+    // ---- фото работ (A-12) ----
+    const pd = this.state.photoDialog;
+    const photoDialogPhotos = pd ? this.state.workPhotos.filter((ph) => ph.visitKey === pd.visitKey).map((ph) => {
+      const canPublish = ph.consent || !ph.visitKey;
+      return { ...ph, hasUrl: !!ph.url, noUrl: !ph.url, bgImage: ph.url ? 'url(' + ph.url + ')' : 'none',
+        consentMark: ph.consent ? '✓' : '', consentBg: ph.consent ? '#C98B84' : 'transparent', consentBorder: ph.consent ? '#C98B84' : '#E2D8D4',
+        publishMark: ph.published ? '✓' : '', publishBg: ph.published ? '#C98B84' : (canPublish ? 'transparent' : '#F1EAE7'), publishBorder: ph.published ? '#C98B84' : '#E2D8D4',
+        publishFg: canPublish ? '#0F0B0C' : '#B4A9A4', publishCursor: canPublish ? 'pointer' : 'not-allowed',
+        publishHint: canPublish ? '' : 'Нужна отметка о согласии клиента', showConsentHint: !canPublish,
+        onTitle: this.setPhotoTitle(ph.id), onToggleConsent: this.togglePhotoConsent(ph.id),
+        onTogglePublish: this.togglePhotoPublish(ph.id), onRemove: this.removePhoto(ph.id) };
+    }) : [];
+
+    // ---- особые дни студии ----
+    const sdf = this.state.studioDayForm;
+    const studioDayRows = this.state.studioDays.map((d) => {
+      const wd = parseDateStr(d.date).getDay();
+      const normallyClosed = wd === 0 || wd === 1;
+      const kindLabel = !d.isOpen ? 'Студия закрыта' : (normallyClosed ? 'Доп. рабочий день · ' : 'Особые часы · ') + d.from + '–' + d.to;
+      return { ...d, dateLabel: dateLabelRu(d.date).replace(/ г\.?$/, ''), weekdayLabel: WEEKDAY_FULL[wd], kindLabel,
+        badgeBg: d.isOpen ? '#C7D6BF' : '#EFC8C6', badgeFg: d.isOpen ? '#4E6B47' : '#8F2A2A', onRemove: this.removeStudioDay(d.date) };
+    });
+    const studioDayKinds = [{ isOpen: false, label: 'Закрыта весь день' }, { isOpen: true, label: 'Работает в особые часы' }].map((k) => {
+      const selected = sdf.isOpen === k.isOpen;
+      return { ...k, border: selected ? '#C98B84' : '#E2D8D4', bg: selected ? '#F4E6E3' : '#fff', onSelect: this.setStudioDayKind(k.isOpen) };
+    });
+    const studioDayAffectedList = this.studioDayAffected(sdf);
+
+    // ---- новый график мастера с даты ----
+    const WD_SHORT_MON = [[1, 'пн'], [2, 'вт'], [3, 'ср'], [4, 'чт'], [5, 'пт'], [6, 'сб'], [0, 'вс']];
+    const detailId = isAdminMasterDetail ? params.id : null;
+    const mpf = this.state.masterPlanForm && this.state.masterPlanForm.masterId === detailId ? this.state.masterPlanForm : null;
+    const savedPlan = detailId ? this.state.masterPlans[detailId] : null;
+    const planDaysLabel = (days) => WD_SHORT_MON.filter(([wd]) => days.includes(wd)).map(([, l]) => l).join(', ');
+    const planAffectedText = (plan) => {
+      const list = this.masterPlanAffected(plan);
+      return list.length
+        ? 'Не попадают в новый график (' + list.length + '): ' + list.map((a) => this.apptShortLabel(a)).join('; ') + '. Перенесите их или отмените со статусом «Отменена студией».'
+        : 'Записей, которые не попадают в новый график, нет.';
+    };
+    const masterPlan = savedPlan ? {
+      fromLabel: dateLabelRu(savedPlan.from).replace(/ г\.?$/, ''), daysLabel: planDaysLabel(savedPlan.days), hoursLabel: savedPlan.start + '–' + savedPlan.end,
+      affectedText: planAffectedText(savedPlan), affectedColor: this.masterPlanAffected(savedPlan).length ? '#8F2A2A' : '#4E6B47',
+    } : null;
+    const masterPlanDayChips = mpf ? WD_SHORT_MON.map(([wd, label]) => {
+      const closed = wd === 0 || wd === 1;
+      const on = mpf.days.includes(wd);
+      return { label, disabled: closed, title: closed ? 'Студия закрыта' : '', cursor: closed ? 'not-allowed' : 'pointer',
+        border: on ? '#C98B84' : '#E2D8D4', bg: closed ? '#FBF7F5' : (on ? '#F4E6E3' : '#fff'), fg: closed ? '#C7BFBC' : '#0F0B0C',
+        onToggle: closed ? undefined : this.toggleMasterPlanDay(wd) };
+    }) : [];
+    const mpfValid = mpf && mpf.from && mpf.days.length && mpf.start && mpf.end && mpf.start < mpf.end;
+    const mpfAffected = mpfValid ? this.masterPlanAffected(mpf) : [];
 
     // ---- карточка мастера ----
     const masterDetailRaw = isAdminMasterDetail ? ADMIN_MASTERS.find((m) => m.id === params.id) : null;
@@ -4781,7 +5202,8 @@ class Component extends DCLogic {
       id: masterDetailRaw.id, name: masterDetailRaw.name, initials: masterDetailRaw.name.split(' ').map((w) => w[0]).join(''),
       specialization: masterDetailRaw.specialty,
       statusLabel: masterDetailStatus.label, statusBg: masterDetailStatus.bg, statusFg: masterDetailStatus.fg,
-      services: this.state.services.filter((s) => s.masters.includes(masterDetailRaw.id)).map((s) => ({ name: s.name, dur: s.dur + ' мин' })),
+      services: this.state.services.filter((s) => s.masters.includes(masterDetailRaw.id)).map((s) => ({ name: s.name, dur: s.dur + ' мин',
+        priceText: Number(this.masterLevel(masterDetailRaw) === 'topMaster' ? s.priceTop : s.price).toLocaleString('ru-RU') + ' ₽' })),
       workDaysLabel: masterDetailRaw.workDaysLabel, workHoursLabel: masterDetailRaw.workHoursLabel,
     } : null;
 
@@ -4789,7 +5211,7 @@ class Component extends DCLogic {
     const catsSorted = [...this.state.serviceCategories].sort((a, b) => a.order - b.order);
     const servicesByCategory = catsSorted.map((cat, idx) => {
       const svcs = this.state.services.filter((s) => s.categoryId === cat.id).map((s) => ({
-        ...s, durText: s.dur + ' мин', priceText: Number(s.price).toLocaleString('ru-RU') + ' ₽',
+        ...s, durText: s.dur + ' мин' + (Number(s.cleanup) ? ' + ' + s.cleanup + ' уборка' : ''), priceText: Number(s.price).toLocaleString('ru-RU') + (s.priceTop != null && Number(s.priceTop) !== Number(s.price) ? ' / ' + Number(s.priceTop).toLocaleString('ru-RU') : '') + ' ₽',
         mastersText: s.masters.map((mid) => (ADMIN_MASTERS.find((m) => m.id === mid) || {}).name).filter(Boolean).join(', ') || '—',
         activeLabel: s.active ? 'Включена' : 'Отключена', activeBg: s.active ? '#C7D6BF' : '#F1EAE7', activeFg: s.active ? '#4E6B47' : '#6C6663',
         onOpen: this.openServiceForm(s.id),
@@ -5022,6 +5444,36 @@ class Component extends DCLogic {
       goBackToMastersList: () => this.goTo('/staff/admin/masters'),
       scheduleRows,
       masterDetail,
+      adminTodayStr: ADMIN_TODAY, adminTomorrowStr: ADMIN_TOMORROW,
+      masterLevelOptions: masterDetailRaw ? ['master', 'topMaster'].map((lv) => {
+        const on = this.masterLevel(masterDetailRaw) === lv;
+        return { label: LEVEL_LABEL[lv], bg: on ? '#C98B84' : '#fff', fg: on ? '#0F0B0C' : '#857B77', onSelect: this.setMasterLevel(masterDetailRaw.id, lv) };
+      }) : [],
+      photoDialogOpen: !!this.state.photoDialog,
+      photoDialog: this.state.photoDialog ? { ...this.state.photoDialog, profileHref: '#/masters/' + (this.state.photoDialog.masterId || '') } : { subtitle: '', profileHref: '#/' },
+      photoDialogPhotos: photoDialogPhotos, photoDialogEmpty: photoDialogPhotos.length === 0,
+      photoDialogPublishedCount: photoDialogPhotos.filter((ph) => ph.published).length,
+      closePhotoDialog: this.closePhotoDialog, onPhotoFiles: this.onPhotoFiles,
+      studioDayRows, studioDaysEmpty: studioDayRows.length === 0, studioDayKinds,
+      studioDayForm: sdf, studioDayFormIsHours: sdf.isOpen, studioDayHasError: !!sdf.error,
+      onStudioDayDate: this.setStudioDayField('date'), onStudioDayFrom: this.setStudioDayField('from'),
+      onStudioDayTo: this.setStudioDayField('to'), onStudioDayReason: this.setStudioDayField('reason'),
+      studioDayAffected: studioDayAffectedList.map((a) => ({ label: this.apptShortLabel(a) })),
+      studioDayHasAffected: studioDayAffectedList.length > 0,
+      studioDayAffectedTitle: (sdf.isOpen ? 'Вне новых часов студии ' : 'На эту дату ') + 'записей: ' + studioDayAffectedList.length,
+      submitStudioDay: this.submitStudioDay,
+      masterPlan, masterPlanExists: !!masterPlan,
+      masterPlanCanStart: !!masterDetailRaw && !mpf && !savedPlan,
+      openMasterPlanForm: masterDetailRaw ? this.openMasterPlanForm(masterDetailRaw) : null,
+      cancelMasterPlan: detailId ? this.cancelMasterPlan(detailId) : null,
+      masterPlanFormOpen: !!mpf, masterPlanForm: mpf || { from: '', start: '', end: '', error: '' },
+      masterPlanDayChips, masterPlanHasError: !!(mpf && mpf.error),
+      onMasterPlanFrom: this.setMasterPlanField('from'), onMasterPlanStart: this.setMasterPlanField('start'), onMasterPlanEnd: this.setMasterPlanField('end'),
+      masterPlanPreviewText: !mpfValid ? '' : (mpfAffected.length
+        ? 'Не попадут в новый график (' + mpfAffected.length + '): ' + mpfAffected.map((a) => this.apptShortLabel(a)).join('; ')
+        : 'Записей, которые не попадут в новый график, нет.'),
+      masterPlanPreviewColor: mpfAffected.length ? '#8F2A2A' : '#4E6B47',
+      closeMasterPlanForm: this.closeMasterPlanForm, submitMasterPlan: this.submitMasterPlan,
       isAdminServices, isAdminServiceForm,
       servicesByCategory,
       addServiceCategory: this.addServiceCategory,
@@ -5035,6 +5487,9 @@ class Component extends DCLogic {
       onServiceFormCategory: this.setServiceFormField('categoryId'),
       serviceFormCategories: catsSorted,
       onServiceFormDur: this.setServiceFormField('dur'),
+      onServiceFormPriceTop: this.setServiceFormField('priceTop'),
+      serviceFormError: this.state.serviceFormError, serviceFormHasError: !!this.state.serviceFormError,
+      onServiceFormCleanup: this.setServiceFormField('cleanup'),
       onServiceFormPrice: this.setServiceFormField('price'),
       serviceFormMasters,
       serviceFormActiveMark, serviceFormActiveBg, serviceFormActiveBorder, toggleServiceFormActive: this.toggleServiceFormBool('active'),
