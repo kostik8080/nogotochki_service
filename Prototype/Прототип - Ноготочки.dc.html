@@ -1384,6 +1384,9 @@
                     </div>
                   </sc-if>
 
+                  <sc-for list="{{ m.blocks }}" as="bl" hint-placeholder-count="1">
+                    <div title="Блокировка времени" style="position:absolute; left:2px; right:2px; top:{{ bl.top }}px; height:{{ bl.height }}px; border-radius:4px; border:1px dashed #C7BFBC; background-image:repeating-linear-gradient(45deg, #F1EAE7, #F1EAE7 6px, #FBF7F5 6px, #FBF7F5 12px); color:#857B77; font-size:10px; font-weight:700; padding:3px 6px; box-sizing:border-box; z-index:1; display:flex; align-items:flex-end;">{{ bl.label }}</div>
+                  </sc-for>
                   <sc-if value="{{ m.showPreview }}" hint-placeholder-val="{{ false }}">
                     <div style="position:absolute; left:2px; right:2px; top:{{ m.previewTop }}px; height:{{ m.previewHeight }}px; background:{{ m.previewBg }}; border:1.5px dashed {{ m.previewBorder }}; border-radius:4px; z-index:5;"></div>
                   </sc-if>
@@ -2645,7 +2648,11 @@ const ROUTES = [
   { path: '/staff/states-gallery', label: 'Сотрудники · Галерея состояний', group: 'Сотрудники' },
 ];
 
-const STAFF_TEST_USER = { phone: '+7 (999) 000-11-22', password: 'Admin1234', name: 'Администратор студии', roles: ['administrator'] };
+// Учётная запись администратора: как строка users — только хеш пароля, открытого пароля нет.
+const STAFF_TEST_USER = { phone: '+7 (999) 000-11-22', name: 'Администратор студии', roles: ['administrator'],
+  passwordHash: 'pbkdf2-sha256$600000$wZ8N9reVtz1EIOZS9Weqww==$aVZJSxVoGFHcrY7dVkT+ZNiH2KriH6iYjqkH/YpQ8iQ=' };
+// Подсказка для тех, кто проверяет прототип. Это не данные пользователей и в базу не попадает.
+const DEMO_LOGIN_HINTS = { client: '+7 (911) 222-33-44 / Test1234', staff: '+7 (999) 000-11-22 / Admin1234' };
 // Раздел администратора. Шахматка показывает четверг, 24 сентября; время — в минутах от полуночи.
 const ADMIN_DAY_WEEKDAY = 4;
 // «Сегодня» в разделе администратора и даты демо-недели 22–26 сентября (вт–сб).
@@ -2917,6 +2924,8 @@ class Component extends DCLogic {
     masterPlans: {},
     masterPlanForm: null,
     workPhotos: WORK_PHOTOS_SEED,
+    clientPasswordHash: null,
+    staffPasswordHash: null,
     photoDialog: null,
     masterLevels: {},
     serviceFormError: '',
@@ -3156,9 +3165,11 @@ class Component extends DCLogic {
   onPwCurrent = (e) => this.setState({ pwCurrent: e.target.value, pwCurrentError: false });
   onPwNew = (e) => this.setState({ pwNew: e.target.value });
   onPwConfirm = (e) => this.setState({ pwConfirm: e.target.value });
-  savePassword = () => {
-    if (this.state.pwCurrent !== 'Test1234') { this.setState({ pwCurrentError: true }); return; }
-    this.setState({ pwCurrent: '', pwNew: '', pwConfirm: '' });
+  savePassword = async () => {
+    if (!(await this.checkPassword(this.state.pwCurrent, this.clientHash()))) { this.setState({ pwCurrentError: true }); return; }
+    // Сохраняется только хеш нового пароля; поля формы очищаются.
+    const newHash = await this._data.hashPassword(this.state.pwNew);
+    this.setState({ clientPasswordHash: newHash, pwCurrent: '', pwNew: '', pwConfirm: '' });
     this.showToast('Пароль изменён');
   };
 
@@ -3221,7 +3232,7 @@ class Component extends DCLogic {
       if (scenario === 'slotConflict') {
         const b = this.getEffectiveBookings().find((x) => x.id === bookingId);
         const masterId = this.state.rescheduleMasterOverrideId || (b && b.masterId);
-        const alts = data.getAlternativeSlots([masterId], this.state.rescheduleSelectedDate, b.durationMin, this.state.rescheduleSelectedSlot.start, 5, data.cleanupForServices([b.serviceId]));
+        const alts = data.getAlternativeSlots([masterId], this.state.rescheduleSelectedDate, b.durationMin, this.state.rescheduleSelectedSlot.start, 5, data.cleanupForServices([b.serviceId]), b.id);
         this.setState({ rescheduleSubmitting: false, rescheduleErrorType: 'slotTaken', rescheduleAlternatives: alts });
         return;
       }
@@ -3575,7 +3586,7 @@ class Component extends DCLogic {
     const durationMin = booking.durationMin;
     const cleanupMin = data.cleanupForServices([booking.serviceId]);
     const eligible = [masterId];
-    const anyAvailability = data.hasAnyAvailability(eligible, durationMin, cleanupMin);
+    const anyAvailability = data.hasAnyAvailability(eligible, durationMin, cleanupMin, booking.id);
     const coveringMasters = data.findCoveringMasters([booking.serviceId]).filter((m) => m.id !== masterId);
 
     if (this.state.rescheduleErrorType === 'serverError') {
@@ -3625,7 +3636,7 @@ class Component extends DCLogic {
       if (data.isSalonClosedOn(dateStr)) return 'salonClosed';
       const vac = data.getVacationInfo(master, dateObj);
       if (vac && vac.active) return 'vacation';
-      return data.dayHasAvailability(eligible, dateStr, durationMin, cleanupMin) ? 'available' : 'noSlots';
+      return data.dayHasAvailability(eligible, dateStr, durationMin, cleanupMin, booking.id) ? 'available' : 'noSlots';
     };
 
     const calendarDays = [];
@@ -3657,13 +3668,13 @@ class Component extends DCLogic {
       hasSelectedDate = true;
       const dateStr = this.state.rescheduleSelectedDate;
       const isOriginalDate = dateStr === originalDateStr;
-      const slots = data.getFreeStartTimes(masterId, dateStr, durationMin, cleanupMin);
+      const slots = data.getFreeStartTimes(masterId, dateStr, durationMin, cleanupMin, booking.id);
       const augmented = slots.slice();
       if (isOriginalDate && !augmented.some((s) => s.start === oldTime)) augmented.push({ start: oldTime, end: oldTime, isOwn: true });
       augmented.sort((a, b) => a.start.localeCompare(b.start));
       if (!slots.length && !isOriginalDate) {
         noSlotsThisDay = true;
-        nextDateSuggestions = data.nextAvailableDates(eligible, durationMin, dateStr, 3, cleanupMin).map((ds) => ({
+        nextDateSuggestions = data.nextAvailableDates(eligible, durationMin, dateStr, 3, cleanupMin, booking.id).map((ds) => ({
           dateStr: ds, label: new Date(ds + 'T00:00:00').toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' }),
           onClick: () => this.reschedulePickDate(ds),
         }));
@@ -3893,7 +3904,8 @@ class Component extends DCLogic {
     const availableMasterCards = full.map((m) => {
       const total = cart.reduce((sum, id) => { const s = allServices.find((x) => x.id === id); return sum + (s ? s.priceByLevel[this.masterLevel(m)] : 0); }, 0);
       const vac = data.getVacationInfo(m);
-      const slot = data.nearestFreeSlot(m.id);
+      const cartDur = cart.reduce((sum, id) => { const s = allServices.find((x) => x.id === id); return sum + (s ? s.durationMin : 0); }, 0);
+      const slot = data.nearestFreeSlot(m.id, cartDur, data.cleanupForServices(cart));
       return {
         id: m.id, name: m.name, specialty: m.specialty, levelLabel: this.levelLabel(this.masterLevel(m)),
         priceText: total.toLocaleString('ru-RU') + ' ₽',
@@ -4228,6 +4240,10 @@ class Component extends DCLogic {
   stopVerifyTimer = () => { clearInterval(this._verifyInterval); };
 
   getTestClient = () => (this._data && this._data.testClient) || { phone: '+7 (911) 222-33-44', email: 'maria@example.com' };
+  // Текущий хеш пароля: после смены или сброса — новый хеш, сам пароль нигде не сохраняется.
+  clientHash = () => this.state.clientPasswordHash || this.getTestClient().passwordHash;
+  staffHash = () => this.state.staffPasswordHash || STAFF_TEST_USER.passwordHash;
+  checkPassword = (password, stored) => (this._data ? this._data.verifyPassword(password, stored) : Promise.resolve(false));
 
   completeAuth = () => {
     sessionStorage.setItem('nog_authed', '1');
@@ -4243,10 +4259,11 @@ class Component extends DCLogic {
     const f = this.state.authForms.login;
     const client = this.getTestClient();
     this.updateAuthForm('login', { loading: true, error: '' });
-    setTimeout(() => {
+    setTimeout(async () => {
       const idNorm = f.identifier.trim().toLowerCase();
-      const ok = (idNorm === client.phone.toLowerCase() || idNorm === client.email.toLowerCase()) && f.password === 'Test1234';
-      if (ok) { this.updateAuthForm('login', { loading: false }); this.completeAuth(); }
+      const idOk = idNorm === client.phone.toLowerCase() || idNorm === client.email.toLowerCase();
+      const ok = idOk && await this.checkPassword(f.password, this.clientHash());
+      if (ok) { this.updateAuthForm('login', { loading: false, password: '' }); this.completeAuth(); }
       else this.updateAuthForm('login', { loading: false, error: 'Неверный логин или пароль' });
     }, 700);
   };
@@ -4254,11 +4271,11 @@ class Component extends DCLogic {
   submitStaffLogin = () => {
     const f = this.state.authForms.staffLogin;
     this.updateAuthForm('staffLogin', { loading: true, error: '' });
-    setTimeout(() => {
+    setTimeout(async () => {
       const idNorm = f.identifier.trim().toLowerCase();
-      const ok = idNorm === STAFF_TEST_USER.phone.toLowerCase() && f.password === STAFF_TEST_USER.password;
+      const ok = idNorm === STAFF_TEST_USER.phone.toLowerCase() && await this.checkPassword(f.password, this.staffHash());
       if (ok) {
-        this.updateAuthForm('staffLogin', { loading: false });
+        this.updateAuthForm('staffLogin', { loading: false, password: '' });
         sessionStorage.setItem('nog_staff_authed', '1');
         this.goTo('/staff/admin-home');
       } else {
@@ -4303,19 +4320,22 @@ class Component extends DCLogic {
   // Перерыв на уборку после записи — из услуги записи.
   apptCleanupOf = (a) => { const s = this.state.services.find((x) => x.id === a.serviceId); return s ? Number(s.cleanup) || 0 : 0; };
   // Пересекается ли визит [start, start+dur) вместе с уборкой после него с другими записями мастера (с учётом их уборки).
+  // Блокировки мастера на день из шахматки (обед и т. п.): визит на них заходить не может, уборка — может.
+  adminDayBlocks = (masterId) => ADMIN_WEEK_BLOCKS.filter((b) => b.masterId === masterId && b.weekday === ADMIN_DAY_WEEKDAY && !b.allDay);
   adminBusyOverlap = (masterId, start, dur, cleanup, excludeId) => this.state.adminAppointments.some((a) => ADMIN_LIVE(a) && a.id !== excludeId && a.masterId === masterId
-    && start < a.start + a.dur + this.apptCleanupOf(a) && start + dur + cleanup > a.start);
+    && start < a.start + a.dur + this.apptCleanupOf(a) && start + dur + cleanup > a.start)
+    || this.adminDayBlocks(masterId).some((b) => start < b.start + b.dur && start + dur > b.start);
   // Ближайшие окна, куда помещается визит: уборка после визита не должна задевать следующую запись,
   // но может выходить за конец смены.
+  // Считается в момент запроса из смены, записей (с уборкой) и блокировок: первое время каждого свободного окна.
   adminFreeStarts = (master, dur, cleanup, excludeId, limit) => {
     const out = [];
-    const busy = this.state.adminAppointments.filter((a) => ADMIN_LIVE(a) && a.masterId === master.id && a.id !== excludeId).sort((a, b) => a.start - b.start);
-    let cursor = master.shiftStart;
-    for (const b of busy) {
-      if (b.start - cursor >= dur + cleanup && out.length < limit) out.push(cursor);
-      cursor = Math.max(cursor, b.start + b.dur + this.apptCleanupOf(b));
+    let prevOk = false;
+    for (let t = master.shiftStart; t + dur <= master.shiftEnd && out.length < limit; t += 15) {
+      const ok = !this.adminBusyOverlap(master.id, t, dur, cleanup, excludeId);
+      if (ok && !prevOk) out.push(t);
+      prevOk = ok;
     }
-    if (master.shiftEnd - cursor >= dur && out.length < limit) out.push(cursor);
     return out;
   };
 
@@ -4693,9 +4713,13 @@ class Component extends DCLogic {
     const r = this.state.authForms.reset;
     if (r.password !== r.confirm) { this.updateAuthForm('reset', { error: 'mismatch' }); return; }
     this.updateAuthForm('reset', { loading: true, error: '' });
-    setTimeout(() => {
+    setTimeout(async () => {
+      // Новый пароль превращается в хеш и заменяет прежний хеш; сам пароль не сохраняется.
+      const newHash = await this._data.hashPassword(r.password);
+      if (sessionStorage.getItem('nog_forgot_from') === 'staff') this.setState({ staffPasswordHash: newHash });
+      else this.setState({ clientPasswordHash: newHash });
       sessionStorage.removeItem('nog_reset_verified');
-      this.updateAuthForm('reset', { loading: false, success: true });
+      this.updateAuthForm('reset', { loading: false, success: true, password: '', confirm: '' });
     }, 700);
   };
   resendResetLink = () => { this.goTo('/forgot-password'); };
@@ -4715,10 +4739,11 @@ class Component extends DCLogic {
     const f = this.state.authForms.login;
     const client = this.getTestClient();
     this.updateAuthForm('login', { loading: true, error: '' });
-    setTimeout(() => {
+    setTimeout(async () => {
       const idNorm = f.identifier.trim().toLowerCase();
-      const ok = (idNorm === client.phone.toLowerCase() || idNorm === client.email.toLowerCase()) && f.password === 'Test1234';
-      if (ok) { this.updateAuthForm('login', { loading: false }); sessionStorage.setItem('nog_authed', '1'); this.setState({ authed: true, sessionExpiredModalOpen: false }); }
+      const idOk = idNorm === client.phone.toLowerCase() || idNorm === client.email.toLowerCase();
+      const ok = idOk && await this.checkPassword(f.password, this.clientHash());
+      if (ok) { this.updateAuthForm('login', { loading: false, password: '' }); sessionStorage.setItem('nog_authed', '1'); this.setState({ authed: true, sessionExpiredModalOpen: false }); }
       else this.updateAuthForm('login', { loading: false, error: 'Неверный логин или пароль' });
     }, 600);
   };
@@ -4859,8 +4884,10 @@ class Component extends DCLogic {
       const showPreOff = !m.dayOff && m.shiftStart > ADMIN_GRID_START;
       const showPostOff = !m.dayOff && m.shiftEnd < ADMIN_GRID_END;
       const showPreview = drop && drop.masterId === m.id;
+      const blocks = m.dayOff ? [] : this.adminDayBlocks(m.id).map((b) => ({ ...b, top: timeToTop(b.start), height: Math.round(b.dur * ADMIN_PX_PER_MIN),
+        label: b.reason + ' · ' + String(Math.floor(b.start / 60)).padStart(2, '0') + ':' + String(b.start % 60).padStart(2, '0') + '–' + String(Math.floor((b.start + b.dur) / 60)).padStart(2, '0') + ':' + String((b.start + b.dur) % 60).padStart(2, '0') }));
       return {
-        ...m, initials: m.name.split(' ').map((w) => w[0]).join(''), appts,
+        ...m, initials: m.name.split(' ').map((w) => w[0]).join(''), appts, blocks,
         loadPct: m.dayOff ? 'выходной' : 'занято ' + Math.round(bookedMin / (m.shiftEnd - m.shiftStart) * 100) + '%',
         dayOffLabel: m.dayOff ? 'Выходной' : '',
         showPreOff, preOffTop, preOffHeight, showPostOff, postOffTop, postOffHeight,
@@ -4921,7 +4948,7 @@ class Component extends DCLogic {
     });
     const adminSummary = {
       total: adminAllAppts.length,
-      freeHours: (ADMIN_MASTERS.reduce((sum, m) => sum + (m.dayOff ? 0 : (m.shiftEnd - m.shiftStart)), 0) - adminAllAppts.reduce((s, a) => s + a.dur + this.apptCleanupOf(a), 0)) / 60,
+      freeHours: (ADMIN_MASTERS.reduce((sum, m) => sum + (m.dayOff ? 0 : (m.shiftEnd - m.shiftStart - this.adminDayBlocks(m.id).reduce((x, b) => x + b.dur, 0))), 0) - adminAllAppts.reduce((s, a) => s + a.dur + this.apptCleanupOf(a), 0)) / 60,
       active: adminAllAppts.filter((a) => a.status === 'active').length,
       noShow: adminAllAppts.filter((a) => a.status === 'noShow').length,
       cancelled: this.state.adminAppointments.filter((a) => !ADMIN_LIVE(a)).length,
@@ -5343,7 +5370,7 @@ class Component extends DCLogic {
       staffLoginLoading: staffLoginF.loading,
       staffLoginButtonOpacity: staffLoginF.loading ? 0.6 : 1,
       staffLoginButtonLabel: staffLoginF.loading ? 'Входим…' : 'Войти',
-      staffLoginTestHint: STAFF_TEST_USER.phone + ' / ' + STAFF_TEST_USER.password,
+      staffLoginTestHint: DEMO_LOGIN_HINTS.staff,
       submitStaffLogin: this.submitStaffLogin,
       goStaffSmsLogin: this.goStaffSmsLogin,
       goStaffForgot: this.goStaffForgot,

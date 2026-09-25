@@ -59,8 +59,7 @@ export const masters = [
     workdays: [2, 4, 6], workHours: { from: '10:00', to: '19:00' }, experienceYears: 5,
     // Паспорт: Елена делает маникюр, наращивание (без дизайна) и ламинирование бровей.
     serviceIds: ['s1', 's2', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12', 's13'],
-    // Паспорт, сценарий 8: Елена уходит в отпуск на неделю.
-    vacation: { startOffsetDays: 10, lengthDays: 7 },
+    // Паспорт, сценарий 8: отпуск Елены — блокировка в timeBlocks (таблица time_blocks).
   },
 ];
 
@@ -86,77 +85,171 @@ export function isSalonClosedOn(dateStr) {
 }
 
 const hhmmToMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+const minToHhmm = (mins) => pad(Math.floor(mins / 60)) + ':' + pad(mins % 60);
+const parseLocalDate = (dateStr) => { const [y, m, d] = dateStr.split('-').map(Number); return new Date(y, m - 1, d); };
+const atTime = (dateStr, hhmm) => new Date(parseLocalDate(dateStr).getTime() + hhmmToMin(hhmm) * 60000);
+const TODAY = parseLocalDate(fmtDate(new Date()));
+const HORIZON_DAYS = salonSettings.bookingHorizonMonths * 30;
+const horizonDates = () => Array.from({ length: HORIZON_DAYS }, (_, i) => fmtDate(addDays(TODAY, i)));
+const datesOnWeekday = (weekday) => horizonDates().filter((d) => parseLocalDate(d).getDay() === weekday);
 
-// Генерация расписания мастера на bookingHorizonMonths вперёд.
+// ===================================================================================
+// Данные, из которых считается свободное время. Каждый массив повторяет таблицу БД
+// (docs/db-schema.md). Готовых слотов нигде нет: свободное время мастера на день
+// вычисляется в момент запроса — см. dayInfo(), getFreeIntervals(), getFreeStartTimes().
+// ===================================================================================
+
+// master_weekly_hours — обычный недельный график с периодом действия (valid_to = null — бессрочно).
+export const weeklyHours = masters.flatMap((m) => m.workdays.map((weekday) => ({
+  masterId: m.id, weekday, start: m.workHours.from, end: m.workHours.to, validFrom: '2024-01-01', validTo: null,
+})));
+
+// master_day_overrides — изменение смены на конкретную дату (из «Графика смен»).
+// Пример: Елена выходит в ближайшую среду, хотя по графику работает вт, чт, сб.
+export const masterDayOverrides = [
+  { masterId: 'm3', date: datesOnWeekday(3)[0], isWorking: true, start: '12:00', end: '19:00' },
+];
+
+// time_blocks — блокировки времени мастера: конкретные промежутки (обед по четвергам — серия блокировок).
+const firstSaturday = datesOnWeekday(6)[0];
+export const timeBlocks = [
+  // Паспорт, сценарий 1: обед Анны по четвергам 13:00–14:00.
+  ...datesOnWeekday(4).map((d) => ({ masterId: 'm1', type: 'lunch', reason: 'Обед', startsAt: atTime(d, '13:00'), endsAt: atTime(d, '14:00') })),
+  // Паспорт, сценарий 3: личное время Марины по пятницам 15:00–17:00.
+  ...datesOnWeekday(5).map((d) => ({ masterId: 'm2', type: 'personal', reason: 'Личное время', startsAt: atTime(d, '15:00'), endsAt: atTime(d, '17:00') })),
+  // Паспорт, сценарий 3: суббота Елены заблокирована как выходной.
+  { masterId: 'm3', type: 'day_off', reason: 'Выходной', startsAt: atTime(firstSaturday, '00:00'), endsAt: addDays(atTime(firstSaturday, '00:00'), 1) },
+  // Паспорт, сценарий 8: Елена уходит в отпуск на неделю (через 10 дней).
+  { masterId: 'm3', type: 'vacation', reason: 'Отпуск', startsAt: addDays(TODAY, 10), endsAt: addDays(TODAY, 17) },
+];
+
+// slot_holds — брони времени на 10 минут у других клиентов. В демо пусто: сценарий «слот заняли»
+// показывается через панель разработчика. Формат: { masterId, startsAt, busyUntil, expiresAt, ownerId }.
+export const slotHolds = [];
+
+// Статусы записей, которые занимают время мастера (отменённые время освобождают).
+const OCCUPYING = new Set(['active', 'done', 'noShow']);
+
+// ---- Режим дня: студия → изменение смены мастера → недельный график → блокировка на весь день ----
+const dayInfoCache = new Map();
+export function dayInfo(masterId, dateStr) {
+  const key = masterId + '|' + dateStr;
+  if (dayInfoCache.has(key)) return dayInfoCache.get(key);
+  const date = parseLocalDate(dateStr);
+  const weekday = date.getDay();
+  const special = studioDayFor(dateStr);
+  const res = { date: dateStr, weekday, status: 'available', startMin: 0, endMin: 0, reason: special ? special.reason : '' };
+  if (isSalonClosedOn(dateStr)) { res.status = 'salonClosed'; dayInfoCache.set(key, res); return res; }
+  const studio = special && special.isOpen ? special : salonSettings.workHours;
+  const override = masterDayOverrides.find((o) => o.masterId === masterId && o.date === dateStr);
+  const weekly = weeklyHours.find((w) => w.masterId === masterId && w.weekday === weekday && w.validFrom <= dateStr && (!w.validTo || w.validTo >= dateStr));
+  const shift = override ? (override.isWorking ? override : null) : weekly;
+  if (!shift) { res.status = 'masterOff'; dayInfoCache.set(key, res); return res; }
+  res.startMin = Math.max(hhmmToMin(shift.start), hhmmToMin(studio.from));
+  res.endMin = Math.min(hhmmToMin(shift.end), hhmmToMin(studio.to));
+  if (res.endMin <= res.startMin) res.status = 'masterOff';
+  // Блокировка, закрывающая всё рабочее окно: отпуск показывается отдельно, остальное — как выходной.
+  const winStart = atTime(dateStr, minToHhmm(res.startMin)), winEnd = atTime(dateStr, minToHhmm(res.endMin));
+  const fullBlock = timeBlocks.find((b) => b.masterId === masterId && b.startsAt <= winStart && b.endsAt >= winEnd);
+  if (res.status === 'available' && fullBlock) { res.status = fullBlock.type === 'vacation' ? 'vacation' : 'masterOff'; res.reason = fullBlock.reason; }
+  dayInfoCache.set(key, res);
+  return res;
+}
+
+// Календарь мастера на горизонт записи (режим каждого дня, без слотов).
 export function generateSchedule(masterId) {
-  const master = masters.find((m) => m.id === masterId);
-  if (!master) return [];
-  const today = new Date();
-  const days = [];
-  const horizonDays = salonSettings.bookingHorizonMonths * 30;
-  let vacationStart = null, vacationEnd = null;
-  if (master.vacation) {
-    vacationStart = addDays(today, master.vacation.startOffsetDays);
-    vacationEnd = addDays(vacationStart, master.vacation.lengthDays);
-  }
-  for (let i = 0; i < horizonDays; i++) {
-    const date = addDays(today, i);
-    const weekday = date.getDay(); // 0=вс..6=сб
-    const special = studioDayFor(fmtDate(date));
-    const salonClosed = isSalonClosedOn(fmtDate(date));
-    // Рабочее окно — пересечение смены мастера с часами студии (в особый день — с его часами).
-    let startMin = hhmmToMin(master.workHours.from), endMin = hhmmToMin(master.workHours.to);
-    if (special && special.isOpen) { startMin = Math.max(startMin, hhmmToMin(special.from)); endMin = Math.min(endMin, hhmmToMin(special.to)); }
-    const masterWorks = master.workdays.includes(weekday);
-    const onVacation = vacationStart && date >= vacationStart && date < vacationEnd;
-    let status = 'available';
-    if (salonClosed) status = 'salonClosed';
-    else if (onVacation) status = 'vacation';
-    else if (!masterWorks || endMin <= startMin) status = 'masterOff';
-    const busy = [];
-    if (status === 'available') {
-      const stepMin = salonSettings.slotStepMinutes;
-      const slotsCount = (endMin - startMin) / stepMin;
-      // детерминированная "занятость" — псевдослучайно по дню/индексу
-      const fillRatio = master.almostFullyBooked ? 0.97 : 0.35;
-      for (let s = 0; s < slotsCount; s++) {
-        const seed = (i * 7 + s * 13 + masterId.length) % 100;
-        if (seed / 100 < fillRatio) {
-          const mins = startMin + s * stepMin;
-          busy.push(`${pad(Math.floor(mins / 60))}:${pad(mins % 60)}`);
+  return horizonDates().map((d) => dayInfo(masterId, d));
+}
+
+// Ближайший или текущий отпуск мастера — из блокировок типа vacation.
+export function getVacationInfo(master, ref = new Date()) {
+  const vac = timeBlocks.filter((b) => b.masterId === master.id && b.type === 'vacation' && b.endsAt > ref).sort((a, b) => a.startsAt - b.startsAt)[0];
+  if (!vac) return null;
+  return { start: vac.startsAt, end: vac.endsAt, active: ref >= vac.startsAt && ref < vac.endsAt };
+}
+
+// ---- bookings: записи всех клиентов ----
+// В демо это записи тестового клиента плюс детерминированно сгенерированные записи других клиентов.
+// Генератор сам соблюдает правила базы: запись помещается в рабочее окно, не заходит на блокировки
+// и вместе с уборкой не пересекается с другими записями.
+const rand = (n) => { const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); };
+let bookingsIndex = null;
+function toBooking(b) {
+  const s = services.find((x) => x.id === b.serviceId);
+  const endsAt = new Date(b.datetime.getTime() + b.durationMin * 60000);
+  return { id: b.id, masterId: b.masterId, clientId: 'c1', serviceIds: [b.serviceId], status: b.status,
+    startsAt: b.datetime, endsAt, busyUntil: new Date(endsAt.getTime() + (s ? s.cleanupMin || 0 : 0) * 60000) };
+}
+function buildBookings() {
+  const list = testClientBookings.map(toBooking);
+  const overlaps = (masterId, from, to) => list.some((b) => b.masterId === masterId && OCCUPYING.has(b.status) && b.startsAt < to && b.busyUntil > from);
+  const hitsBlock = (masterId, from, to) => timeBlocks.some((b) => b.masterId === masterId && b.startsAt < to && b.endsAt > from);
+  const step = salonSettings.slotStepMinutes;
+  masters.forEach((m, mi) => {
+    const fill = m.almostFullyBooked ? 0.95 : 0.4;
+    const mains = m.serviceIds.filter((id) => !(services.find((s) => s.id === id) || {}).addon);
+    horizonDates().forEach((dateStr, di) => {
+      const day = dayInfo(m.id, dateStr);
+      if (day.status !== 'available') return;
+      let cursor = day.startMin;
+      while (cursor + step <= day.endMin) {
+        const r = rand((mi + 1) * 100003 + di * 101 + cursor);
+        const svc = services.find((s) => s.id === mains[Math.floor(rand(r * 7919) * mains.length)]);
+        const startsAt = atTime(dateStr, minToHhmm(cursor));
+        const endsAt = new Date(startsAt.getTime() + svc.durationMin * 60000);
+        const busyUntil = new Date(endsAt.getTime() + (svc.cleanupMin || 0) * 60000);
+        if (r < fill && cursor + svc.durationMin <= day.endMin && !hitsBlock(m.id, startsAt, endsAt) && !overlaps(m.id, startsAt, busyUntil)) {
+          list.push({ id: 'g' + m.id + '-' + di + '-' + cursor, masterId: m.id, clientId: 'other', serviceIds: [svc.id], status: 'active', startsAt, endsAt, busyUntil });
+          cursor += Math.ceil((svc.durationMin + (svc.cleanupMin || 0)) / step) * step;
+        } else {
+          cursor += step;
         }
       }
-    }
-    days.push({ date: fmtDate(date), weekday, status, busy, startMin, endMin, reason: special ? special.reason : '' });
-  }
-  return days;
+    });
+  });
+  // Индекс по мастеру и дате начала — как индекс bookings (master_id, starts_at) в БД.
+  const index = new Map();
+  list.forEach((b) => { const k = b.masterId + '|' + fmtDate(b.startsAt); if (!index.has(k)) index.set(k, []); index.get(k).push(b); });
+  return { list, index };
+}
+export function allBookings() {
+  if (!bookingsIndex) bookingsIndex = buildBookings();
+  return bookingsIndex.list;
 }
 
-// Отпуск мастера относительно текущей даты.
-export function getVacationInfo(master, ref = new Date()) {
-  if (!master.vacation) return null;
-  const start = addDays(ref, master.vacation.startOffsetDays);
-  const end = addDays(start, master.vacation.lengthDays);
-  return { start, end, active: ref >= start && ref < end };
-}
-
-// Ближайший свободный слот мастера с учётом минимального времени до записи.
-export function nearestFreeSlot(masterId) {
-  const master = masters.find((m) => m.id === masterId);
-  if (!master) return null;
-  const schedule = generateSchedule(masterId);
+// Занятые промежутки мастера на день в минутах от полуночи: записи и брони — вместе с уборкой.
+function busyForDay(masterId, dateStr, excludeBookingId) {
+  allBookings();
+  const dayStart = parseLocalDate(dateStr), dayEnd = addDays(dayStart, 1);
+  const toMin = (d) => Math.round((d - dayStart) / 60000);
+  const bookings = (bookingsIndex.index.get(masterId + '|' + dateStr) || [])
+    .filter((b) => OCCUPYING.has(b.status) && b.id !== excludeBookingId)
+    .map((b) => [toMin(b.startsAt), toMin(b.busyUntil)]);
   const now = new Date();
-  const minLeadMs = salonSettings.minLeadHours * 3600 * 1000;
-  const step = salonSettings.slotStepMinutes;
-  for (const day of schedule) {
-    if (day.status !== 'available') continue;
-    for (let mins = day.startMin; mins < day.endMin; mins += step) {
-      const time = `${pad(Math.floor(mins / 60))}:${pad(mins % 60)}`;
-      if (day.busy.includes(time)) continue;
-      const dt = new Date(day.date + 'T' + time + ':00');
-      if (dt.getTime() - now.getTime() < minLeadMs) continue;
-      return { date: day.date, time };
-    }
+  const holds = slotHolds.filter((h) => h.masterId === masterId && h.expiresAt > now && h.startsAt < dayEnd && h.busyUntil > dayStart)
+    .map((h) => [toMin(h.startsAt), toMin(h.busyUntil)]);
+  const blocks = timeBlocks.filter((b) => b.masterId === masterId && b.startsAt < dayEnd && b.endsAt > dayStart)
+    .map((b) => [Math.max(0, toMin(b.startsAt)), Math.min(24 * 60, toMin(b.endsAt))]);
+  return { clients: bookings.concat(holds), blocks };
+}
+
+// Свободные интервалы мастера на день: рабочее окно минус записи (с уборкой), брони и блокировки.
+export function getFreeIntervals(masterId, dateStr, excludeBookingId = null) {
+  const day = dayInfo(masterId, dateStr);
+  if (day.status !== 'available') return [];
+  const { clients, blocks } = busyForDay(masterId, dateStr, excludeBookingId);
+  let free = [[day.startMin, day.endMin]];
+  clients.concat(blocks).forEach(([a, b]) => {
+    free = free.flatMap(([s, e]) => (b <= s || a >= e) ? [[s, e]] : [[s, Math.min(a, e)], [Math.max(b, s), e]].filter(([x, y]) => y > x));
+  });
+  return free;
+}
+
+// Ближайшее свободное время мастера (для карточки на шаге «Мастер»).
+export function nearestFreeSlot(masterId, durationMin = salonSettings.slotStepMinutes, cleanupMin = 0) {
+  for (const dateStr of horizonDates()) {
+    const slots = getFreeStartTimes(masterId, dateStr, durationMin, cleanupMin);
+    if (slots.length) return { date: dateStr, time: slots[0].start };
   }
   return null;
 }
@@ -174,12 +267,38 @@ export function findIncompatible(cartIds, newId) {
   return null;
 }
 
-// Тестовый клиент и его записи.
-export const testClient = { id: 'c1', name: 'Мария Кузнецова', phone: '+7 (911) 222-33-44', email: 'maria@example.com' };
+// ---- Пароли: хранится только хеш (как users.password_hash), открытого пароля в данных нет ----
+// Формат: алгоритм$итерации$соль$хеш (соль и хеш — base64). В настоящем сервисе хеш считает сервер
+// (argon2id или bcrypt), в прототипе — браузер через Web Crypto (PBKDF2-SHA256, 600 000 итераций).
+const PBKDF2_ITERATIONS = 600000;
+const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = (str) => Uint8Array.from(atob(str), (ch) => ch.charCodeAt(0));
+async function pbkdf2(password, salt, iterations) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  return crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256);
+}
+export async function hashPassword(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return 'pbkdf2-sha256$' + PBKDF2_ITERATIONS + '$' + b64(salt) + '$' + b64(await pbkdf2(password, salt, PBKDF2_ITERATIONS));
+}
+export async function verifyPassword(password, stored) {
+  const [algo, iter, salt, hash] = String(stored || '').split('$');
+  if (algo !== 'pbkdf2-sha256' || !salt || !hash) return false;
+  const actual = b64(await pbkdf2(password, unb64(salt), Number(iter)));
+  // Сравнение без раннего выхода, чтобы время ответа не подсказывало совпавшие символы.
+  let diff = actual.length ^ hash.length;
+  for (let i = 0; i < Math.max(actual.length, hash.length); i++) diff |= (actual.charCodeAt(i) || 0) ^ (hash.charCodeAt(i) || 0);
+  return diff === 0;
+}
+
+// Тестовый клиент и его записи. Пароль для входа в демо — в подсказке панели разработчика, не в данных.
+export const testClient = { id: 'c1', name: 'Мария Кузнецова', phone: '+7 (911) 222-33-44', email: 'maria@example.com',
+  passwordHash: 'pbkdf2-sha256$600000$QZeO66KJpRl6i7oWxkw0eg==$wR/Ui6yghDzymEcT5h+QOrB+IdZRakePRejs3WLdPos=' };
 
 export const testClientBookings = (() => {
   const now = new Date();
-  const inHours = (h) => new Date(now.getTime() + h * 3600 * 1000);
+  // Время записей выровнено по шагу слотов (30 минут), как у настоящих записей.
+  const inHours = (h) => { const t = new Date(now.getTime() + h * 3600 * 1000); t.setMinutes(Math.round(t.getMinutes() / 30) * 30, 0, 0); return t; };
   const agoDays = (d) => addDays(now, -d);
   return [
     { id: 'b1', serviceId: 's1', status: 'active', service: 'Маникюр с покрытием гель-лаком', master: 'Анна Ковалева', masterId: 'm1', datetime: inHours(30), durationMin: 90, price: '1 800 ₽', canModify: true, comment: 'Пожалуйста, покороче форму', address: salonSettings.address },
@@ -201,61 +320,45 @@ export function findCoveringMasters(cartIds) {
   return masters.filter((m) => cartIds.every((id) => m.serviceIds.includes(id)));
 }
 
-function getMasterDay(masterId, dateStr) {
-  return generateSchedule(masterId).find((d) => d.date === dateStr);
-}
-
 // Перерыв на уборку для визита из нескольких услуг — наибольший среди них (уборка одна, после визита).
 export function cleanupForServices(serviceIds) {
   return serviceIds.reduce((max, id) => { const s = services.find((x) => x.id === id); return Math.max(max, s ? (s.cleanupMin || 0) : 0); }, 0);
 }
 
-// Список окон {start,end}, куда целиком помещается визит длительностью durationMin.
-// cleanupMin — перерыв на уборку после визита: он не должен задевать занятое время,
-// но может выходить за конец смены.
-export function getFreeStartTimes(masterId, dateStr, durationMin, cleanupMin = 0) {
-  const day = getMasterDay(masterId, dateStr);
-  if (!day || day.status !== 'available') return [];
-  const { startMin, endMin } = day;
+// Слоты {start,end}, с которых можно начать визит длительностью durationMin (алгоритм — docs/db-schema.md, раздел 7.3):
+// визит целиком внутри одного свободного интервала; визит вместе с уборкой (cleanupMin) не задевает
+// другие записи и брони, но может заходить на блокировки и за конец смены.
+// excludeBookingId — переносимая запись: её собственное время не считается занятым.
+export function getFreeStartTimes(masterId, dateStr, durationMin, cleanupMin = 0, excludeBookingId = null) {
+  const day = dayInfo(masterId, dateStr);
+  if (day.status !== 'available') return [];
+  const free = getFreeIntervals(masterId, dateStr, excludeBookingId);
+  const { clients } = busyForDay(masterId, dateStr, excludeBookingId);
   const step = salonSettings.slotStepMinutes;
-  const busySet = new Set(day.busy);
-  const now = new Date();
-  const isToday = dateStr === fmtDate(now);
-  const minLeadMs = salonSettings.minLeadHours * 3600 * 1000;
+  const earliest = Date.now() + salonSettings.minLeadHours * 3600 * 1000;
   const results = [];
-  for (let mins = startMin; mins + durationMin <= endMin; mins += step) {
-    let ok = true;
-    const busyEnd = Math.min(mins + durationMin + cleanupMin, endMin);
-    for (let m = mins; m < busyEnd; m += step) {
-      const t = pad(Math.floor(m / 60)) + ':' + pad(m % 60);
-      if (busySet.has(t)) { ok = false; break; }
-    }
-    if (!ok) continue;
-    const startTime = pad(Math.floor(mins / 60)) + ':' + pad(mins % 60);
-    if (isToday) {
-      const dt = new Date(dateStr + 'T' + startTime + ':00');
-      if (dt.getTime() - now.getTime() < minLeadMs) continue;
-    }
-    const endMins = mins + durationMin;
-    const endTime = pad(Math.floor(endMins / 60)) + ':' + pad(endMins % 60);
-    results.push({ start: startTime, end: endTime });
+  for (let mins = day.startMin; mins + durationMin <= day.endMin; mins += step) {
+    if (!free.some(([a, b]) => mins >= a && mins + durationMin <= b)) continue;
+    const busyEnd = mins + durationMin + cleanupMin;
+    if (clients.some(([a, b]) => a < busyEnd && b > mins)) continue;
+    if (atTime(dateStr, minToHhmm(mins)).getTime() < earliest) continue;
+    results.push({ start: minToHhmm(mins), end: minToHhmm(mins + durationMin) });
   }
   return results;
 }
 
-export function dayHasAvailability(masterIds, dateStr, durationMin, cleanupMin = 0) {
-  return masterIds.some((id) => getFreeStartTimes(id, dateStr, durationMin, cleanupMin).length > 0);
+export function dayHasAvailability(masterIds, dateStr, durationMin, cleanupMin = 0, excludeBookingId = null) {
+  return masterIds.some((id) => getFreeStartTimes(id, dateStr, durationMin, cleanupMin, excludeBookingId).length > 0);
 }
 
 // Следующие count дат (после fromDateStr), где у кого-то из masterIds есть окно.
-export function nextAvailableDates(masterIds, durationMin, fromDateStr, count = 3, cleanupMin = 0) {
+export function nextAvailableDates(masterIds, durationMin, fromDateStr, count = 3, cleanupMin = 0, excludeBookingId = null) {
   if (!masterIds.length) return [];
-  const schedule = generateSchedule(masterIds[0]);
   const out = [];
-  for (const day of schedule) {
-    if (day.date <= fromDateStr) continue;
-    if (dayHasAvailability(masterIds, day.date, durationMin, cleanupMin)) {
-      out.push(day.date);
+  for (const dateStr of horizonDates()) {
+    if (dateStr <= fromDateStr) continue;
+    if (dayHasAvailability(masterIds, dateStr, durationMin, cleanupMin, excludeBookingId)) {
+      out.push(dateStr);
       if (out.length >= count) break;
     }
   }
@@ -263,32 +366,29 @@ export function nextAvailableDates(masterIds, durationMin, fromDateStr, count = 
 }
 
 // Первый доступный слот в горизонте записи (для «Ближайшее свободное время»).
-export function nearestAvailableSlot(masterIds, durationMin, cleanupMin = 0) {
+export function nearestAvailableSlot(masterIds, durationMin, cleanupMin = 0, excludeBookingId = null) {
   if (!masterIds.length) return null;
-  const schedule = generateSchedule(masterIds[0]);
-  for (const day of schedule) {
+  for (const dateStr of horizonDates()) {
     for (const masterId of masterIds) {
-      const slots = getFreeStartTimes(masterId, day.date, durationMin, cleanupMin);
-      if (slots.length) return { date: day.date, start: slots[0].start, end: slots[0].end, masterId };
+      const slots = getFreeStartTimes(masterId, dateStr, durationMin, cleanupMin, excludeBookingId);
+      if (slots.length) return { date: dateStr, start: slots[0].start, end: slots[0].end, masterId };
     }
   }
   return null;
 }
 
 // Есть ли хоть один слот во всём горизонте (для «всё занято» / «нет окна для визита»).
-export function hasAnyAvailability(masterIds, durationMin, cleanupMin = 0) {
-  return !!nearestAvailableSlot(masterIds, durationMin, cleanupMin);
+export function hasAnyAvailability(masterIds, durationMin, cleanupMin = 0, excludeBookingId = null) {
+  return !!nearestAvailableSlot(masterIds, durationMin, cleanupMin, excludeBookingId);
 }
 
-
-function nextAvailableDatesDetailed(masterIds, durationMin, fromDateStr, count, cleanupMin = 0) {
-  const schedule = generateSchedule(masterIds[0]);
+function nextAvailableDatesDetailed(masterIds, durationMin, fromDateStr, count, cleanupMin = 0, excludeBookingId = null) {
   const out = [];
-  for (const day of schedule) {
-    if (day.date <= fromDateStr) continue;
+  for (const dateStr of horizonDates()) {
+    if (dateStr <= fromDateStr) continue;
     for (const id of masterIds) {
-      const slots = getFreeStartTimes(id, day.date, durationMin, cleanupMin);
-      if (slots.length) { out.push({ date: day.date, start: slots[0].start, end: slots[0].end, masterId: id }); break; }
+      const slots = getFreeStartTimes(id, dateStr, durationMin, cleanupMin, excludeBookingId);
+      if (slots.length) { out.push({ date: dateStr, start: slots[0].start, end: slots[0].end, masterId: id }); break; }
     }
     if (out.length >= count) break;
   }
@@ -296,14 +396,14 @@ function nextAvailableDatesDetailed(masterIds, durationMin, fromDateStr, count, 
 }
 
 // Альтернативные слоты при конфликте (сначала тот же день, затем следующие дни).
-export function getAlternativeSlots(masterIds, dateStr, durationMin, excludeStart, count = 5, cleanupMin = 0) {
+export function getAlternativeSlots(masterIds, dateStr, durationMin, excludeStart, count = 5, cleanupMin = 0, excludeBookingId = null) {
   const sameDay = [];
   masterIds.forEach((id) => {
-    getFreeStartTimes(id, dateStr, durationMin, cleanupMin).forEach((s) => {
+    getFreeStartTimes(id, dateStr, durationMin, cleanupMin, excludeBookingId).forEach((s) => {
       if (s.start !== excludeStart) sameDay.push({ date: dateStr, start: s.start, end: s.end, masterId: id });
     });
   });
   let out = sameDay.slice(0, count);
-  if (out.length < count) out = out.concat(nextAvailableDatesDetailed(masterIds, durationMin, dateStr, count - out.length, cleanupMin));
+  if (out.length < count) out = out.concat(nextAvailableDatesDetailed(masterIds, durationMin, dateStr, count - out.length, cleanupMin, excludeBookingId));
   return out.slice(0, count);
 }
