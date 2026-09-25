@@ -18,6 +18,7 @@
     "prod:migrate": "node --import ./scripts/node-version.mjs dist/scripts/db-migrate.js",
     "prod:backup": "node --import ./scripts/node-version.mjs dist/scripts/db-backup.js",
     "prod:admin:create": "node --import ./scripts/node-version.mjs dist/scripts/admin-create.js",
+    "test": "tsx --import ./scripts/node-version.mjs --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

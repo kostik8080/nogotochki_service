@@ -25,6 +25,7 @@ npm run db:reset         # создать базу data/nogotochki.db с тес�
 | `npm run prod:migrate` | То же, что `db:migrate`, из сборки `dist/`. Если в базе уже есть данные, сначала делает резервную копию |
 | `npm run prod:backup` | То же, что `db:backup`, из сборки `dist/` — для запуска по расписанию |
 | `npm run prod:admin:create` | То же, что `admin:create`, из сборки `dist/` |
+| `npm test` | Автотесты (`test/*.test.ts`, встроенный `node:test`): расчет свободных слотов на примерах схемы и паспорта |
 | `npm run typecheck` | Проверка типов TypeScript |
 
 Тестовые входы (пароли — из `.env`): администратор `admin@example.com`, мастер `anna@example.com`, клиентка `maria@example.com`. Ольга Белова (`+79035556677`) — клиентка без пароля, ее записал администратор по телефону.

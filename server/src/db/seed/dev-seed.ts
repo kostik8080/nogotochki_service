@@ -10,6 +10,7 @@
 // и повторный запуск в другой день сдвинул бы их и наложил на прежние.
 import type { SQLInputValue } from 'node:sqlite';
 import { hashPassword } from '../../auth/password.js';
+import { addDays, isoWeekday, zonedDate, zonedTimeToUtc } from '../../lib/studio-time.js';
 import { type Db, transaction } from '../connection.js';
 
 export interface SeedOptions {
@@ -123,40 +124,8 @@ const closedStudioDates = new Set(studioDays.filter((d) => !d.isOpen).map((d) =>
 // Дата и время студии. В базе — UTC (раздел 2), а график задан по часам студии.
 // ---------------------------------------------------------------------------
 
-/** Смещение часового пояса от UTC в миллисекундах в указанный момент. */
-function tzOffsetMs(instant: number): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: TIMEZONE, hourCycle: 'h23',
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
-  }).formatToParts(new Date(instant));
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
-  const wallClockAsUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
-  return wallClockAsUtc - Math.floor(instant / 1000) * 1000;
-}
-
-/** Дата 'YYYY-MM-DD' и время 'HH:MM' по часам студии → момент в UTC. */
-function studioTime(date: string, time: string): Date {
-  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  const [hh, mm] = time.split(':').map(Number) as [number, number];
-  const wallClock = Date.UTC(y, m - 1, d, hh, mm);
-  return new Date(wallClock - tzOffsetMs(wallClock - tzOffsetMs(wallClock)));
-}
-
-/** Календарная дата студии в указанный момент. */
-function studioDate(instant: Date): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE }).format(instant);
-}
-
-function addDays(date: string, days: number): string {
-  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
-}
-
-/** День недели по ISO: 1 — понедельник … 7 — воскресенье. */
-function isoWeekday(date: string): number {
-  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  return new Date(Date.UTC(y, m - 1, d)).getUTCDay() || 7;
-}
+const studioTime = (date: string, time: string) => new Date(zonedTimeToUtc(date, time, TIMEZONE));
+const studioDate = (instant: Date) => zonedDate(instant.getTime(), TIMEZONE);
 
 /** Ближайшая дата с этим днем недели через `minDays` дней или позже (назад — при отрицательном `step`). */
 function findWeekday(from: string, weekday: number, minDays: number, step: 1 | -1 = 1): string {
