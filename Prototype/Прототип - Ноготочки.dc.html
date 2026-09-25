@@ -1841,10 +1841,9 @@
               <sc-if value="{{ adminClientDetail.blacklisted }}" hint-placeholder-val="{{ false }}">
                 <button disabled="{{ true }}" style="height:44px; border-radius:4px; border:1px solid #E2D8D4; background:#F1EAE7; color:#857B77; font-weight:700; font-size:13px;">Уже в чёрном списке</button>
               </sc-if>
-              <sc-if value="{{ adminClientDetail.blacklisted }}" hint-placeholder-val="{{ true }}">
+              <sc-if value="{{ adminClientDetail.notBlacklisted }}" hint-placeholder-val="{{ true }}">
                 <button onClick="{{ openBlacklistDialog }}" style="height:44px; border-radius:4px; border:1px solid #C13B3B; background:#fff; color:#C13B3B; font-weight:700; font-size:13px; cursor:pointer;">В чёрный список</button>
               </sc-if>
-              <button onClick="{{ archiveClient }}" style="height:44px; border-radius:4px; border:1px solid #E2D8D4; background:#fff; font-weight:700; font-size:13px; cursor:pointer;">Архивировать</button>
             </div>
 
             <div style="flex:1; min-width:400px;">
@@ -4176,7 +4175,6 @@ class Component extends DCLogic {
   closeBlacklistDialog = () => this.setState({ blacklistDialogOpen: false });
   setBlacklistReasonInput = (e) => this.setState({ blacklistReasonInput: e.target.value });
   submitBlacklist = () => { this.setState({ blacklistDialogOpen: false }); this.showToast('Клиент добавлен в чёрный список'); };
-  archiveClient = () => this.showToast('Клиент архивирован');
 
   staffLogoutFromSwitcher = () => { sessionStorage.removeItem('nog_staff_authed'); this.setState({ staffHeaderMenuOpen: false }); this.goTo('/staff/login'); };
 
@@ -4735,7 +4733,7 @@ class Component extends DCLogic {
       tags: acdFull.tags, hasTags: acdFull.tags.length > 0,
       visits: acdRaw.visits, totalSpentText: acdRaw.totalSpent.toLocaleString('ru-RU') + ' ₽', avgCheckText: acdRaw.avgCheck.toLocaleString('ru-RU') + ' ₽',
       cancellations: acdFull.cancellations, noShows: acdFull.noShows, firstVisit: acdFull.firstVisit, lastVisit: acdRaw.lastVisit, source: acdFull.source,
-      blacklisted: acdRaw.blacklisted, blacklistReason: acdRaw.blacklistReason,
+      blacklisted: acdRaw.blacklisted, notBlacklisted: !acdRaw.blacklisted, blacklistReason: acdRaw.blacklistReason,
       history: acdFull.history.map((h) => ({ ...h, statusLabel: HIST_STATUS[h.status].label, statusBg: HIST_STATUS[h.status].bg, statusFg: HIST_STATUS[h.status].fg, amountText: h.amount ? h.amount.toLocaleString('ru-RU') + ' ₽' : '—', isCancelled: h.status === 'cancelledClient' || h.status === 'cancelledStudio' })),
       hasHistory: acdFull.history.length > 0, hasNoHistory: acdFull.history.length === 0,
       upcoming: acdFull.upcoming, hasUpcoming: acdFull.upcoming.length > 0, hasNoUpcoming: acdFull.upcoming.length === 0,
@@ -5018,7 +5016,6 @@ class Component extends DCLogic {
       blacklistCanSubmit: this.state.blacklistReasonInput.trim().length > 0,
       blacklistSubmitDisabled: this.state.blacklistReasonInput.trim().length === 0,
       submitBlacklist: this.submitBlacklist,
-      archiveClient: this.archiveClient,
       isAdminMasters, isAdminMastersSchedule, isAdminMasterDetail,
       mastersListRows,
       goToMastersSchedule: () => this.goTo('/staff/admin/masters/schedule'),
