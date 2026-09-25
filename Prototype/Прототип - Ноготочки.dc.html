@@ -1311,7 +1311,7 @@
             <div style="display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #E2D8D4; border-radius:6px; padding:6px 10px;">
               <i data-lucide="chevron-left" style="width:16px; height:16px; stroke:#C7BFBC;"></i>
               <i data-lucide="calendar" style="width:15px; height:15px; stroke:#8E4B48;"></i>
-              <span style="font-weight:700; font-size:14px; white-space:nowrap;">Чт, 24 сентября</span>
+              <span style="font-weight:700; font-size:14px; white-space:nowrap;">{{ adminDateLabel }}</span>
               <i data-lucide="chevron-right" style="width:16px; height:16px; stroke:#C7BFBC;"></i>
             </div>
             <div style="display:flex; gap:0; background:#F1EAE7; border-radius:8px; padding:3px;">
@@ -1333,6 +1333,7 @@
             </div>
           </div>
 
+          <sc-if value="{{ adminIsDayView }}" hint-placeholder-val="{{ true }}">
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
             <div style="flex:1; min-width:120px; background:#fff; border:1px solid #E2D8D4; border-radius:8px; padding:10px 14px;"><div style="font-size:18px; font-weight:700;">{{ adminSummaryTotal }}</div><div style="font-size:11px; color:#857B77;">записей на день</div></div>
             <div style="flex:1; min-width:120px; background:#fff; border:1px solid #E2D8D4; border-radius:8px; padding:10px 14px;"><div style="font-size:18px; font-weight:700;">{{ adminSummaryFreeHours }}</div><div style="font-size:11px; color:#857B77;">свободных часов</div></div>
@@ -1393,6 +1394,46 @@
               </sc-for>
             </div>
           </div>
+          </sc-if>
+
+          <!-- Шахматка на неделю: мастера × рабочие дни студии (вт–сб) -->
+          <sc-if value="{{ adminIsWeekView }}" hint-placeholder-val="{{ false }}">
+            <div style="overflow-x:auto; background:#fff; border:1px solid #E2D8D4; border-radius:8px;">
+              <div style="min-width:940px;">
+                <div style="display:flex; border-bottom:1px solid #E2D8D4;">
+                  <div style="width:170px; flex-shrink:0; padding:10px 12px; font-size:11px; color:#857B77; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Мастер</div>
+                  <sc-for list="{{ adminWeekDays }}" as="d" hint-placeholder-count="5">
+                    <div onClick="{{ d.onOpen }}" title="{{ d.title }}" style="flex:1; min-width:150px; padding:10px 12px; border-left:1px solid #E2D8D4; cursor:pointer; background:{{ d.headBg }};">
+                      <div style="font-weight:700; font-size:13px; color:{{ d.headFg }};">{{ d.label }}</div>
+                      <div style="font-size:11px; color:#857B77;">{{ d.countLabel }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+                <sc-for list="{{ adminWeekRows }}" as="r" hint-placeholder-count="3">
+                  <div style="display:flex; border-bottom:1px solid #F1EAE7;">
+                    <div style="width:170px; flex-shrink:0; padding:10px 12px; display:flex; align-items:center; gap:8px;">
+                      <div style="width:28px; height:28px; border-radius:50%; background:#E3BDB7; color:#8E4B48; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; flex-shrink:0;">{{ r.initials }}</div>
+                      <div style="font-weight:700; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ r.name }}</div>
+                    </div>
+                    <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="5">
+                      <div style="flex:1; min-width:150px; min-height:84px; padding:6px; border-left:1px solid #F1EAE7; box-sizing:border-box; display:flex; flex-direction:column; gap:4px; background:{{ c.cellBg }};">
+                        <sc-if value="{{ c.isOff }}" hint-placeholder-val="{{ false }}">
+                          <div style="margin:auto; font-size:11px; color:#857B77;">{{ c.offLabel }}</div>
+                        </sc-if>
+                        <sc-for list="{{ c.items }}" as="a" hint-placeholder-count="2">
+                          <div onClick="{{ a.onOpen }}" title="{{ a.title }}" style="background:{{ a.bg }}; color:{{ a.fg }}; border-left:2.5px solid {{ a.border }}; border-radius:4px; padding:3px 6px; cursor:{{ a.cursor }}; overflow:hidden;">
+                            <div style="font-size:11px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ a.timeLabel }} · {{ a.client }}</div>
+                            <div style="font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ a.service }}</div>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="font-size:12px; color:#857B77; margin-top:10px;">Клик по записи четверга открывает быстрые действия, по заголовку дня — шахматку на день. В демо подробный день есть только для четверга, 24 сентября.</div>
+          </sc-if>
         </div>
       </div>
       </div>
@@ -2463,6 +2504,31 @@ const ADMIN_APPTS_SEED = [
   { id: 'ap11', masterId: 'm3', start: 14 * 60, dur: 90, client: 'Кристина Новак', serviceId: 's1', service: 'Маникюр с покрытием гель-лаком', price: 1800, status: 'active', newClient: true },
   { id: 'ap12', masterId: 'm3', start: 16 * 60, dur: 60, client: 'Светлана Комарова', serviceId: 's12', service: 'Ламинирование бровей', price: 1800, status: 'active', newClient: true },
 ];
+// Неделя 22–26 сентября (вт–сб). Четверг берётся из ADMIN_APPTS_SEED (живое состояние шахматки),
+// остальные дни — демо-записи только для просмотра. Блокировки — по сценариям паспорта.
+const ADMIN_WEEK_DAYS = [
+  { weekday: 2, label: 'Вт, 22' }, { weekday: 3, label: 'Ср, 23' }, { weekday: 4, label: 'Чт, 24' },
+  { weekday: 5, label: 'Пт, 25' }, { weekday: 6, label: 'Сб, 26' },
+];
+const ADMIN_WEEK_OTHER_APPTS = [
+  { weekday: 2, masterId: 'm1', start: 10 * 60, dur: 90, client: 'Ольга Петрова', service: 'Маникюр с покрытием гель-лаком', status: 'done' },
+  { weekday: 2, masterId: 'm1', start: 14 * 60, dur: 60, client: 'Екатерина Воронова', service: 'Педикюр без покрытия', status: 'done' },
+  { weekday: 2, masterId: 'm3', start: 11 * 60, dur: 150, client: 'Виктория Лебедева', service: 'Наращивание ногтей', status: 'done' },
+  { weekday: 2, masterId: 'm3', start: 15 * 60, dur: 45, client: 'Мария Кузнецова', service: 'Маникюр без покрытия', status: 'done' },
+  { weekday: 3, masterId: 'm1', start: 12 * 60, dur: 45, client: 'Анна Соколова', service: 'Маникюр без покрытия', status: 'done' },
+  { weekday: 3, masterId: 'm2', start: 11 * 60, dur: 60, client: 'Елена Фомина', service: 'Ламинирование бровей', status: 'done' },
+  { weekday: 3, masterId: 'm2', start: 16 * 60, dur: 30, client: 'Инна Захарова', service: 'Окрашивание бровей хной', status: 'noShow' },
+  { weekday: 5, masterId: 'm1', start: 10 * 60, dur: 90, client: 'Мария Кузнецова', service: 'Маникюр с покрытием гель-лаком', status: 'active' },
+  { weekday: 5, masterId: 'm1', start: 16 * 60 + 30, dur: 60, client: 'Ольга Петрова', service: 'Педикюр без покрытия', status: 'active' },
+  { weekday: 5, masterId: 'm2', start: 11 * 60, dur: 40, client: 'Татьяна Мельник', service: 'Коррекция и окрашивание бровей', status: 'active' },
+  { weekday: 5, masterId: 'm2', start: 14 * 60, dur: 60, client: 'Дарья Игнатьева', service: 'Ламинирование бровей', status: 'active' },
+  { weekday: 6, masterId: 'm2', start: 12 * 60, dur: 30, client: 'Полина Гуляева', service: 'Окрашивание бровей хной', status: 'active' },
+];
+const ADMIN_WEEK_BLOCKS = [
+  { weekday: 4, masterId: 'm1', start: 13 * 60, dur: 60, reason: 'Обед' },
+  { weekday: 5, masterId: 'm2', start: 15 * 60, dur: 120, reason: 'Личное время' },
+  { weekday: 6, masterId: 'm3', allDay: true, reason: 'Выходной (блокировка)' },
+];
 const ADMIN_CLIENTS_DB = [
   { id: 'ac1', name: 'Ольга Петрова', phone: '+7 921 445 12 34', favMasterId: 'm1' },
   { id: 'ac2', name: 'Мария Кузнецова', phone: '+7 916 233 55 67', favMasterId: 'm1' },
@@ -2664,7 +2730,7 @@ class Component extends DCLogic {
     window.addEventListener('hashchange', this._onHash);
     this._onResize = () => this.setState({ viewportMobile: window.innerWidth < 768 });
     window.addEventListener('resize', this._onResize);
-    { const p0 = parseHashPath(this.state.hash); this.guardAccountRoute(p0.path); this.handleDeepLinkAction(p0.path, p0.query); }
+    { const p0 = parseHashPath(this.state.hash); if (this.redirectRoot(p0.path)) return; this.guardAccountRoute(p0.path); this.handleDeepLinkAction(p0.path, p0.query); }
     this._prevPath = this.state.hash.replace(/^#/, '') || '/';
     if (this._prevPath === '/verify') this.startVerifyTimer();
     if (this._prevPath === '/booking/services') this.loadCatalog();
@@ -2699,6 +2765,17 @@ class Component extends DCLogic {
     }
   };
 
+  // Корень #/ — редирект по авторизации: сотрудник → шахматка, клиент → кабинет, гость → лендинг.
+  // replace, а не присваивание hash, чтобы «назад» не возвращал на пустой корень.
+  redirectRoot = (path) => {
+    if (path !== '/') return false;
+    const base = window.location.href.split('#')[0];
+    if (sessionStorage.getItem('nog_staff_authed') === '1') window.location.replace(base + '#/staff/admin-home');
+    else if (this.state.authed) window.location.replace(base + '#/account');
+    else window.location.replace('./Лендинг%20-%20Ноготочки.dc.html');
+    return true;
+  };
+
   guardAccountRoute = (path) => {
     if (path.indexOf('/account') === 0 && !this.state.authed) {
       sessionStorage.setItem('nog_return_to', path);
@@ -2718,6 +2795,8 @@ class Component extends DCLogic {
   componentDidUpdate() {
     if (window.lucide) window.lucide.createIcons();
     const { path, query } = parseHashPath(this.state.hash);
+    if (this.redirectRoot(path)) return;
+    this.ensureServiceForm(path);
     this.handleDeepLinkAction(path, query);
     const prevPath = this._prevPath || '/';
     if (path !== prevPath) {
@@ -4035,7 +4114,7 @@ class Component extends DCLogic {
   openApptPopover = (apptId) => (e) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    this.setState({ adminApptPopover: { apptId, x: rect.right + 10, y: rect.top } });
+    this.setState({ adminApptPopover: { apptId, x: Math.max(8, Math.min(rect.right + 10, window.innerWidth - 290)), y: Math.max(8, Math.min(rect.top, window.innerHeight - 320)) } });
   };
   closeApptPopover = () => this.setState({ adminApptPopover: null });
   adminMarkDone = (id) => () => {
@@ -4124,11 +4203,20 @@ class Component extends DCLogic {
     const a = list[idx].order, b = list[swapIdx].order;
     return { serviceCategories: s.serviceCategories.map((c) => c.id === list[idx].id ? { ...c, order: b } : c.id === list[swapIdx].id ? { ...c, order: a } : c) };
   });
+  newServiceDraft = () => ({ categoryId: (this.state.serviceCategories[0] || {}).id, name: '', description: '', dur: 45, price: 0, masters: [], active: true });
+  // Форма услуги — отдельный маршрут: открытие и закрытие меняют адрес, чтобы работали «назад» и карта прототипа.
   openServiceForm = (id) => () => {
-    const svc = id ? this.state.services.find((s) => s.id === id) : { categoryId: this.state.serviceCategories[0].id, name: '', description: '', dur: 45, price: 0, masters: [], active: true };
+    const svc = id ? this.state.services.find((s) => s.id === id) : this.newServiceDraft();
     this.setState({ serviceFormId: id, serviceForm: { ...svc } });
+    this.goTo('/staff/admin/services/form');
   };
-  closeServiceForm = () => this.setState({ serviceFormId: null, serviceForm: null });
+  closeServiceForm = () => { this.setState({ serviceFormId: null, serviceForm: null }); this.goTo('/staff/admin/services'); };
+  // Прямой заход на #/staff/admin/services/form (карта прототипа, обновление страницы) — открываем пустую форму новой услуги.
+  ensureServiceForm = (path) => {
+    if (path === '/staff/admin/services/form' && !this.state.serviceForm && this.state.serviceCategories.length) {
+      this.setState({ serviceFormId: null, serviceForm: this.newServiceDraft() });
+    }
+  };
   setServiceFormField = (field) => (e) => this.setState((s) => ({ serviceForm: { ...s.serviceForm, [field]: e.target.value } }));
   toggleServiceFormBool = (field) => () => this.setState((s) => ({ serviceForm: { ...s.serviceForm, [field]: !s.serviceForm[field] } }));
   toggleServiceFormMaster = (id) => () => this.setState((s) => {
@@ -4143,6 +4231,7 @@ class Component extends DCLogic {
       return { services, serviceFormId: null, serviceForm: null };
     });
     this.showToast('Услуга сохранена');
+    this.goTo('/staff/admin/services');
   };
 
   goSmsLogin = () => {
@@ -4418,6 +4507,45 @@ class Component extends DCLogic {
         previewBg: showPreview && drop.conflict ? 'rgba(193,59,59,0.18)' : 'rgba(78,107,71,0.18)', previewBorder: showPreview && drop.conflict ? '#C13B3B' : '#4E6B47',
         onDragOver: this.adminDragOverColumn(m), onDrop: this.adminDropOnColumn(m),
         onColumnClick: this.adminColumnClickHandler(m),
+      };
+    });
+    const adminIsWeekView = this.state.adminViewMode === 'week';
+    const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    const weekItemsFor = (masterId, weekday) => {
+      const appts = weekday === ADMIN_DAY_WEEKDAY
+        ? this.state.adminAppointments.filter((a) => a.masterId === masterId && ADMIN_LIVE(a))
+        : ADMIN_WEEK_OTHER_APPTS.filter((a) => a.masterId === masterId && a.weekday === weekday);
+      const items = appts.map((a) => ({
+        start: a.start, timeLabel: hhmm(a.start), client: a.client, service: a.service,
+        bg: STATUS_STYLE[a.status].bg, fg: STATUS_STYLE[a.status].fg, border: STATUS_STYLE[a.status].fg,
+        title: STATUS_STYLE[a.status].label,
+        cursor: a.id ? 'pointer' : 'default',
+        onOpen: a.id ? this.openApptPopover(a.id) : undefined,
+      }));
+      const blocks = ADMIN_WEEK_BLOCKS.filter((b) => b.masterId === masterId && b.weekday === weekday && !b.allDay).map((b) => ({
+        start: b.start, timeLabel: hhmm(b.start) + '–' + hhmm(b.start + b.dur), client: b.reason, service: 'Блокировка времени',
+        bg: '#FBF7F5', fg: '#857B77', border: '#C7BFBC', title: 'Блокировка', cursor: 'default', onOpen: undefined,
+      }));
+      return { count: appts.length, items: items.concat(blocks).sort((x, y) => x.start - y.start) };
+    };
+    const adminWeekRows = ADMIN_MASTERS.map((m) => ({
+      id: m.id, name: m.name, initials: m.name.split(' ').map((w) => w[0]).join(''),
+      cells: ADMIN_WEEK_DAYS.map((d) => {
+        const allDay = ADMIN_WEEK_BLOCKS.find((b) => b.masterId === m.id && b.weekday === d.weekday && b.allDay);
+        const isOff = !m.workdays.includes(d.weekday) || !!allDay;
+        const { items } = isOff ? { items: [] } : weekItemsFor(m.id, d.weekday);
+        return { id: m.id + d.weekday, isOff, offLabel: allDay ? allDay.reason : 'Выходной', items,
+          cellBg: isOff ? '#FBF7F5' : (d.weekday === ADMIN_DAY_WEEKDAY ? '#FFFDFC' : '#fff') };
+      }),
+    }));
+    const adminWeekDays = ADMIN_WEEK_DAYS.map((d) => {
+      const count = ADMIN_MASTERS.reduce((sum, m) => sum + (m.workdays.includes(d.weekday) ? weekItemsFor(m.id, d.weekday).count : 0), 0);
+      const isToday = d.weekday === ADMIN_DAY_WEEKDAY;
+      return {
+        ...d, countLabel: count + ' ' + (count % 10 === 1 && count % 100 !== 11 ? 'запись' : (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20) ? 'записи' : 'записей')),
+        headBg: isToday ? '#F4E6E3' : '#fff', headFg: isToday ? '#8E4B48' : '#0F0B0C',
+        title: isToday ? 'Открыть день' : 'В демо подробный день есть только для четверга',
+        onOpen: isToday ? () => this.setAdminViewMode('day') : () => this.showToast('В демо подробный день есть только для четверга, 24 сентября'),
       };
     });
     const adminAllAppts = this.state.adminAppointments.filter(ADMIN_LIVE);
@@ -4813,6 +4941,9 @@ class Component extends DCLogic {
       adminViewWeekBg: this.state.adminViewMode === 'week' ? '#fff' : 'transparent',
       setAdminViewDay: () => this.setAdminViewMode('day'),
       setAdminViewWeek: () => this.setAdminViewMode('week'),
+      adminIsDayView: !adminIsWeekView, adminIsWeekView,
+      adminDateLabel: adminIsWeekView ? '22–26 сентября' : 'Чт, 24 сентября',
+      adminWeekDays, adminWeekRows,
       adminSearch: this.state.adminSearch, onAdminSearch: this.setAdminSearch,
       adminSummaryTotal: adminSummary.total,
       adminSummaryFreeHours: Math.round(adminSummary.freeHours * 10) / 10,
@@ -5139,7 +5270,9 @@ class Component extends DCLogic {
         { group: 'Кабинет', label: 'Отмена записи (меньше 24ч)', onClick: () => this.goToState('normal', '/account/bookings/b2') },
         { group: 'Система', label: '404 — страница не найдена', onClick: () => this.goToState('normal', '/this-page-does-not-exist') },
         { group: 'Система', label: 'Технические работы', onClick: () => this.goToState('normal', '/maintenance') },
-        { group: 'Администратор', label: 'Шахматка дня', onClick: () => this.goToState('normal', '/staff/admin-home') },
+        { group: 'Администратор', label: 'Шахматка дня', onClick: () => { this.setState({ adminViewMode: 'day' }); this.goToState('normal', '/staff/admin-home'); } },
+        { group: 'Администратор', label: 'Шахматка недели', onClick: () => { this.setState({ adminViewMode: 'week' }); this.goToState('normal', '/staff/admin-home'); } },
+        { group: 'Администратор · Услуги', label: 'Новая услуга (форма)', onClick: () => { this.goToState('normal', '/staff/admin/services'); setTimeout(() => this.openServiceForm(null)(), 50); } },
         { group: 'Администратор', label: 'Новая запись: конфликт слота', onClick: () => { this.goToState('normal', '/staff/admin-home'); setTimeout(() => { this.openNewApptPanel({ masterId: 'm1', start: 14 * 60 }); this.toggleApptService('s1'); this.setState((s) => ({ apptForm: { ...s.apptForm, selectedClient: ADMIN_CLIENTS_DB[0] } })); this.submitNewAppt(true)(); }, 50); } },
         { group: 'Администратор · Запись', label: 'Поповер быстрых действий', onClick: () => { this.goToState('normal', '/staff/admin-home'); setTimeout(() => this.setState({ adminApptPopover: { apptId: 'ap3', x: 700, y: 240 } }), 50); } },
         { group: 'Администратор · Запись', label: 'Диалог: перенос (конфликт)', onClick: () => { this.goToState('normal', '/staff/admin-home'); setTimeout(() => { this.openRescheduleDialog('ap4')(); this.setRescheduleMaster('m1'); this.setState((s) => ({ rescheduleForm: { ...s.rescheduleForm, newTime: 14 * 60, conflictShown: true } })); }, 50); } },
