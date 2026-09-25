@@ -59,30 +59,41 @@ const designMainServiceIds = [1, 2, 7, 8];
 
 type Level = 'master' | 'top_master';
 
+/** Недельный график, который действует с даты `validFrom` до начала следующего графика мастера. */
+interface Schedule {
+  validFrom: string;
+  /** Рабочие дни по ISO: 1 — понедельник … 7 — воскресенье. */
+  weekdays: number[]; start: string; end: string;
+}
+
 interface Master {
   id: number; name: string; level: Level; specialty: string; experienceYears: number; bio: string;
-  /** Рабочие дни по ISO: 1 — понедельник … 7 — воскресенье. */
-  weekdays: number[]; start: string; end: string; serviceIds: number[];
+  /** Графики по возрастанию даты начала. */
+  schedules: Schedule[]; serviceIds: number[];
 }
 
 const masters: Master[] = [
   {
     id: 1, name: 'Анна Ковалева', level: 'master', specialty: 'Маникюр и педикюр', experienceYears: 7,
     bio: 'Более 6 лет в маникюре, аккуратная работа с покрытием и формой',
-    weekdays: [2, 3, 4, 5], start: '10:00', end: '18:00',
+    schedules: [
+      { validFrom: '2024-01-01', weekdays: [2, 3, 4, 5], start: '10:00', end: '18:00' },
+      // Сценарий 14: с 1 октября Анна работает ср–сб. Сентябрьские дни считаются по старому графику.
+      { validFrom: '2026-10-01', weekdays: [3, 4, 5, 6], start: '10:00', end: '18:00' },
+    ],
     // Сценарий 2: наращивание с дизайном выполняет только Анна.
     serviceIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
   },
   {
     id: 2, name: 'Марина Орлова', level: 'master', specialty: 'Мастер по бровям', experienceYears: 4,
     bio: 'Подбирает форму бровей индивидуально под черты лица',
-    weekdays: [3, 4, 5, 6], start: '11:00', end: '20:00',
+    schedules: [{ validFrom: '2024-01-01', weekdays: [3, 4, 5, 6], start: '11:00', end: '20:00' }],
     serviceIds: [11, 12, 13, 14],
   },
   {
     id: 3, name: 'Елена Смирнова', level: 'master', specialty: 'Универсальный мастер', experienceYears: 5,
     bio: 'Работает и с ногтями, и с бровями — удобно для комплексного визита',
-    weekdays: [2, 4, 6], start: '10:00', end: '19:00',
+    schedules: [{ validFrom: '2024-01-01', weekdays: [2, 4, 6], start: '10:00', end: '19:00' }],
     // Наращивание делает, дизайн — нет.
     serviceIds: [1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13],
   },
@@ -234,11 +245,16 @@ export function seedDevData(db: Db, options: SeedOptions): void {
         experience_years: m.experienceYears, bio: m.bio, sort_order: i + 1,
       });
       for (const serviceId of m.serviceIds) insert('master_services', { master_id: m.id, service_id: serviceId });
-      for (const weekday of m.weekdays) {
-        insert('master_weekly_hours', {
-          master_id: m.id, weekday, valid_from: '2024-01-01', start_time: m.start, end_time: m.end,
-        });
-      }
+      // Прежний график закрывается днем накануне нового: периоды не пересекаются (триггер 10.6).
+      m.schedules.forEach((schedule, j) => {
+        const next = m.schedules[j + 1];
+        for (const weekday of schedule.weekdays) {
+          insert('master_weekly_hours', {
+            master_id: m.id, weekday, valid_from: schedule.validFrom, valid_to: next ? addDays(next.validFrom, -1) : null,
+            start_time: schedule.start, end_time: schedule.end,
+          });
+        }
+      });
     });
 
     // Заметка со слов мастера: у мастеров нет учетных записей, вносит администратор.
