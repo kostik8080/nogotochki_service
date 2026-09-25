@@ -37,7 +37,9 @@ export function runMigrations(db: Db, dir: string = MIGRATIONS_DIR): string[] {
       throw new Error(`Миграция ${name}: имя должно быть вида 001_description.sql`);
     }
     const sql = readFileSync(path.join(dir, name), 'utf8');
-    const checksum = createHash('sha256').update(sql).digest('hex');
+    // Сумма считается по тексту с едиными окончаниями строк: git в Windows может заменить \n на \r\n,
+    // и без этого та же миграция выглядела бы измененной.
+    const checksum = createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex');
 
     const appliedChecksum = applied.get(name);
     if (appliedChecksum !== undefined) {
