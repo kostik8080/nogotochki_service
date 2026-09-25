@@ -7,7 +7,7 @@ import type { Db } from './connection.js';
 
 export const MIGRATIONS_DIR = path.join(import.meta.dirname, 'migrations');
 
-/** Имя файла миграции: номер из трех цифр и описание, например 001_initial_schema.sql. */
+/** Имя файла миграции: номер из трех цифр и описание, например 001_init.sql. */
 const FILE_PATTERN = /^\d{3}_[a-z0-9_]+\.sql$/;
 
 interface AppliedMigration {
