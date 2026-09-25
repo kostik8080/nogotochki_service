@@ -4,6 +4,7 @@
 // При расхождениях команда завершается с кодом 1.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import type { SQLInputValue } from 'node:sqlite';
 import { SERVER_ROOT } from '../src/config.js';
 import { openDatabase } from '../src/db/connection.js';
 import { runMigrations } from '../src/db/migrator.js';
@@ -89,7 +90,7 @@ const db = openDatabase(':memory:');
 runMigrations(db);
 
 const problems: string[] = [];
-const all = <T>(sql: string, ...params: unknown[]) => db.prepare(sql).all(...params) as T[];
+const all = <T>(sql: string, ...params: SQLInputValue[]) => db.prepare(sql).all(...params) as unknown as T[];
 
 interface ColumnInfo { name: string; type: string; notnull: number; pk: number }
 interface ForeignKeyInfo { table: string; from: string; to: string; on_delete: string }
@@ -152,7 +153,7 @@ for (const [table, fields] of docTables) {
   for (const column of columns) {
     if (!fields.some((f) => f.name === column.name)) problems.push(`${table}.${column.name}: поле не описано в документе`);
   }
-  const strict = db.prepare('SELECT strict FROM pragma_table_list WHERE name = ?').pluck().get(table);
+  const { strict } = db.prepare('SELECT strict FROM pragma_table_list WHERE name = ?').get(table) as { strict: number };
   if (!strict) problems.push(`${table}: таблица не STRICT (раздел 1)`);
 }
 

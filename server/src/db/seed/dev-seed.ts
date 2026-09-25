@@ -2,8 +2,9 @@
 // из паспорта (docs/pasport-produkta.md) и моковых данных прототипа (Prototype/data.js).
 // Записи и блокировки считаются от сегодняшнего дня, чтобы в календаре всегда были
 // и прошедшие визиты, и предстоящие. Только для разработки: в production не запускается.
-import { pbkdf2Sync, randomBytes } from 'node:crypto';
-import type { Db } from '../connection.js';
+import { hashPassword } from '../../auth/password.js';
+import type { SQLInputValue } from 'node:sqlite';
+import { type Db, transaction } from '../connection.js';
 
 export interface SeedOptions {
   adminPassword: string;
@@ -156,14 +157,6 @@ function findWeekday(from: string, weekday: number, minDays: number, step: 1 | -
 const iso = (d: Date) => d.toISOString();
 const addMinutes = (d: Date, min: number) => new Date(d.getTime() + min * 60_000);
 
-/** Хеш пароля в формате прототипа. Сервер при входе сможет перевести его на argon2id (решение 36). */
-function hashPassword(password: string): string {
-  const iterations = 600_000;
-  const salt = randomBytes(16);
-  const hash = pbkdf2Sync(password, salt, iterations, 32, 'sha256');
-  return `pbkdf2-sha256$${iterations}$${salt.toString('base64')}$${hash.toString('base64')}`;
-}
-
 // ---------------------------------------------------------------------------
 // Заполнение
 // ---------------------------------------------------------------------------
@@ -172,28 +165,27 @@ export function seedDevData(db: Db, options: SeedOptions): void {
   const now = options.now ?? new Date();
   const today = studioDate(now);
 
-  const usersCount = db.prepare('SELECT count(*) FROM users').pluck().get() as number;
+  const { usersCount } = db.prepare('SELECT count(*) AS usersCount FROM users').get() as { usersCount: number };
   if (usersCount > 0) {
     throw new Error('В базе уже есть данные. Чтобы пересоздать базу с тестовыми данными: npm run db:reset');
   }
 
-  const insert = (table: string, row: Record<string, unknown>) => {
+  // Пустое значение передается как null: node:sqlite не принимает undefined.
+  const insert = (table: string, row: Record<string, SQLInputValue>) => {
     const cols = Object.keys(row);
     const sql = `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((c) => '@' + c).join(', ')})`;
     return Number(db.prepare(sql).run(row).lastInsertRowid);
   };
 
-  db.transaction(() => {
+  transaction(db, () => {
     // --- Студия ---
-    insert('settings', {
-      id: 1, studio_name: 'Ноготочки', address: 'Москва, ул. Цветочная, 12', phone: '+79991234567',
-      map_url: 'https://yandex.ru/maps/?text=' + encodeURIComponent('Москва, ул. Цветочная, 12'),
-      timezone: TIMEZONE, slot_step_min: 30, booking_horizon_days: HORIZON_DAYS, min_lead_min: 120,
-      client_change_deadline_hours: 24, slot_hold_min: 10,
-    });
-    for (let weekday = 2; weekday <= 6; weekday++) {
-      insert('studio_hours', { weekday, open_time: '10:00', close_time: '20:00' });
-    }
+    // Настройки и режим работы создает миграция 002. Здесь — ссылка на карту и выключение
+    // режима технических работ, чтобы сервисом можно было пользоваться при разработке.
+    const settingsUpdated = db.prepare(`
+      UPDATE settings SET map_url = ?, is_maintenance = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      WHERE id = 1
+    `).run('https://yandex.ru/maps/?text=' + encodeURIComponent('Москва, ул. Цветочная, 12')).changes;
+    if (settingsUpdated !== 1) throw new Error('Нет строки настроек студии: примените миграции (npm run db:migrate)');
 
     // --- Пользователи ---
     const consentAt = iso(addMinutes(now, -60 * 24 * 90));
@@ -392,12 +384,12 @@ export function seedDevData(db: Db, options: SeedOptions): void {
 
     // --- Фото работ (сценарий 13). Файлов на диске нет, в базе только пути. ---
     insert('work_photos', {
-      booking_item_id: lamination.itemIds[0], file_path: 'photos/seed/brows-lamination.jpg',
+      booking_item_id: lamination.itemIds[0]!, file_path: 'photos/seed/brows-lamination.jpg',
       title: 'Ламинирование бровей', is_published: 1, publish_consent_at: iso(now), sort_order: 1, uploaded_by: ADMIN_ID,
     });
     insert('work_photos', {
       master_id: 1, service_id: 1, file_path: 'photos/seed/nude-manicure.jpg',
       title: 'Нюдовый маникюр', is_published: 1, sort_order: 2, uploaded_by: ADMIN_ID,
     });
-  }).immediate();
+  });
 }

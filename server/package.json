@@ -5,22 +5,25 @@
   "description": "Серверная часть «Ноготочки. Онлайн-запись»",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=24.7"
   },
   "scripts": {
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:seed": "tsx scripts/db-seed.ts",
     "db:reset": "tsx scripts/db-reset.ts",
     "db:check-schema": "tsx scripts/db-check-schema.ts",
+    "admin:create": "tsx scripts/admin-create.ts",
+    "build": "node scripts/build.mjs",
+    "prod:migrate": "node dist/scripts/db-migrate.js",
+    "prod:admin:create": "node dist/scripts/admin-create.js",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "better-sqlite3": "^13.0.3"
-  },
   "devDependencies": {
-    "@types/better-sqlite3": "^9.6.0",
-    "@types/node": "^22.20.4",
+    "@types/node": "^24.13.6",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }

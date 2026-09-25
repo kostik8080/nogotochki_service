@@ -1,9 +1,20 @@
 // Настройки сервера из переменных окружения. Перечень переменных — в server/.env.example.
+// В production настройки проверяются при запуске: с неверными сервер не стартует.
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
-/** Папка server/ — от нее считаются относительные пути, откуда бы ни запускалась команда. */
-export const SERVER_ROOT = path.resolve(import.meta.dirname, '..');
+/**
+ * Папка server/ — от нее считаются относительные пути, откуда бы ни запускалась команда.
+ * Ищется по package.json вверх от этого файла: код лежит в src/ при разработке и в dist/src/ после сборки.
+ */
+export const SERVER_ROOT = findServerRoot(import.meta.dirname);
+
+function findServerRoot(from: string): string {
+  for (let dir = from; ; dir = path.dirname(dir)) {
+    if (existsSync(path.join(dir, 'package.json'))) return dir;
+    if (path.dirname(dir) === dir) throw new Error(`Не найден package.json сервера выше ${from}`);
+  }
+}
 
 const envFile = path.join(SERVER_ROOT, '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
@@ -18,13 +29,44 @@ const nodeEnv = env('NODE_ENV') ?? 'development';
 if (!['development', 'test', 'production'].includes(nodeEnv)) {
   throw new Error(`NODE_ENV=${nodeEnv}: допустимы development, test, production`);
 }
+const isProduction = nodeEnv === 'production';
 
 export const config = {
   nodeEnv,
-  isProduction: nodeEnv === 'production',
+  isProduction,
   databasePath: path.resolve(SERVER_ROOT, env('DATABASE_PATH') ?? 'data/nogotochki.db'),
   seed: {
     adminPassword: env('SEED_ADMIN_PASSWORD'),
     clientPassword: env('SEED_CLIENT_PASSWORD'),
   },
 };
+
+if (isProduction) checkProductionConfig();
+
+function checkProductionConfig(): void {
+  const errors: string[] = [];
+
+  const dbPath = env('DATABASE_PATH');
+  if (!dbPath) {
+    errors.push('DATABASE_PATH не задан: в production путь к базе указывается явно');
+  } else if (!path.isAbsolute(dbPath)) {
+    errors.push(`DATABASE_PATH=${dbPath}: нужен абсолютный путь, например /var/lib/nogotochki/nogotochki.db`);
+  } else if (isInside(SERVER_ROOT, dbPath)) {
+    // Папку с кодом заменяют при каждом обновлении — база внутри нее будет потеряна.
+    errors.push(`DATABASE_PATH=${dbPath}: база лежит внутри папки с кодом (${SERVER_ROOT}), вынесите ее на постоянный диск`);
+  }
+
+  if (config.seed.adminPassword || config.seed.clientPassword) {
+    errors.push('SEED_ADMIN_PASSWORD и SEED_CLIENT_PASSWORD нужны только для тестовых данных — уберите их из окружения production');
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Настройки production неверны:\n  - ${errors.join('\n  - ')}`);
+  }
+}
+
+/** Лежит ли путь внутри папки. Путь на другом диске Windows path.relative возвращает абсолютным. */
+function isInside(dir: string, target: string): boolean {
+  const relative = path.relative(dir, target);
+  return !relative.startsWith('..') && !path.isAbsolute(relative);
+}

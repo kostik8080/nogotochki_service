@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import type { Db } from './connection.js';
+import { type Db, transaction } from './connection.js';
 
 export const MIGRATIONS_DIR = path.join(import.meta.dirname, 'migrations');
 
@@ -26,7 +26,7 @@ export function runMigrations(db: Db, dir: string = MIGRATIONS_DIR): string[] {
   `);
 
   const applied = new Map(
-    (db.prepare('SELECT name, checksum FROM schema_migrations').all() as AppliedMigration[])
+    (db.prepare('SELECT name, checksum FROM schema_migrations').all() as unknown as AppliedMigration[])
       .map((m) => [m.name, m.checksum]),
   );
   const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
@@ -52,16 +52,16 @@ export function runMigrations(db: Db, dir: string = MIGRATIONS_DIR): string[] {
     }
 
     // Файл целиком в одной транзакции: при ошибке база остается в прежнем состоянии.
-    db.transaction(() => {
+    transaction(db, () => {
       db.exec(sql);
       db.prepare('INSERT INTO schema_migrations (name, checksum) VALUES (?, ?)').run(name, checksum);
-    }).immediate();
+    });
     newlyApplied.push(name);
   }
 
   // Контрольная проверка всех ссылок: в SQLite внешний ключ меняют пересозданием таблицы,
   // и ошибка в такой миграции могла оставить строки со ссылками в никуда.
-  const violations = db.pragma('foreign_key_check') as unknown[];
+  const violations = db.prepare('PRAGMA foreign_key_check').all();
   if (violations.length > 0) {
     throw new Error(`После миграций нарушены внешние ключи: ${JSON.stringify(violations)}`);
   }

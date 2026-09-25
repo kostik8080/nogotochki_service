@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "."
+  },
+  "include": ["src", "scripts"],
+  "exclude": [
+    "src/db/seed",
+    "scripts/db-seed.ts",
+    "scripts/db-reset.ts",
+    "scripts/db-check-schema.ts"
+  ]
+}
