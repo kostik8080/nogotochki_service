@@ -9,6 +9,7 @@
   },
   "scripts": {
     "db:migrate": "tsx --import ./scripts/node-version.mjs scripts/db-migrate.ts",
+    "db:fresh": "tsx --import ./scripts/node-version.mjs scripts/db-fresh.ts",
     "db:seed": "tsx --import ./scripts/node-version.mjs scripts/db-seed.ts",
     "db:reset": "tsx --import ./scripts/node-version.mjs scripts/db-reset.ts",
     "db:backup": "tsx --import ./scripts/node-version.mjs scripts/db-backup.ts",
