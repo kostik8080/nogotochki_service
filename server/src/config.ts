@@ -31,6 +31,17 @@ if (!['development', 'test', 'production'].includes(nodeEnv)) {
 }
 const isProduction = nodeEnv === 'production';
 
+const portRaw = env('PORT') ?? '3000';
+const port = Number(portRaw);
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  throw new Error(`PORT=${portRaw}: нужен номер порта от 1 до 65535`);
+}
+
+const trustProxyRaw = env('TRUST_PROXY') ?? '0';
+if (!['0', '1'].includes(trustProxyRaw)) throw new Error(`TRUST_PROXY=${trustProxyRaw}: допустимы 0 и 1`);
+
+const pdPolicyVersion = env('PD_POLICY_VERSION') ?? '2026-09-01';
+
 const backupKeepRaw = env('BACKUP_KEEP') ?? '14';
 const backupKeep = Number(backupKeepRaw);
 if (!Number.isInteger(backupKeep) || backupKeep < 1) {
@@ -41,6 +52,15 @@ export const config = {
   nodeEnv,
   isProduction,
   databasePath: path.resolve(SERVER_ROOT, env('DATABASE_PATH') ?? 'data/nogotochki.db'),
+  /** Порт HTTP-сервера API. */
+  port,
+  /**
+   * Сервер стоит за прокси (nginx, панель хостинга): IP клиента берется из X-Forwarded-For.
+   * Без прокси заголовок подделывается клиентом, поэтому по умолчанию выключено.
+   */
+  trustProxy: trustProxyRaw === '1',
+  /** Редакция политики обработки персональных данных, на которую клиент соглашается при регистрации. */
+  pdPolicyVersion,
   backup: {
     dir: path.resolve(SERVER_ROOT, env('BACKUP_DIR') ?? 'backups'),
     keep: backupKeep,

@@ -99,7 +99,7 @@ beforeEach(() => {
   const service = (id: number, category: number, kind: string, name: string, duration: number, cleanup: number) =>
     insert('services', {
       id, category_id: category, kind, name, duration_min: duration, cleanup_min: cleanup,
-      price_master_rub: 1000, price_top_rub: 1000, max_quantity: kind === 'addon' ? 5 : 1,
+      price_master_kop: 100_000, price_top_kop: 100_000, max_quantity: kind === 'addon' ? 5 : 1,
     });
   service(MANICURE, 1, 'main', 'Маникюр с покрытием', 90, 15);
   service(MANICURE_PLAIN, 1, 'main', 'Маникюр без покрытия', 45, 15);

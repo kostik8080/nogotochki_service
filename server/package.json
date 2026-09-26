@@ -8,6 +8,8 @@
     "node": ">=24.7"
   },
   "scripts": {
+    "start": "tsx --import ./scripts/node-version.mjs src/server.ts",
+    "dev": "tsx watch --import ./scripts/node-version.mjs src/server.ts",
     "db:migrate": "tsx --import ./scripts/node-version.mjs scripts/db-migrate.ts",
     "db:fresh": "tsx --import ./scripts/node-version.mjs scripts/db-fresh.ts",
     "db:seed": "tsx --import ./scripts/node-version.mjs scripts/db-seed.ts",
@@ -16,6 +18,7 @@
     "db:check-schema": "tsx --import ./scripts/node-version.mjs scripts/db-check-schema.ts",
     "admin:create": "tsx --import ./scripts/node-version.mjs scripts/admin-create.ts",
     "build": "node --import ./scripts/node-version.mjs scripts/build.mjs",
+    "prod:start": "node --import ./scripts/node-version.mjs dist/src/server.js",
     "prod:migrate": "node --import ./scripts/node-version.mjs dist/scripts/db-migrate.js",
     "prod:backup": "node --import ./scripts/node-version.mjs dist/scripts/db-backup.js",
     "prod:admin:create": "node --import ./scripts/node-version.mjs dist/scripts/admin-create.js",

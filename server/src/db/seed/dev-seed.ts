@@ -44,26 +44,27 @@ const categories = [
 
 interface Service {
   id: number; categoryId: number; name: string; description: string;
+  /** Цены — в копейках, как в базе: 1800_00 — это 1800 ₽. */
   durationMin: number; cleanupMin: number; priceMaster: number; priceTop: number;
   addon?: boolean; featured?: boolean;
 }
 
 // id совпадают с номерами услуг прототипа: s1 → 1, s2 → 2 и т. д.
 const services: Service[] = [
-  { id: 1, categoryId: 1, name: 'Маникюр с покрытием гель-лаком', description: 'Классический уход и стойкое покрытие', durationMin: 90, cleanupMin: 15, priceMaster: 1800, priceTop: 2200, featured: true },
-  { id: 2, categoryId: 1, name: 'Маникюр без покрытия', description: 'Аппаратный или комбинированный уход', durationMin: 45, cleanupMin: 15, priceMaster: 1200, priceTop: 1500, featured: true },
-  { id: 3, categoryId: 1, name: 'Дизайн ногтей', description: 'Дополнение к маникюру, маникюру и педикюру или наращиванию', durationMin: 30, cleanupMin: 0, priceMaster: 300, priceTop: 300, addon: true, featured: true },
-  { id: 4, categoryId: 1, name: 'Снятие покрытия', description: 'Аккуратное снятие гель-лака', durationMin: 20, cleanupMin: 15, priceMaster: 500, priceTop: 600 },
-  { id: 5, categoryId: 2, name: 'Педикюр с покрытием', description: 'Уход за стопами и стойкое покрытие', durationMin: 90, cleanupMin: 15, priceMaster: 2200, priceTop: 2600, featured: true },
-  { id: 6, categoryId: 2, name: 'Педикюр без покрытия', description: 'Уход за стопами без покрытия', durationMin: 60, cleanupMin: 15, priceMaster: 1600, priceTop: 1900 },
-  { id: 7, categoryId: 2, name: 'Маникюр и педикюр', description: 'Комплексный уход за руками и ногами', durationMin: 150, cleanupMin: 15, priceMaster: 3200, priceTop: 3800 },
-  { id: 8, categoryId: 3, name: 'Наращивание ногтей', description: 'Форма и длина по вашему желанию', durationMin: 150, cleanupMin: 15, priceMaster: 2800, priceTop: 3400, featured: true },
-  { id: 9, categoryId: 3, name: 'Коррекция наращённых ногтей', description: 'Поддержание формы между визитами', durationMin: 90, cleanupMin: 15, priceMaster: 1800, priceTop: 2200 },
-  { id: 10, categoryId: 3, name: 'Снятие наращённых ногтей', description: 'Бережное снятие материала', durationMin: 30, cleanupMin: 15, priceMaster: 600, priceTop: 700 },
-  { id: 11, categoryId: 4, name: 'Коррекция и окрашивание бровей', description: 'Форма и цвет, подобранные под лицо', durationMin: 40, cleanupMin: 10, priceMaster: 1200, priceTop: 1500 },
-  { id: 12, categoryId: 4, name: 'Ламинирование бровей', description: 'Ухоженный вид без макияжа', durationMin: 60, cleanupMin: 10, priceMaster: 1800, priceTop: 2100, featured: true },
-  { id: 13, categoryId: 4, name: 'Коррекция бровей', description: 'Только форма, без окрашивания', durationMin: 20, cleanupMin: 10, priceMaster: 700, priceTop: 900 },
-  { id: 14, categoryId: 4, name: 'Окрашивание бровей хной', description: 'Естественный стойкий цвет', durationMin: 30, cleanupMin: 10, priceMaster: 900, priceTop: 1100 },
+  { id: 1, categoryId: 1, name: 'Маникюр с покрытием гель-лаком', description: 'Классический уход и стойкое покрытие', durationMin: 90, cleanupMin: 15, priceMaster: 1800_00, priceTop: 2200_00, featured: true },
+  { id: 2, categoryId: 1, name: 'Маникюр без покрытия', description: 'Аппаратный или комбинированный уход', durationMin: 45, cleanupMin: 15, priceMaster: 1200_00, priceTop: 1500_00, featured: true },
+  { id: 3, categoryId: 1, name: 'Дизайн ногтей', description: 'Дополнение к маникюру, маникюру и педикюру или наращиванию', durationMin: 30, cleanupMin: 0, priceMaster: 300_00, priceTop: 300_00, addon: true, featured: true },
+  { id: 4, categoryId: 1, name: 'Снятие покрытия', description: 'Аккуратное снятие гель-лака', durationMin: 20, cleanupMin: 15, priceMaster: 500_00, priceTop: 600_00 },
+  { id: 5, categoryId: 2, name: 'Педикюр с покрытием', description: 'Уход за стопами и стойкое покрытие', durationMin: 90, cleanupMin: 15, priceMaster: 2200_00, priceTop: 2600_00, featured: true },
+  { id: 6, categoryId: 2, name: 'Педикюр без покрытия', description: 'Уход за стопами без покрытия', durationMin: 60, cleanupMin: 15, priceMaster: 1600_00, priceTop: 1900_00 },
+  { id: 7, categoryId: 2, name: 'Маникюр и педикюр', description: 'Комплексный уход за руками и ногами', durationMin: 150, cleanupMin: 15, priceMaster: 3200_00, priceTop: 3800_00 },
+  { id: 8, categoryId: 3, name: 'Наращивание ногтей', description: 'Форма и длина по вашему желанию', durationMin: 150, cleanupMin: 15, priceMaster: 2800_00, priceTop: 3400_00, featured: true },
+  { id: 9, categoryId: 3, name: 'Коррекция наращённых ногтей', description: 'Поддержание формы между визитами', durationMin: 90, cleanupMin: 15, priceMaster: 1800_00, priceTop: 2200_00 },
+  { id: 10, categoryId: 3, name: 'Снятие наращённых ногтей', description: 'Бережное снятие материала', durationMin: 30, cleanupMin: 15, priceMaster: 600_00, priceTop: 700_00 },
+  { id: 11, categoryId: 4, name: 'Коррекция и окрашивание бровей', description: 'Форма и цвет, подобранные под лицо', durationMin: 40, cleanupMin: 10, priceMaster: 1200_00, priceTop: 1500_00 },
+  { id: 12, categoryId: 4, name: 'Ламинирование бровей', description: 'Ухоженный вид без макияжа', durationMin: 60, cleanupMin: 10, priceMaster: 1800_00, priceTop: 2100_00, featured: true },
+  { id: 13, categoryId: 4, name: 'Коррекция бровей', description: 'Только форма, без окрашивания', durationMin: 20, cleanupMin: 10, priceMaster: 700_00, priceTop: 900_00 },
+  { id: 14, categoryId: 4, name: 'Окрашивание бровей хной', description: 'Естественный стойкий цвет', durationMin: 30, cleanupMin: 10, priceMaster: 900_00, priceTop: 1100_00 },
 ];
 
 const DESIGN_ID = 3;
@@ -234,7 +235,7 @@ export function seedDevData(db: Db, options: SeedOptions): SeedReport {
     categories.forEach((c, i) => ensure('service_categories', { id: c.id, name: c.name, sort_order: i + 1 }, ['id']));
     services.forEach((s, i) => ensure('services', {
       id: s.id, category_id: s.categoryId, kind: s.addon ? 'addon' : 'main', name: s.name, description: s.description,
-      duration_min: s.durationMin, cleanup_min: s.cleanupMin, price_master_rub: s.priceMaster, price_top_rub: s.priceTop,
+      duration_min: s.durationMin, cleanup_min: s.cleanupMin, price_master_kop: s.priceMaster, price_top_kop: s.priceTop,
       price_unit: s.addon ? 'за 2 ногтя' : null, max_quantity: s.addon ? 5 : 1,
       is_featured: s.featured ? 1 : 0, sort_order: i + 1,
     }, ['id']));
@@ -341,7 +342,7 @@ export function seedDevData(db: Db, options: SeedOptions): SeedReport {
         const quantity = l.quantity ?? 1;
         return insert('booking_items', {
           booking_id: bookingId, service_id: l.service.id, position: i + 1, service_name: l.service.name,
-          unit_price_rub: unit, quantity, price_rub: unit * quantity, duration_min: l.service.durationMin,
+          unit_price_kop: unit, quantity, price_kop: unit * quantity, duration_min: l.service.durationMin,
         });
       });
 
@@ -407,7 +408,7 @@ export function seedDevData(db: Db, options: SeedOptions): SeedReport {
     });
     db.prepare('UPDATE bookings SET version = version + 1 WHERE id = ?').run(manicure.bookingId);
 
-    // Сценарий 2: наращивание с дизайном на четыре ногтя: 2800 + 2 × 300 = 3400 ₽, 180 минут.
+    // Сценарий 2: наращивание с дизайном на четыре ногтя: 2800 + 2 × 300 = 3400 ₽ (340 000 копеек), 180 минут.
     addBooking({
       clientId: mariaId, masterId: 1, date: findWeekday(today, 5, 2), time: '11:00',
       items: [{ serviceId: 8 }, { serviceId: DESIGN_ID, quantity: 2 }],
