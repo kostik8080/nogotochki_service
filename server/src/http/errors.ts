@@ -50,9 +50,13 @@ export function fromDatabaseError(error: unknown): HttpError | null {
   for (const [code, message] of Object.entries(TRIGGER_ERRORS)) {
     if (error.message.includes(code)) return conflict(code, message);
   }
-  if (/UNIQUE constraint failed/.test(error.message)) {
-    return conflict('ALREADY_EXISTS', 'Такое значение уже есть', { constraint: error.message.replace(/^.*UNIQUE constraint failed:\s*/, '') });
+  // Вторая линия защиты от двойной записи — частичный уникальный индекс bookings (master_id, starts_at):
+  // если его нарушение дошло сюда, это то же «время занято».
+  if (/UNIQUE constraint failed: bookings\.master_id, bookings\.starts_at/.test(error.message)) {
+    return conflict('SLOT_TAKEN', TRIGGER_ERRORS.SLOT_TAKEN!);
   }
+  // Имена таблиц и полей из текста ошибки базы наружу не отдаются.
+  if (/UNIQUE constraint failed/.test(error.message)) return conflict('ALREADY_EXISTS', 'Такое значение уже есть');
   return null;
 }
 

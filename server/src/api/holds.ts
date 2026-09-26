@@ -2,13 +2,13 @@
 // «Продолжить» — время закрепляется за ним на settings.slot_hold_min минут (10) и не предлагается другим.
 // Бронь истекает сама: во всех проверках учитываются только строки с expires_at > сейчас, а истекшие
 // строки удаляет уборка (cleanupExpired раз в минуту и при каждой новой брони).
-import { checkSlot, slotTaken, type Alternative } from '../booking/availability.js';
+import { checkSlot, isSlotConflict, nearestFreeSlots, SlotUnavailable, slotTaken } from '../booking/availability.js';
 import { loadBooking, pricesAtLevel } from '../booking/existing.js';
 import { cleanupExpiredHolds } from '../booking/cleanup.js';
 import { findMastersForServices } from '../booking/slots.js';
 import { readVisitItems, requireMasterForVisit, resolveVisit, visitPrice, type Level } from '../booking/visit.js';
 import { transaction } from '../db/connection.js';
-import { badRequest, databaseErrorCode, notFound } from '../http/errors.js';
+import { badRequest, notFound } from '../http/errors.js';
 import type { Result, Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
 import { readSettings } from '../studio/settings.js';
@@ -38,7 +38,8 @@ export function holdRoutes(router: Router): void {
     const settings = readSettings(ctx.db);
     const audience = user.role === 'admin' ? 'admin' : 'client';
     const now = ctx.now;
-    const alternatives: Alternative[] = [];
+    // Что искали — для подбора альтернатив после отката транзакции.
+    let wanted: { masterIds: number[]; durationMin: number; cleanupMin: number; excludeBookingId: number | null } | undefined;
 
     try {
       const result = transaction(ctx.db, () => {
@@ -70,6 +71,8 @@ export function holdRoutes(router: Router): void {
           priceOf = (level) => visitPrice(visit, level);
         }
 
+        wanted = { masterIds: candidates.map((m) => m.id), durationMin, cleanupMin, excludeBookingId };
+
         // Прежняя бронь пользователя снимается: новая ее заменяет. Если новую создать не удастся,
         // транзакция откатится, и прежняя бронь останется.
         ctx.db.prepare('DELETE FROM slot_holds WHERE owner_id = ?').run(user.id);
@@ -79,10 +82,7 @@ export function holdRoutes(router: Router): void {
           const check = checkSlot(ctx.db, {
             masterId: master.id, startsAt, durationMin, cleanupMin, now, audience, viewerId: user.id, excludeBookingId,
           });
-          if (!check.available) {
-            alternatives.push(...check.slots.map((s) => ({ masterId: master.id, startsAt: s.startsAt, endsAt: s.endsAt })));
-            continue;
-          }
+          if (!check.available) continue;
           const endsAt = new Date(Date.parse(startsAt) + durationMin * 60_000).toISOString();
           const busyUntil = new Date(Date.parse(endsAt) + cleanupMin * 60_000).toISOString();
           const expiresAt = new Date(now.getTime() + settings.slot_hold_min * 60_000).toISOString();
@@ -93,9 +93,9 @@ export function holdRoutes(router: Router): void {
           const hold = ctx.db.prepare('SELECT * FROM slot_holds WHERE id = ?').get(id) as unknown as HoldRow;
           return { hold, master, priceKop: priceOf(master.level), durationMin };
         }
-        return null;
+        // Ни у кого из мастеров время не свободно: откат вернет прежнюю бронь пользователя.
+        throw new SlotUnavailable();
       });
-      if (!result) throw slotTaken(startsAt, alternatives);
       return {
         status: 201,
         body: {
@@ -108,8 +108,11 @@ export function holdRoutes(router: Router): void {
         },
       };
     } catch (error) {
-      // Триггер базы отклонил бронь: кто-то занял время между проверкой и вставкой (сценарий 4).
-      if (databaseErrorCode(error) === 'SLOT_TAKEN') throw slotTaken(startsAt, alternatives);
+      // Время занято: по проверке сервера или по триггеру slot_holds_no_overlap, если кто-то занял его
+      // между проверкой и вставкой (сценарий 4). Ответ — 409 с ближайшим свободным временем.
+      if (isSlotConflict(error) && wanted) {
+        throw slotTaken(nearestFreeSlots(ctx.db, { ...wanted, startsAt, now, audience, viewerId: user.id }));
+      }
       throw error;
     }
   });

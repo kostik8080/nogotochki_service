@@ -1,10 +1,10 @@
 // Записи: создание, свои записи, карточка записи, перенос и отмена (паспорт, функции 6–8 клиента,
 // функции 5–7 администратора). Записи никогда не удаляются: отмена — это событие в журнале и смена статуса.
-import { checkSlot, slotTaken } from '../booking/availability.js';
+import { checkSlot, isSlotConflict, nearestFreeSlots, SlotUnavailable, slotTaken } from '../booking/availability.js';
 import { loadBooking, pricesAtLevel } from '../booking/existing.js';
 import { readVisitItems, requireMasterForVisit, resolveVisit, unitPrice } from '../booking/visit.js';
 import { type Db, transaction } from '../db/connection.js';
-import { badRequest, conflict, databaseErrorCode, forbidden, notFound } from '../http/errors.js';
+import { badRequest, conflict, forbidden, notFound } from '../http/errors.js';
 import { pathId, type Result, type Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
 import { addDays, zonedTimeToUtc } from '../lib/studio-time.js';
@@ -37,9 +37,14 @@ export function bookingRoutes(router: Router): void {
     requireNotMaintenance(ctx, user);
 
     const now = ctx.now;
+    // Длительность и уборка визита нужны и после отката транзакции — чтобы подобрать альтернативы.
+    let timing: { durationMin: number; cleanupMin: number } | undefined;
     try {
+      // transaction() начинает с BEGIN IMMEDIATE: блокировка на запись берется сразу, до первого чтения.
+      // Вторая одновременная запись ждет, пока первая зафиксируется, и видит уже созданную запись.
       const bookingId = transaction(ctx.db, () => {
         const visit = resolveVisit(ctx.db, items);
+        timing = { durationMin: visit.durationMin, cleanupMin: visit.cleanupMin };
         const master = requireMasterForVisit(ctx.db, masterId, visit.serviceIds);
         const endsAt = new Date(Date.parse(startsAt) + visit.durationMin * 60_000).toISOString();
         const busyUntil = new Date(Date.parse(endsAt) + visit.cleanupMin * 60_000).toISOString();
@@ -61,12 +66,15 @@ export function bookingRoutes(router: Router): void {
         // Повторная проверка в той же транзакции: с момента брони администратор мог добавить блокировку
         // или изменить график (раздел 10.3). Ограничения клиента — 2 часа до визита и горизонт — проверены
         // при создании брони, а бронь гарантирует время, поэтому здесь они не повторяются.
+        // Уровень 1 защиты от двойной записи.
         const check = checkSlot(ctx.db, {
           masterId, startsAt, durationMin: visit.durationMin, cleanupMin: visit.cleanupMin, now, audience: 'admin', viewerId: user.id,
         });
-        if (!check.available) throw slotTaken(startsAt, check.slots.map((s) => ({ masterId, startsAt: s.startsAt, endsAt: s.endsAt })));
+        if (!check.available) throw new SlotUnavailable();
 
         // Своя бронь снимается до вставки: триггер записи учитывает любые действующие брони (раздел 8).
+        // Уровень 2: вставку, которая пересекается с другой записью или чужой бронью, отклонит триггер
+        // bookings_no_overlap_insert с кодом SLOT_TAKEN.
         ctx.db.prepare('DELETE FROM slot_holds WHERE owner_id = ?').run(user.id);
         const id = Number(ctx.db.prepare(`
           INSERT INTO bookings (client_id, master_id, is_any_master, starts_at, ends_at, busy_until, price_level, comment,
@@ -87,7 +95,12 @@ export function bookingRoutes(router: Router): void {
       });
       return { status: 201, body: { booking: bookingView(ctx.db, bookingId, { viewer: user.role, now }) } };
     } catch (error) {
-      if (databaseErrorCode(error) === 'SLOT_TAKEN') throw slotTaken(startsAt, []);
+      // Уровень 3: транзакция уже откатилась. Вместо текста ошибки базы — 409 и ближайшее свободное время мастера.
+      if (isSlotConflict(error) && timing) {
+        throw slotTaken(nearestFreeSlots(ctx.db, {
+          masterIds: [masterId], startsAt, ...timing, now, audience: user.role === 'admin' ? 'admin' : 'client', viewerId: user.id,
+        }));
+      }
       throw error;
     }
   });
@@ -137,6 +150,7 @@ export function bookingRoutes(router: Router): void {
     input.done();
 
     const now = ctx.now;
+    let target: { masterId: number; durationMin: number; cleanupMin: number } | undefined;
     try {
       transaction(ctx.db, () => {
         const booking = loadBooking(ctx.db, id);
@@ -145,6 +159,7 @@ export function bookingRoutes(router: Router): void {
         checkVersion(booking.version, version);
 
         const masterId = masterIdInput ?? booking.master_id;
+        target = { masterId, durationMin: booking.durationMin, cleanupMin: booking.cleanupMin };
         if (masterId === booking.master_id && startsAt === booking.starts_at) {
           throw badRequest('NOTHING_TO_CHANGE', 'Новое время совпадает с текущим');
         }
@@ -165,7 +180,7 @@ export function bookingRoutes(router: Router): void {
           masterId, startsAt, durationMin: booking.durationMin, cleanupMin: booking.cleanupMin, now,
           audience: 'admin', viewerId: user.id, excludeBookingId: id,
         });
-        if (!check.available) throw slotTaken(startsAt, check.slots.map((s) => ({ masterId, startsAt: s.startsAt, endsAt: s.endsAt })));
+        if (!check.available) throw new SlotUnavailable();
 
         ctx.db.prepare('DELETE FROM slot_holds WHERE owner_id = ?').run(user.id);
         const prices = pricesAtLevel(booking, master.level);
@@ -183,6 +198,7 @@ export function bookingRoutes(router: Router): void {
         `).run(id, user.id, booking.master_id, masterId, booking.starts_at, startsAt,
           prices.changed ? booking.totalKop : null, prices.changed ? prices.totalKop : null, reason, now.toISOString());
         // Условие по версии — защита от одновременного редактирования двумя сотрудниками (раздел 9, экран A-S1).
+        // Пересечение с другой записью — в том числе при смене мастера — отклонит триггер bookings_no_overlap_update.
         const updated = ctx.db.prepare(`
           UPDATE bookings SET master_id = ?, starts_at = ?, ends_at = ?, busy_until = ?, price_level = ?,
                               version = version + 1, updated_at = ?
@@ -191,7 +207,12 @@ export function bookingRoutes(router: Router): void {
         if (updated.changes !== 1) throw versionConflict();
       });
     } catch (error) {
-      if (databaseErrorCode(error) === 'SLOT_TAKEN') throw slotTaken(startsAt, []);
+      if (isSlotConflict(error) && target) {
+        throw slotTaken(nearestFreeSlots(ctx.db, {
+          masterIds: [target.masterId], startsAt, durationMin: target.durationMin, cleanupMin: target.cleanupMin, now,
+          audience: user.role === 'admin' ? 'admin' : 'client', viewerId: user.id, excludeBookingId: id,
+        }));
+      }
       throw error;
     }
     return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now, withEvents: true }) } };
