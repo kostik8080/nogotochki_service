@@ -1,7 +1,7 @@
 // Управление мастерами (паспорт, функция 3 администратора; экраны A-19, A-22, A-22p).
 // Мастера не удаляются: на них ссылаются записи. Вместо удаления — isActive: false, отключенного мастера
 // не предлагают клиентам, но он остается в истории записей.
-import { getMasterDay } from '../booking/slots.js';
+import { applyOrPreview, bookingsOutsideWorkingHours } from '../booking/affected.js';
 import type { Db } from '../db/connection.js';
 import { transaction } from '../db/connection.js';
 import { badRequest, notFound } from '../http/errors.js';
@@ -115,21 +115,6 @@ function saveSchedule(db: Db, masterId: number, validFrom: string, days: Schedul
   for (const d of days) insert.run(masterId, d.weekday, validFrom, d.start, d.end);
 }
 
-/**
- * Действующие записи мастера с этого момента, которые не помещаются в его рабочее окно:
- * после смены графика администратор переносит или отменяет их сам (сценарий 14). Блокировки здесь не учитываются.
- */
-function bookingsOutsideSchedule(db: Db, masterId: number, from: string): number[] {
-  const { timezone } = readSettings(db);
-  const rows = db.prepare(`
-    SELECT id, starts_at, ends_at FROM bookings WHERE master_id = ? AND status = 'active' AND starts_at >= ? ORDER BY starts_at
-  `).all(masterId, from) as { id: number; starts_at: string; ends_at: string }[];
-  return rows.filter((b) => {
-    const day = getMasterDay(db, masterId, zonedDate(Date.parse(b.starts_at), timezone));
-    return day.status !== 'open' || Date.parse(b.starts_at) < day.window.start || Date.parse(b.ends_at) > day.window.end;
-  }).map((b) => b.id);
-}
-
 export function adminMasterRoutes(router: Router): void {
   router.get('/api/admin/masters', (ctx): Result => {
     requireRole(ctx, 'admin');
@@ -211,11 +196,13 @@ export function adminMasterRoutes(router: Router): void {
 
   // Новый недельный график с даты (A-22p, сценарий 14): «с 1 октября Анна работает ср–сб».
   // В ответе — действующие записи с этой даты, которые в новый график не попадают.
+  // С dryRun: true график не сохраняется — только показывает эти записи.
   router.put('/api/admin/masters/:id/schedule', (ctx): Result => {
     const user = requireRole(ctx, 'admin');
     const id = pathId(ctx);
     const input = Input.body(ctx.body);
     const { validFrom, days } = readSchedule(input);
+    const dryRun = input.bool('dryRun', { optional: true }) ?? false;
     input.done();
 
     const { timezone } = readSettings(ctx.db);
@@ -223,12 +210,12 @@ export function adminMasterRoutes(router: Router): void {
     // Прошедшие дни не переписываются: по ним уже считались слоты созданных записей.
     if (validFrom < today) throw badRequest('DATE_IN_PAST', 'Новый график может начаться не раньше сегодняшнего дня');
 
-    transaction(ctx.db, () => {
+    const from = new Date(zonedTimeToUtc(validFrom, '00:00', timezone)).toISOString();
+    const affected = applyOrPreview(ctx.db, dryRun, () => {
       if (!getMaster(ctx.db, id)) throw notFound('Мастер не найден');
       saveSchedule(ctx.db, id, validFrom, days);
+      return bookingsOutsideWorkingHours(ctx.db, { masterId: id, from });
     });
-    const from = new Date(zonedTimeToUtc(validFrom, '00:00', timezone)).toISOString();
-    const affected = bookingsOutsideSchedule(ctx.db, id, from);
     return {
       status: 200,
       body: {

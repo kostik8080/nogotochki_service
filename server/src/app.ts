@@ -1,18 +1,26 @@
 // HTTP-приложение API: разбирает запрос, находит сессию, вызывает обработчик и отвечает JSON.
 // Сервер (src/server.ts) и тесты (test/api.test.ts) создают его одинаково: createApp(db).
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { adminClientRoutes } from './api/admin-clients.js';
 import { adminMasterRoutes } from './api/admin-masters.js';
+import { adminScheduleRoutes } from './api/admin-schedule.js';
 import { adminServiceRoutes } from './api/admin-services.js';
+import { adminSettingsRoutes } from './api/admin-settings.js';
 import { authRoutes } from './api/auth.js';
 import { bookingRoutes } from './api/bookings.js';
 import { catalogRoutes } from './api/catalog.js';
 import { holdRoutes } from './api/holds.js';
+import { passwordResetRoutes } from './api/password-reset.js';
+import { photoRoutes } from './api/photos.js';
+import { profileRoutes } from './api/profile.js';
 import { clearSessionCookie, findSession, SESSION_COOKIE } from './auth/sessions.js';
 import type { Db } from './db/connection.js';
 import { fromDatabaseError, HttpError } from './http/errors.js';
-import { parseCookies, readJson, sendJson } from './http/io.js';
+import { parseCookies, readJson, readRaw, sendFile, sendJson } from './http/io.js';
 import { RateLimiter } from './http/rate-limit.js';
-import { type Context, type LimitBucket, Router } from './http/router.js';
+import { type Context, type LimitBucket, Router, type Services } from './http/router.js';
+import type { Mailer } from './notify/mailer.js';
+import type { SmsSender } from './notify/sms.js';
 
 export interface AppOptions {
   /** Текущий момент; тесты подставляют свой. */
@@ -25,6 +33,14 @@ export interface AppOptions {
   rateLimit?: boolean;
   /** Куда писать непредвиденные ошибки. */
   logError?: (error: unknown) => void;
+  /** Почта для кодов и ссылок; null — не настроена. */
+  mailer?: Mailer | null;
+  /** SMS-шлюз; null — не подключен. */
+  sms?: SmsSender | null;
+  /** Публичный адрес сервиса для ссылок в письмах. */
+  appUrl?: string;
+  /** Папка фото работ. */
+  uploadsDir: string;
 }
 
 export interface App {
@@ -33,37 +49,51 @@ export interface App {
   prune(now: Date): void;
 }
 
-export function createApp(db: Db, options: AppOptions = {}): App {
+export function createApp(db: Db, options: AppOptions): App {
   const now = options.now ?? (() => new Date());
   const secureCookies = options.secureCookies ?? false;
   const logError = options.logError ?? ((error) => console.error(error));
+  const services: Services = {
+    mailer: options.mailer ?? null,
+    sms: options.sms ?? null,
+    appUrl: options.appUrl ?? 'http://localhost:3000',
+    uploadsDir: options.uploadsDir,
+    secureCookies,
+  };
 
-  // Вход — 20 попыток в минуту с одного IP; регистрация — 10 в час; бронь — 30 в минуту на пользователя.
+  // Вход — 20 попыток в минуту с одного IP; регистрация — 10 в час; бронь — 30 в минуту на пользователя;
+  // коды и ссылки (сброс пароля, подтверждение контактов) — 10 в час с одного IP.
   const limiters: Record<LimitBucket, RateLimiter> = {
     login: new RateLimiter(20, 60_000),
     register: new RateLimiter(10, 3600_000),
     hold: new RateLimiter(30, 60_000),
+    code: new RateLimiter(10, 3600_000),
   };
 
   const router = new Router();
   authRoutes(router, { secureCookies });
+  passwordResetRoutes(router);
+  profileRoutes(router);
   catalogRoutes(router);
   holdRoutes(router);
   bookingRoutes(router);
+  photoRoutes(router);
   adminServiceRoutes(router);
   adminMasterRoutes(router);
+  adminScheduleRoutes(router);
+  adminClientRoutes(router);
+  adminSettingsRoutes(router);
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const cookies: string[] = [];
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
       const method = req.method ?? 'GET';
-      const { handler, params } = router.match(method, url.pathname);
-      const body = method === 'GET' ? undefined : await readJson(req);
+      const { handler, params, raw } = router.match(method, url.pathname);
 
       const at = now();
       const ctx: Context = {
-        db, req, params, query: url.searchParams, body, now: at, user: null, sessionStatus: 'none',
+        db, req, params, query: url.searchParams, body: undefined, services, now: at, user: null, sessionStatus: 'none',
         ip: clientIp(req, options.trustProxy ?? false),
         limit: (bucket, key) => {
           if (options.rateLimit !== false) limiters[bucket].hit(key, at.getTime());
@@ -80,8 +110,17 @@ export function createApp(db: Db, options: AppOptions = {}): App {
         else cookies.push(clearSessionCookie(secureCookies));
       }
 
+      // Файл (фото) принимается только от вошедшего пользователя: без входа 10 МБ даже не читаются.
+      if (raw) {
+        if (!ctx.user) throw new HttpError(401, ctx.sessionStatus === 'expired' ? 'SESSION_EXPIRED' : 'UNAUTHORIZED', 'Нужно войти в аккаунт');
+        ctx.rawBody = await readRaw(req, raw);
+      } else if (method !== 'GET') {
+        ctx.body = await readJson(req);
+      }
+
       const result = await handler(ctx);
-      sendJson(res, result.status, result.body, { ...result.headers, ...(cookies.length ? { 'Set-Cookie': cookies } : {}) });
+      if (result.file) sendFile(res, result.file.data, result.file.type, result.file.cache);
+      else sendJson(res, result.status, result.body, { ...result.headers, ...(cookies.length ? { 'Set-Cookie': cookies } : {}) });
     } catch (error) {
       const known = error instanceof HttpError ? error : fromDatabaseError(error);
       if (!known) logError(error);

@@ -71,3 +71,12 @@ export function sessionCookie(token: string, expiresAt: Date, secure: boolean): 
 export function clearSessionCookie(secure: boolean): string {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`;
 }
+
+/**
+ * Закрыть все сессии пользователя, кроме текущей (если указана): после смены или сброса пароля,
+ * блокировки и удаления аккаунта вход с других устройств перестает действовать сразу (решение 17).
+ */
+export function revokeUserSessions(db: Db, userId: number, now: Date, exceptSessionId: number | null = null): void {
+  db.prepare('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL AND id IS NOT ?')
+    .run(now.toISOString(), userId, exceptSessionId);
+}

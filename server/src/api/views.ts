@@ -48,6 +48,7 @@ interface BookingRow {
   price_level: string;
   comment: string | null;
   created_by: number;
+  client_acknowledged_at: string | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -103,7 +104,7 @@ export function bookingViews(db: Db, ids: number[], options: BookingViewOptions)
   const settings = readSettings(db);
   const rows = db.prepare(`
     SELECT b.id, b.client_id, b.master_id, m.name AS master_name, m.level AS master_level, b.is_any_master,
-           b.starts_at, b.ends_at, b.busy_until, b.status, b.price_level, b.comment, b.created_by, b.version,
+           b.starts_at, b.ends_at, b.busy_until, b.status, b.price_level, b.comment, b.created_by, b.client_acknowledged_at, b.version,
            b.created_at, b.updated_at,
            c.name AS client_name, c.phone AS client_phone, c.email AS client_email,
            cr.name AS creator_name, cr.role AS creator_role
@@ -122,7 +123,7 @@ export function bookingViews(db: Db, ids: number[], options: BookingViewOptions)
            e.old_status, e.new_status, e.old_master_id, e.new_master_id, e.old_starts_at, e.new_starts_at,
            e.old_total_price_kop, e.new_total_price_kop, e.reason, e.created_at
     FROM booking_events e LEFT JOIN users u ON u.id = e.actor_id
-    WHERE e.booking_id IN (${placeholders(ids.length)}) ${options.withEvents ? '' : "AND e.event_type = 'cancelled'"}
+    WHERE e.booking_id IN (${placeholders(ids.length)})
     ORDER BY e.booking_id, e.created_at, e.id
   `).all(...ids) as unknown as EventRow[];
 
@@ -131,6 +132,11 @@ export function bookingViews(db: Db, ids: number[], options: BookingViewOptions)
     const lines = items.filter((i) => i.booking_id === b.id);
     const history = events.filter((e) => e.booking_id === b.id);
     const cancel = history.find((e) => e.event_type === 'cancelled');
+    // Баннер «Запись отменена или перенесена студией» (CAB-01, решение 26): последнее такое изменение
+    // администратора, которое клиент еще не закрыл крестиком.
+    const studioChange = [...history].reverse().find((e) => e.actor_role === 'admin'
+      && (e.event_type === 'cancelled' || e.event_type === 'rescheduled')
+      && (b.client_acknowledged_at === null || e.created_at > b.client_acknowledged_at));
     const changeDeadline = new Date(Date.parse(b.starts_at) - deadlineMs);
     const isAdmin = options.viewer === 'admin';
     return [b.id, {
@@ -156,6 +162,7 @@ export function bookingViews(db: Db, ids: number[], options: BookingViewOptions)
       // Правило 24 часов (раздел 6): клиент меняет запись сам только до этого момента.
       changeDeadline: changeDeadline.toISOString(),
       canChange: b.status === 'active' && options.now < changeDeadline,
+      studioChange: studioChange ? { type: studioChange.event_type, at: studioChange.created_at } : null,
       version: b.version,
       createdAt: b.created_at,
       updatedAt: b.updated_at,

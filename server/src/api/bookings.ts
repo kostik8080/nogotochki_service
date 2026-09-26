@@ -233,6 +233,53 @@ export function bookingRoutes(router: Router): void {
     return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now, withEvents: true }) } };
   });
 
+  // «Визит завершен» и «Клиент не пришел» (A-03, A-06; паспорт, функция 7 администратора) — только для визита,
+  // который уже начался. Ошибочную отметку можно исправить: завершена ↔ не пришел. Каждая смена — в истории.
+  router.post('/api/bookings/:id/status', (ctx): Result => {
+    const user = requireRole(ctx, 'admin');
+    const id = pathId(ctx);
+    const input = Input.body(ctx.body);
+    const status = input.oneOf('status', ['completed', 'no_show'] as const);
+    const reason = input.string('reason', { optional: true, nullable: true, max: MAX_TEXT }) ?? null;
+    const version = input.int('version', { optional: true, min: 1 });
+    input.done();
+
+    const now = ctx.now.toISOString();
+    transaction(ctx.db, () => {
+      const booking = ctx.db.prepare('SELECT status, starts_at, version FROM bookings WHERE id = ?').get(id) as
+        { status: string; starts_at: string; version: number } | undefined;
+      if (!booking) throw notFound('Запись не найдена');
+      checkVersion(booking.version, version);
+      if (booking.status === 'cancelled_by_client' || booking.status === 'cancelled_by_studio') {
+        throw conflict('BOOKING_NOT_ACTIVE', 'Запись отменена: отметить визит нельзя');
+      }
+      if (booking.status === status) throw badRequest('NOTHING_TO_CHANGE', 'У записи уже этот статус');
+      if (booking.starts_at > now) throw conflict('VISIT_NOT_STARTED', 'Отметить визит можно, когда он уже начался');
+
+      ctx.db.prepare(`
+        INSERT INTO booking_events (booking_id, event_type, actor_id, old_status, new_status, reason, created_at)
+        VALUES (?, 'status_changed', ?, ?, ?, ?, ?)
+      `).run(id, user.id, booking.status, status, reason, now);
+      const updated = ctx.db.prepare('UPDATE bookings SET status = ?, version = version + 1, updated_at = ? WHERE id = ? AND version = ?')
+        .run(status, now, id, booking.version);
+      if (updated.changes !== 1) throw versionConflict();
+    });
+    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now, withEvents: true }) } };
+  });
+
+  // Клиент закрыл баннер «Запись отменена или перенесена студией» (CAB-01): баннер больше не показывается.
+  // Версия записи не растет: это не изменение записи, и сотрудник, который ее редактирует, не получит конфликт.
+  router.post('/api/bookings/:id/acknowledge', (ctx): Result => {
+    const user = requireRole(ctx, 'client');
+    const id = pathId(ctx);
+    Input.body(ctx.body).done();
+    const row = ctx.db.prepare('SELECT client_id FROM bookings WHERE id = ?').get(id) as { client_id: number } | undefined;
+    if (!row) throw notFound('Запись не найдена');
+    if (row.client_id !== user.id) throw forbidden('Это чужая запись');
+    ctx.db.prepare('UPDATE bookings SET client_acknowledged_at = ? WHERE id = ?').run(ctx.now.toISOString(), id);
+    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now }) } };
+  });
+
   // Все записи студии для администратора (A-01, функция 5): фильтры по датам студии, мастеру, услуге, статусу и клиенту.
   router.get('/api/admin/bookings', (ctx): Result => {
     const user = requireRole(ctx, 'admin');

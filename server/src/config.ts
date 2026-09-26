@@ -42,6 +42,15 @@ if (!['0', '1'].includes(trustProxyRaw)) throw new Error(`TRUST_PROXY=${trustPro
 
 const pdPolicyVersion = env('PD_POLICY_VERSION') ?? '2026-09-01';
 
+const appUrl = (env('APP_URL') ?? `http://localhost:${port}`).replace(/\/+$/, '');
+if (!/^https?:\/\/[^/\s]+/.test(appUrl)) throw new Error(`APP_URL=${appUrl}: нужен адрес вида https://nogotochki.ru`);
+
+const smtpPortRaw = env('SMTP_PORT') ?? '587';
+const smtpPort = Number(smtpPortRaw);
+if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
+  throw new Error(`SMTP_PORT=${smtpPortRaw}: нужен номер порта от 1 до 65535`);
+}
+
 const backupKeepRaw = env('BACKUP_KEEP') ?? '14';
 const backupKeep = Number(backupKeepRaw);
 if (!Number.isInteger(backupKeep) || backupKeep < 1) {
@@ -61,6 +70,18 @@ export const config = {
   trustProxy: trustProxyRaw === '1',
   /** Редакция политики обработки персональных данных, на которую клиент соглашается при регистрации. */
   pdPolicyVersion,
+  /** Публичный адрес сервиса без «/» на конце: из него строятся ссылки в письмах. */
+  appUrl,
+  /** Папка фото работ. В базе хранится путь относительно нее (work_photos.file_path). */
+  uploadsDir: path.resolve(SERVER_ROOT, env('UPLOADS_DIR') ?? 'uploads'),
+  /** Почта для одноразовых кодов и ссылок. Без SMTP_HOST письма печатаются в консоль (только не в production). */
+  smtp: {
+    host: env('SMTP_HOST'),
+    port: smtpPort,
+    user: env('SMTP_USER'),
+    password: env('SMTP_PASSWORD'),
+    from: env('SMTP_FROM'),
+  },
   backup: {
     dir: path.resolve(SERVER_ROOT, env('BACKUP_DIR') ?? 'backups'),
     keep: backupKeep,
@@ -80,6 +101,8 @@ function checkProductionConfig(): void {
   // База и резервные копии — на постоянном диске: папку с кодом заменяют при каждом обновлении.
   checkPersistentPath('DATABASE_PATH', '/var/lib/nogotochki/nogotochki.db', errors);
   checkPersistentPath('BACKUP_DIR', '/var/backups/nogotochki', errors);
+  // Фото работ — тоже на постоянном диске: загруженные файлы не должны пропасть при обновлении.
+  checkPersistentPath('UPLOADS_DIR', '/var/lib/nogotochki/uploads', errors);
   if (config.backup.dir === path.dirname(config.databasePath)) {
     errors.push('BACKUP_DIR совпадает с папкой базы: храните копии в отдельной папке');
   }

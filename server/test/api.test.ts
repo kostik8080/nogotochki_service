@@ -2,18 +2,12 @@
 // сервер на свободном порту. Даты считаются от сегодняшнего дня, как и тестовые данные.
 // Тесты идут по порядку и продолжают друг друга: запись, созданная в одном, переносится в следующем.
 import assert from 'node:assert/strict';
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { after, before, describe, it } from 'node:test';
-import { createApp } from '../src/app.js';
 import { cleanupExpired } from '../src/booking/cleanup.js';
-import { type Db, openDatabase } from '../src/db/connection.js';
-import { runMigrations } from '../src/db/migrator.js';
-import { seedDevData } from '../src/db/seed/dev-seed.js';
-import { addDays, isoWeekday, zonedDate, zonedTime, zonedTimeToUtc } from '../src/lib/studio-time.js';
+import type { Db } from '../src/db/connection.js';
+import { zonedTime } from '../src/lib/studio-time.js';
+import { at, type Client, nextWeekday, PASSWORDS, startApi, type TestApi, today, TZ } from './helpers/api.js';
 
-const TZ = 'Europe/Moscow';
-const PASSWORDS = { adminPassword: 'admin-password-1', masterPassword: 'master-password-1', clientPassword: 'client-password-1' };
 const ANNA = 1;
 const MARINA = 2;
 const MANICURE = 1;
@@ -21,85 +15,30 @@ const DESIGN = 3;
 const EXTENSION = 8;
 const LAMINATION = 12;
 
+let api: TestApi;
 let db: Db;
-let server: Server;
-let base: string;
-
-const today = zonedDate(Date.now(), TZ);
-/** Ближайшая дата с этим днем недели не раньше чем через minDays дней, минуя закрытый санитарный день. */
-function nextWeekday(weekday: number, minDays: number): string {
-  let date = addDays(today, minDays);
-  while (isoWeekday(date) !== weekday || date === '2026-09-29') date = addDays(date, 1);
-  return date;
-}
-const at = (date: string, time: string) => new Date(zonedTimeToUtc(date, time, TZ)).toISOString();
 const localTimes = (slots: { startsAt: string }[]) => slots.map((s) => zonedTime(Date.parse(s.startsAt), TZ));
 
 // Четверг и среда через полторы недели: там нет сценарных записей из тестовых данных.
 const THU = nextWeekday(4, 9);
 const WED = nextWeekday(3, 9);
 
-interface Response {
-  status: number;
-  body: any;
-  headers: Headers;
-}
-
-/** Клиент API с собственной cookie сессии — как отдельный браузер. */
-class Client {
-  cookie: string | null = null;
-
-  async request(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<Response> {
-    const res = await fetch(base + path, {
-      method,
-      headers: {
-        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-        ...(this.cookie ? { Cookie: this.cookie } : {}),
-        ...headers,
-      },
-      body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
-    });
-    for (const c of res.headers.getSetCookie()) {
-      const [pair] = c.split(';');
-      this.cookie = pair!.endsWith('=') ? null : pair!;
-    }
-    const text = await res.text();
-    return { status: res.status, body: text ? JSON.parse(text) : undefined, headers: res.headers };
-  }
-
-  get = (path: string) => this.request('GET', path);
-  post = (path: string, body?: unknown) => this.request('POST', path, body);
-  patch = (path: string, body?: unknown) => this.request('PATCH', path, body);
-  put = (path: string, body?: unknown) => this.request('PUT', path, body);
-  delete = (path: string) => this.request('DELETE', path);
-
-  async login(login: string, password: string): Promise<this> {
-    const res = await this.post('/api/auth/login', { login, password });
-    assert.equal(res.status, 200, JSON.stringify(res.body));
-    return this;
-  }
-}
-
-const anon = new Client();
-const maria = new Client();
-const ivan = new Client();
-const admin = new Client();
+let anon: Client;
+let maria: Client;
+let ivan: Client;
+let admin: Client;
+/** Новый клиент API — как отдельный браузер без входа. */
+const fresh = () => api.client();
 
 before(async () => {
-  db = openDatabase(':memory:');
-  runMigrations(db);
-  seedDevData(db, PASSWORDS);
-  server = createServer(createApp(db, { rateLimit: false }).handle);
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  api = await startApi();
+  db = api.db;
+  [anon, maria, ivan, admin] = [fresh(), fresh(), fresh(), fresh()];
   await maria.login('maria@example.com', PASSWORDS.clientPassword);
   await admin.login('admin@example.com', PASSWORDS.adminPassword);
 });
 
-after(() => {
-  server.close();
-  db.close();
-});
+after(() => api.close());
 
 describe('регистрация, вход и выход', () => {
   it('регистрирует клиента и сразу открывает сессию; хеш пароля не возвращается', async () => {
@@ -138,7 +77,7 @@ describe('регистрация, вход и выход', () => {
   });
 
   it('неверный пароль — 401, после пяти подряд вход временно закрыт — 429', async () => {
-    const victim = new Client();
+    const victim = fresh();
     await victim.post('/api/auth/register', { name: 'Жертва', email: 'victim@example.com', password: 'right-password', pdConsent: true });
     for (let i = 0; i < 5; i++) {
       const res = await anon.post('/api/auth/login', { login: 'victim@example.com', password: 'wrong-password' });
@@ -152,8 +91,8 @@ describe('регистрация, вход и выход', () => {
 
   it('пробелы по краям пароля — часть пароля и при регистрации, и при входе', async () => {
     const password = '  spaced password  ';
-    assert.equal((await new Client().post('/api/auth/register', { name: 'Пробел', email: 'space@example.com', password, pdConsent: true })).status, 201);
-    assert.equal((await new Client().post('/api/auth/login', { login: 'space@example.com', password })).status, 200);
+    assert.equal((await fresh().post('/api/auth/register', { name: 'Пробел', email: 'space@example.com', password, pdConsent: true })).status, 201);
+    assert.equal((await fresh().post('/api/auth/login', { login: 'space@example.com', password })).status, 200);
     assert.equal((await anon.post('/api/auth/login', { login: 'space@example.com', password: password.trim() })).status, 401);
   });
 
@@ -169,7 +108,7 @@ describe('регистрация, вход и выход', () => {
   });
 
   it('выход закрывает сессию: дальше — 401', async () => {
-    const temp = new Client();
+    const temp = fresh();
     await temp.login('+7 911 222-33-44', PASSWORDS.clientPassword); // Мария по телефону
     const cookie = temp.cookie;
     assert.equal((await temp.post('/api/auth/logout')).status, 204);

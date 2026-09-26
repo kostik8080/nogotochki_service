@@ -31,6 +31,36 @@ export async function readJson(req: IncomingMessage): Promise<unknown> {
   }
 }
 
+/** Тело как есть (файл). Тип проверяется по списку, размер — по пределу маршрута. */
+export async function readRaw(req: IncomingMessage, options: { types: string[]; maxBytes: number }): Promise<{ data: Buffer; type: string }> {
+  const type = (req.headers['content-type'] ?? '').split(';')[0]!.trim().toLowerCase();
+  if (!options.types.includes(type)) {
+    throw new HttpError(415, 'UNSUPPORTED_MEDIA_TYPE', `Допустимые типы файла: ${options.types.join(', ')}`);
+  }
+  const declared = Number(req.headers['content-length']);
+  if (declared > options.maxBytes) throw new HttpError(413, 'BODY_TOO_LARGE', `Файл больше ${Math.round(options.maxBytes / 1024 / 1024)} МБ`);
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > options.maxBytes) throw new HttpError(413, 'BODY_TOO_LARGE', `Файл больше ${Math.round(options.maxBytes / 1024 / 1024)} МБ`);
+    chunks.push(chunk as Buffer);
+  }
+  if (size === 0) throw new HttpError(400, 'EMPTY_BODY', 'Файл не передан');
+  return { data: Buffer.concat(chunks), type };
+}
+
+/** Отдать файл (фото работы). */
+export function sendFile(res: ServerResponse, data: Buffer, type: string, cache: 'public' | 'private'): void {
+  res.writeHead(200, {
+    'Content-Type': type,
+    'Content-Length': String(data.length),
+    'Cache-Control': cache === 'public' ? 'public, max-age=86400' : 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
+  });
+  res.end(data);
+}
+
 export function sendJson(res: ServerResponse, status: number, body: unknown, headers: Record<string, string | string[]> = {}): void {
   const payload = body === undefined ? '' : JSON.stringify(body);
   res.writeHead(status, {
