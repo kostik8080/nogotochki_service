@@ -1,5 +1,6 @@
 // Регистрация, вход и выход (паспорт, функция 1 клиента и функция 1 администратора).
 // Вход — по телефону или e-mail и паролю, один для всех ролей; права определяет роль учетной записи.
+import { CODE_TTL_MIN, consumeCode, issueCode, lastCodeAt, RESEND_INTERVAL_MS } from '../auth/codes.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { clearSessionCookie, createSession, revokeSession, sessionCookie } from '../auth/sessions.js';
 import { config } from '../config.js';
@@ -30,7 +31,14 @@ export function authRoutes(router: Router, options: { secureCookies: boolean }):
   };
 
   // Регистрация клиента. Сотрудников заводит администратор (npm run admin:create), поэтому роль всегда client.
-  router.post('/api/auth/register', (ctx): Result => {
+  //
+  // Сценарий 16: номер уже есть в карточке клиента, которого администратор записал по телефону (без пароля).
+  // Второй клиент не создается: первый запрос отвечает 202 и требует код подтверждения номера, повторный
+  // запрос с тем же набором полей и code добавляет пароль к существующей карточке — ее записи сразу видны
+  // в кабинете. Код приходит в SMS; пока шлюз не подключен, его выдает администратор после звонка клиентки
+  // (POST /api/admin/clients/:id/phone-code). Без кода привязка не выполняется: иначе любой, кто знает
+  // чужой номер, получил бы доступ к чужим записям.
+  router.post('/api/auth/register', async (ctx): Promise<Result> => {
     ctx.limit('register', ctx.ip);
     const input = Input.body(ctx.body);
     const name = input.string('name', { max: 100 });
@@ -39,27 +47,72 @@ export function authRoutes(router: Router, options: { secureCookies: boolean }):
     const password = input.password('password');
     const pdConsent = input.bool('pdConsent');
     const marketingConsent = input.bool('marketingConsent', { optional: true }) ?? false;
+    const code = input.field<string>('code', { optional: true }, (raw) =>
+      typeof raw === 'string' && /^\d{6}$/.test(raw.trim()) ? { value: raw.trim() } : { error: 'Код — 6 цифр' });
     if (!input.has('phone') && !input.has('email')) input.fail('phone', 'Укажите телефон или e-mail');
     if (pdConsent === false) input.fail('pdConsent', 'Без согласия на обработку персональных данных регистрация невозможна');
+    if (input.has('code') && !input.has('phone')) input.fail('code', 'Код подтверждает телефон — укажите его');
     input.done();
+
+    const now = ctx.now.toISOString();
+    const owner = phone
+      ? ctx.db.prepare('SELECT id, role, password_hash, deleted_at FROM users WHERE phone = ?').get(phone) as
+        { id: number; role: string; password_hash: string | null; deleted_at: string | null } | undefined
+      : undefined;
+    const card = owner && owner.role === 'client' && owner.password_hash === null && owner.deleted_at === null ? owner : undefined;
+    if (owner && !card) throw conflict('PHONE_TAKEN', 'Этот телефон уже зарегистрирован. Войдите или восстановите пароль');
+    if (email && ctx.db.prepare('SELECT 1 FROM users WHERE email = ? AND id IS NOT ?').get(email, card?.id ?? null)) {
+      throw conflict('EMAIL_TAKEN', 'Этот e-mail уже зарегистрирован. Войдите или восстановите пароль');
+    }
+
+    if (card && code === undefined) {
+      // Шаг 1 сценария 16: нужен код. С SMS-шлюзом — отправляем (не чаще раза в минуту), без него код выдаст администратор.
+      const { sms } = ctx.services;
+      if (sms) {
+        const last = lastCodeAt(ctx.db, card.id, 'verify_phone');
+        if (last === null || ctx.now.getTime() - last >= RESEND_INTERVAL_MS) {
+          const sent = transaction(ctx.db, () => issueCode(ctx.db, card.id, 'verify_phone', phone!, ctx.now));
+          await sms.send(phone!, `Ноготочки: код подтверждения номера ${sent}. Действует ${CODE_TTL_MIN} минут.`);
+        }
+      }
+      return {
+        status: 202,
+        body: {
+          status: 'phone_verification_required',
+          delivery: sms ? 'sms' : 'studio',
+          message: sms
+            ? 'Этот номер уже есть в базе студии: вас записывали по телефону. Мы отправили код в SMS — введите его, и прежние записи появятся в кабинете'
+            : 'Этот номер уже есть в базе студии: вас записывали по телефону. Позвоните в студию — администратор убедится, что это вы, и продиктует код',
+          expiresInMin: CODE_TTL_MIN,
+        },
+      };
+    }
 
     // Хеш считается до транзакции: argon2id занимает заметное время, а блокировку базы держать незачем.
     const passwordHash = hashPassword(password);
-    const now = ctx.now.toISOString();
+
+    if (card) {
+      // Шаг 2 сценария 16: проверка кода — отдельной транзакцией, чтобы неверная попытка сохранилась.
+      const check = transaction(ctx.db, () => consumeCode(ctx.db, card.id, 'verify_phone', code!, ctx.now));
+      if (!check.ok || check.target !== phone) {
+        throw badRequest('INVALID_CODE', check.ok || check.reason !== 'wrong' ? 'Код недействителен или устарел. Запросите новый' : 'Неверный код',
+          !check.ok && check.reason === 'wrong' ? { attemptsLeft: check.attemptsLeft } : undefined);
+      }
+      transaction(ctx.db, () => {
+        const linked = ctx.db.prepare(`
+          UPDATE users SET name = ?, email = coalesce(?, email), password_hash = ?, phone_verified_at = ?,
+                           pd_consent_at = ?, pd_consent_version = ?, marketing_consent_at = ?, updated_at = ?
+          WHERE id = ? AND password_hash IS NULL
+        `).run(name, email ?? null, passwordHash, now, now, config.pdPolicyVersion, marketingConsent ? now : null, now, card.id);
+        // Пока проверялся код, карточку мог привязать параллельный запрос.
+        if (linked.changes !== 1) throw conflict('PHONE_TAKEN', 'Этот телефон уже зарегистрирован. Войдите или восстановите пароль');
+        startSession(ctx, card.id);
+      });
+      return { status: 201, body: { user: selfView(ctx.db, card.id), linkedExistingClient: true } };
+    }
+
     const userId = transaction(ctx.db, () => {
-      if (phone) {
-        const existing = ctx.db.prepare('SELECT password_hash FROM users WHERE phone = ?').get(phone) as { password_hash: string | null } | undefined;
-        if (existing) {
-          // Сценарий 16: клиентку записали по телефону, а теперь она регистрируется сама. Привязать
-          // карточку можно только после подтверждения номера кодом; пока SMS не подключены, это делает администратор.
-          throw conflict('PHONE_TAKEN', existing.password_hash === null
-            ? 'Этот номер уже есть в базе студии: вас записывали по телефону. Чтобы открыть доступ к записям, обратитесь к администратору студии'
-            : 'Этот телефон уже зарегистрирован. Войдите или восстановите пароль');
-        }
-      }
-      if (email && ctx.db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) {
-        throw conflict('EMAIL_TAKEN', 'Этот e-mail уже зарегистрирован. Войдите или восстановите пароль');
-      }
+      // Номер или адрес могли занять между проверкой и вставкой: тогда UNIQUE даст 409.
       const id = Number(ctx.db.prepare(`
         INSERT INTO users (role, name, phone, email, password_hash, pd_consent_at, pd_consent_version,
                            marketing_consent_at, created_at, updated_at)

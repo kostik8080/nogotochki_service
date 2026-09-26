@@ -57,14 +57,13 @@ describe('регистрация, вход и выход', () => {
     assert.equal((await ivan.get('/api/auth/me')).body.user.email, 'ivan@example.com');
   });
 
-  it('отклоняет занятый e-mail и телефон клиента, записанного по звонку (сценарий 16) — 409', async () => {
+  it('отклоняет занятый e-mail и телефон зарегистрированного клиента — 409', async () => {
     const email = await anon.post('/api/auth/register', { name: 'Иван', email: 'ivan@example.com', password: 'password-123', pdConsent: true });
     assert.equal(email.status, 409);
     assert.equal(email.body.error.code, 'EMAIL_TAKEN');
-    const olga = await anon.post('/api/auth/register', { name: 'Ольга', phone: '+79035556677', password: 'password-123', pdConsent: true });
-    assert.equal(olga.status, 409);
-    assert.equal(olga.body.error.code, 'PHONE_TAKEN');
-    assert.match(olga.body.error.message, /администратор/);
+    const phone = await anon.post('/api/auth/register', { name: 'Мария', phone: '+79112223344', password: 'password-123', pdConsent: true });
+    assert.equal(phone.status, 409);
+    assert.equal(phone.body.error.code, 'PHONE_TAKEN');
   });
 
   it('проверяет данные до обращения к базе — 400 со списком всех ошибок', async () => {

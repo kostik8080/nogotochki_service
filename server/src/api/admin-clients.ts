@@ -2,6 +2,7 @@
 // и метками, карточка клиента со статистикой, историей визитов, фото и заметками, черный список.
 // Метки, статистика и «любимый мастер» не хранятся, а считаются по записям при запросе (решение 19).
 // Здесь же — закрытие доступа учетной записи (функция 1 администратора).
+import { CODE_TTL_MIN, issueCode } from '../auth/codes.js';
 import { revokeUserSessions } from '../auth/sessions.js';
 import { type Db, transaction } from '../db/connection.js';
 import { badRequest, conflict, forbidden, notFound } from '../http/errors.js';
@@ -253,6 +254,24 @@ export function adminClientRoutes(router: Router): void {
       saveProfile(ctx.db, id, profile, now);
     });
     return { status: 200, body: { client: cardView(ctx, id) } };
+  });
+
+  // Сценарий 16 без SMS-шлюза: клиентка, которую записали по телефону, регистрируется на сайте, а код
+  // подтверждения номера ей продиктует администратор, убедившись по звонку, что это она. Код показывается
+  // один раз и действует 15 минут; в базе — только его хеш. Прежний код гасится.
+  router.post('/api/admin/clients/:id/phone-code', (ctx): Result => {
+    requireRole(ctx, 'admin');
+    const id = pathId(ctx);
+    Input.body(ctx.body).done();
+    const code = transaction(ctx.db, () => {
+      const client = ctx.db.prepare("SELECT phone, password_hash FROM users WHERE id = ? AND role = 'client' AND deleted_at IS NULL")
+        .get(id) as { phone: string | null; password_hash: string | null } | undefined;
+      if (!client) throw notFound('Клиент не найден');
+      if (client.password_hash !== null) throw conflict('CLIENT_HAS_ACCOUNT', 'У клиента уже есть учетная запись: код для привязки не нужен');
+      if (!client.phone) throw badRequest('PHONE_REQUIRED', 'У клиента нет телефона: привязка идет по номеру');
+      return { code: issueCode(ctx.db, id, 'verify_phone', client.phone, ctx.now), phone: client.phone };
+    });
+    return { status: 201, body: { ...code, expiresInMin: CODE_TTL_MIN } };
   });
 
   // Черный список (A-11): причина обязательна, база хранит, кто и когда внес (раздел 5.5).

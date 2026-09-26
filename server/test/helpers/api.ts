@@ -83,8 +83,11 @@ export interface TestApi {
   close(): void;
 }
 
-/** База в памяти со всеми миграциями и тестовыми данными, сервер на свободном порту, папка фото во временной папке. */
-export async function startApi(): Promise<TestApi> {
+/**
+ * База в памяти со всеми миграциями и тестовыми данными, сервер на свободном порту, папка фото во временной папке.
+ * sms: false — SMS-шлюз не подключен, как сейчас в production.
+ */
+export async function startApi(options: { sms?: boolean } = {}): Promise<TestApi> {
   const db = openDatabase(':memory:');
   runMigrations(db);
   seedDevData(db, PASSWORDS);
@@ -92,7 +95,7 @@ export async function startApi(): Promise<TestApi> {
   const sms = new MemorySms();
   const uploadsDir = mkdtempSync(path.join(tmpdir(), 'nogotochki-uploads-'));
   const server = createServer(createApp(db, {
-    rateLimit: false, mailer, sms, appUrl: 'https://nogotochki.test', uploadsDir,
+    rateLimit: false, mailer, sms: options.sms === false ? null : sms, appUrl: 'https://nogotochki.test', uploadsDir,
   }).handle);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
