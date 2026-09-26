@@ -8,6 +8,7 @@ import { transaction } from '../db/connection.js';
 import { badRequest, conflict, forbidden, HttpError } from '../http/errors.js';
 import type { Context, Result, Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
+import { cancelBooking } from '../booking/booking-service.js';
 import { deletePhotoFile } from '../storage/photos.js';
 import { requireRole, requireUser } from './guards.js';
 import { selfView } from './views.js';
@@ -130,13 +131,10 @@ export function profileRoutes(router: Router): void {
     const files = transaction(ctx.db, () => {
       const upcoming = ctx.db.prepare("SELECT id FROM bookings WHERE client_id = ? AND status = 'active' AND starts_at > ?")
         .all(user.id, now) as { id: number }[];
+      // Та же отмена, что по кнопке «Отменить», только без правила 24 часов: клиент отзывает свои данные целиком.
+      // Внутри этой транзакции cancelBooking работает в точке сохранения (SAVEPOINT).
       for (const { id } of upcoming) {
-        // Сначала событие отмены, потом статус (триггер 10.7).
-        ctx.db.prepare(`
-          INSERT INTO booking_events (booking_id, event_type, actor_id, old_status, new_status, reason, created_at)
-          VALUES (?, 'cancelled', ?, 'active', 'cancelled_by_client', 'Клиент удалил аккаунт', ?)
-        `).run(id, user.id, now);
-        ctx.db.prepare("UPDATE bookings SET status = 'cancelled_by_client', version = version + 1, updated_at = ? WHERE id = ?").run(now, id);
+        cancelBooking(ctx.db, user, id, { reason: 'Клиент удалил аккаунт' }, ctx.now, { accountDeletion: true });
       }
       // Комментарии к записям пишет сам клиент — в них могут быть его данные.
       ctx.db.prepare('UPDATE bookings SET comment = NULL WHERE client_id = ? AND comment IS NOT NULL').run(user.id);

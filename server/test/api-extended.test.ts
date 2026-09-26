@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
+import { insertBookingRows } from '../src/booking/booking-service.js';
 import type { Db } from '../src/db/connection.js';
 import { at, type Client, nextWeekday, PASSWORDS, startApi, type TestApi } from './helpers/api.js';
 
@@ -45,19 +46,15 @@ async function book(client: Client, date: string, time: string): Promise<number>
   return res.body.booking.id;
 }
 
-/** Прошедшая действующая запись — напрямую в базу: через API в прошлое не записаться. */
+/** Прошедшая действующая запись: через API в прошлое не записаться, поэтому — функцией записи строк сервиса. */
 function pastBooking(clientEmail: string, daysAgo: number): number {
   const clientId = (db.prepare('SELECT id FROM users WHERE email = ?').get(clientEmail) as { id: number }).id;
   const start = new Date(Math.floor(Date.now() / 3600_000) * 3600_000 - daysAgo * 86_400_000 - 7 * 3600_000);
-  const end = new Date(start.getTime() + 60 * 60_000);
-  const id = Number(db.prepare(`
-    INSERT INTO bookings (client_id, master_id, starts_at, ends_at, busy_until, price_level, created_by) VALUES (?, ?, ?, ?, ?, 'master', ?)
-  `).run(clientId, MARINA, start.toISOString(), end.toISOString(), end.toISOString(), clientId).lastInsertRowid);
-  db.prepare(`
-    INSERT INTO booking_items (booking_id, service_id, position, service_name, unit_price_kop, quantity, price_kop, duration_min)
-    VALUES (?, ?, 1, 'Ламинирование бровей', 180000, 1, 180000, 60)
-  `).run(id, LAMINATION);
-  return id;
+  return insertBookingRows(db, {
+    clientId, masterId: MARINA, priceLevel: 'master', startsAt: start.toISOString(), cleanupMin: 0,
+    lines: [{ serviceId: LAMINATION, name: 'Ламинирование бровей', unitPriceKop: 180_000, quantity: 1, durationMin: 60 }],
+    createdBy: clientId, createdAt: start.toISOString(),
+  });
 }
 
 describe('восстановление пароля', () => {

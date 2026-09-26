@@ -10,6 +10,8 @@
 // и повторный запуск в другой день сдвинул бы их и наложил на прежние.
 import type { SQLInputValue } from 'node:sqlite';
 import { hashPassword } from '../../auth/password.js';
+import { insertBookingRows, writeCancellation, writeReschedule, writeStatusChange } from '../../booking/booking-service.js';
+import { loadBooking } from '../../booking/existing.js';
 import { addDays, isoWeekday, zonedDate, zonedTimeToUtc } from '../../lib/studio-time.js';
 import { type Db, transaction } from '../connection.js';
 
@@ -330,41 +332,33 @@ export function seedDevData(db: Db, options: SeedOptions): SeedReport {
       const endsAt = addMinutes(startsAt, durationMin);
       const createdAt = iso(addMinutes(startsAt, -60 * 24 * 7) < now ? addMinutes(startsAt, -60 * 24 * 7) : now);
 
+      // Строки пишут те же функции, что и API (booking/booking-service.ts). Правила API — бронь, 2 часа
+      // до визита, правило 24 часов — тестовым данным не подходят: им нужна история в прошлом.
       // Запись создается действующей, итог визита фиксируется потом — так же, как в работе сервиса.
-      const bookingId = insert('bookings', {
-        client_id: b.clientId, master_id: b.masterId, is_any_master: b.isAnyMaster ? 1 : 0,
-        starts_at: iso(startsAt), ends_at: iso(endsAt), busy_until: iso(addMinutes(endsAt, cleanupMin)),
-        price_level: master.level, comment: b.comment ?? null, created_by: b.createdBy ?? b.clientId,
-        created_at: createdAt, updated_at: createdAt,
+      const bookingId = insertBookingRows(db, {
+        clientId: b.clientId, masterId: b.masterId, priceLevel: master.level, startsAt: iso(startsAt), cleanupMin,
+        lines: lines.map((l) => ({
+          serviceId: l.service.id, name: l.service.name, quantity: l.quantity ?? 1, durationMin: l.service.durationMin,
+          unitPriceKop: master.level === 'top_master' ? l.service.priceTop : l.service.priceMaster,
+        })),
+        isAnyMaster: b.isAnyMaster, comment: b.comment ?? null, createdBy: b.createdBy ?? b.clientId, createdAt,
       });
-      const itemIds = lines.map((l, i) => {
-        const unit = master.level === 'top_master' ? l.service.priceTop : l.service.priceMaster;
-        const quantity = l.quantity ?? 1;
-        return insert('booking_items', {
-          booking_id: bookingId, service_id: l.service.id, position: i + 1, service_name: l.service.name,
-          unit_price_kop: unit, quantity, price_kop: unit * quantity, duration_min: l.service.durationMin,
-        });
-      });
+      count('bookings', true);
+      const itemIds = (db.prepare('SELECT id FROM booking_items WHERE booking_id = ? ORDER BY position').all(bookingId) as { id: number }[])
+        .map((r) => { count('booking_items', true); return r.id; });
 
       const o = b.outcome;
       if (o) {
-        let at: string;
         if ('actorId' in o) {
-          // Сначала событие отмены, потом статус — иначе триггер 10.7 отклонит смену статуса.
-          at = iso(addMinutes(startsAt, -60 * 24 * 2));
-          insert('booking_events', {
-            booking_id: bookingId, event_type: 'cancelled', actor_id: o.actorId,
-            old_status: 'active', new_status: o.status, reason: o.reason, created_at: at,
+          writeCancellation(db, {
+            bookingId, version: 1, status: o.status, actorId: o.actorId, reason: o.reason, at: iso(addMinutes(startsAt, -60 * 24 * 2)),
           });
         } else {
-          at = iso(endsAt);
-          insert('booking_events', {
-            booking_id: bookingId, event_type: 'status_changed', actor_id: adminId,
-            old_status: 'active', new_status: o.status, created_at: at,
+          writeStatusChange(db, {
+            bookingId, version: 1, oldStatus: 'active', status: o.status, actorId: adminId, reason: null, at: iso(endsAt),
           });
         }
-        db.prepare('UPDATE bookings SET status = ?, version = version + 1, updated_at = ? WHERE id = ?')
-          .run(o.status, at, bookingId);
+        count('booking_events', true);
       }
       return { bookingId, itemIds };
     };
@@ -396,17 +390,14 @@ export function seedDevData(db: Db, options: SeedOptions): SeedReport {
     // Предстоящие визиты. Сценарий 1: маникюр у Анны, клиентка выбрала «Любой свободный мастер».
     const manicureDate = findWeekday(today, 3, 2);
     const manicure = addBooking({
-      clientId: mariaId, masterId: 1, date: manicureDate, time: '10:00', isAnyMaster: true,
+      clientId: mariaId, masterId: 1, date: manicureDate, time: '12:00', isAnyMaster: true,
       items: [{ serviceId: 1 }], comment: 'Пожалуйста, покороче форму',
     });
-    // Сценарий 5: клиентка сама перенесла эту запись с 12:00 на 10:00.
-    insert('booking_events', {
-      booking_id: manicure.bookingId, event_type: 'rescheduled', actor_id: mariaId,
-      old_master_id: 1, new_master_id: 1,
-      old_starts_at: iso(studioTime(manicureDate, '12:00')), new_starts_at: iso(studioTime(manicureDate, '10:00')),
-      reason: 'Удобнее утром',
+    // Сценарий 5: клиентка сама перенесла эту запись с 12:00 на 10:00 — настоящим переносом, с событием в истории.
+    writeReschedule(db, loadBooking(db, manicure.bookingId)!, {
+      masterId: 1, level: 'master', startsAt: iso(studioTime(manicureDate, '10:00')), actorId: mariaId, reason: 'Удобнее утром', at: iso(now),
     });
-    db.prepare('UPDATE bookings SET version = version + 1 WHERE id = ?').run(manicure.bookingId);
+    count('booking_events', true);
 
     // Сценарий 2: наращивание с дизайном на четыре ногтя: 2800 + 2 × 300 = 3400 ₽ (340 000 копеек), 180 минут.
     addBooking({

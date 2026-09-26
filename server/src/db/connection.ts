@@ -31,8 +31,24 @@ export function openDatabase(file: string = config.databasePath): Db {
  * Выполняет fn в транзакции BEGIN IMMEDIATE: блокировка на запись берется сразу,
  * поэтому проверка «свободно ли» и вставка неразделимы (docs/db-schema.md, раздел 10.3).
  * При ошибке все изменения откатываются.
+ *
+ * Внутри уже открытой транзакции (например, отмена записей при удалении аккаунта) fn выполняется
+ * в точке сохранения SAVEPOINT: блокировку уже держит внешняя транзакция, а ошибка откатывает
+ * только изменения fn.
  */
 export function transaction<T>(db: Db, fn: () => T): T {
+  if (db.isTransaction) {
+    db.exec('SAVEPOINT nested');
+    try {
+      const result = fn();
+      db.exec('RELEASE nested');
+      return result;
+    } catch (error) {
+      db.exec('ROLLBACK TO nested');
+      db.exec('RELEASE nested');
+      throw error;
+    }
+  }
   db.exec('BEGIN IMMEDIATE');
   try {
     const result = fn();
