@@ -210,3 +210,106 @@ describe('уровень 3: ответ API, когда запись отклон
     assert.ok(first > at(date, '23:59'), `первая альтернатива ${first} — в следующие дни`);
   });
 });
+
+describe('осознанное наложение (is_overbooking)', () => {
+  let db: Db;
+  beforeEach(() => {
+    db = openDatabase(':memory:');
+    setup(db);
+  });
+  const overbook = (masterId: number, from: string, to: string, createdBy = ADMIN) =>
+    Number(db.prepare(`
+      INSERT INTO bookings (client_id, master_id, is_overbooking, starts_at, ends_at, busy_until, price_level, created_by)
+      VALUES (?, ?, 1, ?, ?, ?, 'master', ?)
+    `).run(CLIENT, masterId, at(DAY, from), at(DAY, to), at(DAY, to), createdBy).lastInsertRowid);
+
+  it('администратор ставит запись поверх занятого времени, в том числе с той же минуты', () => {
+    book(db, ANNA, '15:00', '16:00');
+    overbook(ANNA, '15:30', '16:30');
+    overbook(ANNA, '15:00', '15:30');
+  });
+
+  it('клиент поставить признак не может — отказ базы, даже если сервер ошибется', () => {
+    book(db, ANNA, '15:00', '16:00');
+    assert.throws(() => overbook(ANNA, '15:30', '16:30', CLIENT), /WRONG_USER_ROLE/);
+  });
+
+  it('дальше наложение занимает время как обычная запись', () => {
+    book(db, ANNA, '15:00', '16:00');
+    const over = overbook(ANNA, '15:30', '16:30');
+    assert.throws(() => book(db, ANNA, '16:00', '17:00'), SLOT_TAKEN); // пересекается только с наложением
+    book(db, ANNA, '16:30', '17:30'); // вплотную к наложению — можно
+    const move = (from: string, to: string) =>
+      db.prepare('UPDATE bookings SET starts_at = ?, ends_at = ?, busy_until = ? WHERE id = ?').run(at(DAY, from), at(DAY, to), at(DAY, to), over);
+    assert.throws(() => move('15:45', '16:45'), SLOT_TAKEN); // перенос проверяется как обычный
+    move('18:00', '19:00');
+  });
+
+  it('итог визита у обеих пересекающихся записей отмечается без отказа', () => {
+    const base = book(db, ANNA, '15:00', '16:00');
+    const over = overbook(ANNA, '15:30', '16:30');
+    for (const id of [base, over]) {
+      db.prepare("INSERT INTO booking_events (booking_id, event_type, actor_id, old_status, new_status) VALUES (?, 'status_changed', ?, 'active', 'completed')").run(id, ADMIN);
+      db.prepare("UPDATE bookings SET status = 'completed' WHERE id = ?").run(id);
+    }
+  });
+
+  it('признак не меняется после создания', () => {
+    const id = book(db, ANNA, '15:00', '16:00');
+    assert.throws(() => db.prepare('UPDATE bookings SET is_overbooking = 1 WHERE id = ?').run(id), /OVERBOOKING_IMMUTABLE/);
+  });
+
+  it('чужую действующую бронь наложение не перебивает', () => {
+    const expires = new Date(Date.now() + 600_000).toISOString();
+    db.prepare(`
+      INSERT INTO slot_holds (owner_id, master_id, starts_at, ends_at, busy_until, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(CLIENT, ANNA, at(DAY, '15:00'), at(DAY, '16:00'), at(DAY, '16:00'), expires, new Date().toISOString());
+    assert.throws(() => overbook(ANNA, '15:00', '16:00'), SLOT_TAKEN);
+  });
+});
+
+describe('осознанное наложение через API', () => {
+  let api: TestApi;
+  before(async () => {
+    api = await startApi();
+  });
+  after(() => api.close());
+
+  it('администратор записывает поверх занятого времени только с isOverbooking: true', async () => {
+    const admin = await api.client().login('admin@example.com', PASSWORDS.adminPassword);
+    const maria = await api.client().login('maria@example.com', PASSWORDS.clientPassword);
+    const date = nextWeekday(3, 9);
+    const body = { masterId: MARINA, startsAt: at(date, '12:00'), services: [{ serviceId: 12 }] };
+    assert.equal((await maria.post('/api/holds', body)).status, 201);
+    assert.equal((await maria.post('/api/bookings', body)).status, 201);
+
+    const over = { ...body, newClient: { name: 'Без записи', phone: '+79001230000' } };
+    const refused = await admin.post('/api/bookings', over);
+    assert.equal(refused.status, 409);
+    assert.equal(refused.body.error.code, 'SLOT_TAKEN');
+
+    const created = await admin.post('/api/bookings', { ...over, isOverbooking: true });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    assert.equal(created.body.booking.isOverbooking, true);
+
+    // Рабочее время мастера наложение не отменяет: вечером Марина не работает.
+    const late = await admin.post('/api/bookings', { ...body, startsAt: at(date, '21:00'), clientId: created.body.booking.client.id, isOverbooking: true });
+    assert.equal(late.status, 409);
+  });
+
+  it('клиент передает признак — он молча отбрасывается, запись обычная', async () => {
+    const maria = await api.client().login('maria@example.com', PASSWORDS.clientPassword);
+    const date = nextWeekday(3, 9);
+    // На занятое время клиент не получит даже брони: признак тут ничего не меняет.
+    const busy = await maria.post('/api/holds', { masterId: MARINA, startsAt: at(date, '12:00'), services: [{ serviceId: 12 }] });
+    assert.equal(busy.status, 409);
+
+    const free = { masterId: MARINA, startsAt: at(date, '17:00'), services: [{ serviceId: 12 }] };
+    assert.equal((await maria.post('/api/holds', free)).status, 201);
+    const res = await maria.post('/api/bookings', { ...free, isOverbooking: true });
+    assert.equal(res.status, 201);
+    assert.equal(res.body.booking.isOverbooking, undefined); // клиенту признак не показывается
+    const row = api.db.prepare('SELECT is_overbooking FROM bookings WHERE id = ?').get(res.body.booking.id) as { is_overbooking: number };
+    assert.equal(row.is_overbooking, 0);
+  });
+});

@@ -17,7 +17,8 @@ const MAX_TEXT = 500;
 export function bookingRoutes(router: Router): void {
   // Создать запись на удержанное время (BOOK-04, A-02). Клиенту нужна его действующая бронь с тем же
   // мастером и временем (раздел 8, шаг 2). Администратор может записать без брони — по звонку, за клиента
-  // из базы (clientId) или за нового клиента без учетной записи (newClient: имя и телефон, сценарий 16).
+  // из базы (clientId) или за нового клиента без учетной записи (newClient: имя и телефон, сценарий 16),
+  // а с isOverbooking: true — поверх записи другого клиента (осознанное наложение, решение 40).
   router.post('/api/bookings', (ctx): Result => {
     const user = requireRole(ctx, 'client', 'admin');
     const input = Input.body(ctx.body);
@@ -27,6 +28,12 @@ export function bookingRoutes(router: Router): void {
     const comment = input.string('comment', { optional: true, nullable: true, max: MAX_TEXT }) ?? null;
     const isAnyMaster = input.bool('isAnyMaster', { optional: true }) ?? false;
     const clientId = input.id('clientId', { optional: true });
+    // Проверка роли для наложения. Поле читается у всех, чтобы клиентский запрос с ним не падал как
+    // «неизвестное поле», но действует только у администратора. У клиента оно молча отбрасывается:
+    // запись создается как обычная и проходит все проверки занятости. Мастер сюда не доходит —
+    // requireRole выше отвечает ему 403. Второй барьер — триггер bookings_overbooking_admin_only в базе.
+    const requestedOverbooking = input.bool('isOverbooking', { optional: true }) ?? false;
+    const isOverbooking = user.role === 'admin' && requestedOverbooking;
     const newClient = input.object('newClient', (c) => ({ name: c.string('name', { max: 100 }), phone: c.phone('phone') }), { optional: true });
     if (user.role === 'client' && (input.has('clientId') || input.has('newClient'))) {
       throw forbidden('Клиент записывает только себя');
@@ -66,9 +73,11 @@ export function bookingRoutes(router: Router): void {
         // Повторная проверка в той же транзакции: с момента брони администратор мог добавить блокировку
         // или изменить график (раздел 10.3). Ограничения клиента — 2 часа до визита и горизонт — проверены
         // при создании брони, а бронь гарантирует время, поэтому здесь они не повторяются.
-        // Уровень 1 защиты от двойной записи.
+        // Уровень 1 защиты от двойной записи. При наложении записи других клиентов не мешают,
+        // но рабочее время мастера, блокировки и чужие брони проверяются как всегда.
         const check = checkSlot(ctx.db, {
           masterId, startsAt, durationMin: visit.durationMin, cleanupMin: visit.cleanupMin, now, audience: 'admin', viewerId: user.id,
+          ignoreBookings: isOverbooking,
         });
         if (!check.available) throw new SlotUnavailable();
 
@@ -77,11 +86,11 @@ export function bookingRoutes(router: Router): void {
         // bookings_no_overlap_insert с кодом SLOT_TAKEN.
         ctx.db.prepare('DELETE FROM slot_holds WHERE owner_id = ?').run(user.id);
         const id = Number(ctx.db.prepare(`
-          INSERT INTO bookings (client_id, master_id, is_any_master, starts_at, ends_at, busy_until, price_level, comment,
-                                created_by, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(client, masterId, isAnyMaster ? 1 : 0, startsAt, endsAt, busyUntil, master.level, comment,
-          user.id, now.toISOString(), now.toISOString()).lastInsertRowid);
+          INSERT INTO bookings (client_id, master_id, is_any_master, is_overbooking, starts_at, ends_at, busy_until, price_level,
+                                comment, created_by, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(client, masterId, isAnyMaster ? 1 : 0, isOverbooking ? 1 : 0, startsAt, endsAt, busyUntil, master.level,
+          comment, user.id, now.toISOString(), now.toISOString()).lastInsertRowid);
         // Название, цена и длительность копируются: смена прайса не меняет созданную запись (сценарий 7).
         const insertItem = ctx.db.prepare(`
           INSERT INTO booking_items (booking_id, service_id, position, service_name, unit_price_kop, quantity, price_kop, duration_min)

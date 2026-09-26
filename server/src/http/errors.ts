@@ -42,6 +42,7 @@ const TRIGGER_ERRORS: Record<string, string> = {
   CANCEL_EVENT_REQUIRED: 'Отмена записи без события отмены',
   BOOKING_DELETE_FORBIDDEN: 'Записи не удаляются',
   ROLE_IMMUTABLE: 'Роль пользователя не меняется',
+  OVERBOOKING_IMMUTABLE: 'Признак наложения записи не меняется после создания',
 };
 
 /** Переводит ошибку SQLite в HttpError, если это известное правило базы; иначе возвращает null. */

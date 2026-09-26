@@ -58,6 +58,11 @@ export interface SlotQuery {
   viewerId?: number | null;
   /** Переносимая запись: ее время не считается занятым (CAB-04, A-04). */
   excludeBookingId?: number | null;
+  /**
+   * Осознанное наложение администратором (решение 40): записи других клиентов не считаются занятым временем.
+   * Рабочее время, блокировки и чужие действующие брони по-прежнему учитываются.
+   */
+  ignoreBookings?: boolean;
 }
 
 interface Settings {
@@ -150,9 +155,9 @@ interface Busy {
 }
 
 /** Занятое время мастера, которое задевает промежуток [from, to). */
-function loadBusy(db: Db, masterId: number, from: number, to: number, q: Pick<SlotQuery, 'now' | 'viewerId' | 'excludeBookingId'>): Busy {
+function loadBusy(db: Db, masterId: number, from: number, to: number, q: Pick<SlotQuery, 'now' | 'viewerId' | 'excludeBookingId' | 'ignoreBookings'>): Busy {
   const params = { master: masterId, from: toIso(from), to: toIso(to) };
-  const bookings = db.prepare(`
+  const bookings = q.ignoreBookings ? [] : db.prepare(`
     SELECT starts_at, busy_until FROM bookings
     WHERE master_id = @master AND status IN ${OCCUPYING}
       AND starts_at < @to AND busy_until > @from

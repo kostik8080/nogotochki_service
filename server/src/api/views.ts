@@ -41,6 +41,7 @@ interface BookingRow {
   master_name: string;
   master_level: string;
   is_any_master: number;
+  is_overbooking: number;
   starts_at: string;
   ends_at: string;
   busy_until: string;
@@ -103,7 +104,7 @@ export function bookingViews(db: Db, ids: number[], options: BookingViewOptions)
   if (ids.length === 0) return [];
   const settings = readSettings(db);
   const rows = db.prepare(`
-    SELECT b.id, b.client_id, b.master_id, m.name AS master_name, m.level AS master_level, b.is_any_master,
+    SELECT b.id, b.client_id, b.master_id, m.name AS master_name, m.level AS master_level, b.is_any_master, b.is_overbooking,
            b.starts_at, b.ends_at, b.busy_until, b.status, b.price_level, b.comment, b.created_by, b.client_acknowledged_at, b.version,
            b.created_at, b.updated_at,
            c.name AS client_name, c.phone AS client_phone, c.email AS client_email,
@@ -170,6 +171,8 @@ export function bookingViews(db: Db, ids: number[], options: BookingViewOptions)
       ...(isAdmin ? {
         client: { id: b.client_id, name: b.client_name, phone: b.client_phone, email: b.client_email },
         busyUntil: b.busy_until,
+        // Запись поставлена администратором поверх другой записи (решение 40). Клиенту это не показывается.
+        isOverbooking: b.is_overbooking === 1,
         createdBy: { id: b.created_by, name: b.creator_name, role: b.creator_role },
         ...(options.withEvents ? { events: history.map(eventView) } : {}),
       } : {}),
