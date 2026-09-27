@@ -2,7 +2,7 @@
 // и метками, карточка клиента со статистикой, историей визитов, фото и заметками, черный список.
 // Метки, статистика и «любимый мастер» не хранятся, а считаются по записям при запросе (решение 19).
 // Здесь же — закрытие доступа учетной записи (функция 1 администратора).
-import { CODE_TTL_MIN, issueCode } from '../auth/codes.js';
+import { CODE_TTL_MIN, issueCode, pendingTarget } from '../auth/codes.js';
 import { revokeUserSessions } from '../auth/sessions.js';
 import { type Db, transaction } from '../db/connection.js';
 import { badRequest, conflict, forbidden, notFound } from '../http/errors.js';
@@ -121,6 +121,11 @@ function cardView(ctx: Context, id: number) {
     phoneVerified: user.phone_verified_at !== null,
     emailVerified: user.email_verified_at !== null,
     marketingConsent: user.marketing_consent_at !== null,
+    // Человек запросил подтверждение телефона на сайте и ждет звонка в студию (POST /api/admin/users/:id/phone-code).
+    pendingPhoneConfirmation: (() => {
+      const pending = pendingTarget(ctx.db, id, 'verify_phone', ctx.now);
+      return pending ? { phone: pending.target, requestedAt: pending.requestedAt } : null;
+    })(),
     createdAt: c.created_at,
     profile: {
       birthDate: profile?.birth_date ?? null,
@@ -256,22 +261,51 @@ export function adminClientRoutes(router: Router): void {
     return { status: 200, body: { client: cardView(ctx, id) } };
   });
 
-  // Сценарий 16 без SMS-шлюза: клиентка, которую записали по телефону, регистрируется на сайте, а код
-  // подтверждения номера ей продиктует администратор, убедившись по звонку, что это она. Код показывается
-  // один раз и действует 15 минут; в базе — только его хеш. Прежний код гасится.
-  router.post('/api/admin/clients/:id/phone-code', (ctx): Result => {
+  // Подтверждение телефона администратором. SMS в сервисе нет, поэтому номер подтверждает администратор:
+  // человек звонит в студию, администратор убеждается, что это он, и диктует код. Для чего код:
+  //   * сценарий 16 — клиентка, которую записали по телефону, регистрируется на сайте с тем же номером;
+  //   * новый телефон в профиле — клиент запросил смену номера (POST /api/profile/phone).
+  // Номер берется из последнего запроса человека за сутки, а у карточки без пароля — из самой карточки.
+  // Код показывается один раз и действует 15 минут; в базе — только его хеш, прежний код гасится.
+  router.post('/api/admin/users/:id/phone-code', (ctx): Result => {
     requireRole(ctx, 'admin');
     const id = pathId(ctx);
     Input.body(ctx.body).done();
-    const code = transaction(ctx.db, () => {
-      const client = ctx.db.prepare("SELECT phone, password_hash FROM users WHERE id = ? AND role = 'client' AND deleted_at IS NULL")
-        .get(id) as { phone: string | null; password_hash: string | null } | undefined;
-      if (!client) throw notFound('Клиент не найден');
-      if (client.password_hash !== null) throw conflict('CLIENT_HAS_ACCOUNT', 'У клиента уже есть учетная запись: код для привязки не нужен');
-      if (!client.phone) throw badRequest('PHONE_REQUIRED', 'У клиента нет телефона: привязка идет по номеру');
-      return { code: issueCode(ctx.db, id, 'verify_phone', client.phone, ctx.now), phone: client.phone };
+    const result = transaction(ctx.db, () => {
+      const user = ctx.db.prepare('SELECT phone, password_hash FROM users WHERE id = ? AND deleted_at IS NULL').get(id) as
+        { phone: string | null; password_hash: string | null } | undefined;
+      if (!user) throw notFound('Учетная запись не найдена');
+      const pending = pendingTarget(ctx.db, id, 'verify_phone', ctx.now);
+      const phone = pending?.target ?? (user.password_hash === null ? user.phone : null);
+      if (!phone) {
+        throw conflict('NO_PENDING_REQUEST', 'Подтверждать нечего: человек не запрашивал подтверждение телефона на сайте');
+      }
+      return {
+        code: issueCode(ctx.db, id, 'verify_phone', phone, ctx.now),
+        phone,
+        purpose: user.password_hash === null ? 'link_account' : 'change_phone',
+      };
     });
-    return { status: 201, body: { ...code, expiresInMin: CODE_TTL_MIN } };
+    return { status: 201, body: { ...result, expiresInMin: CODE_TTL_MIN } };
+  });
+
+  // Код для сброса пароля, если в аккаунте нет e-mail и ссылку прислать некуда. Администратор выдает его,
+  // убедившись по звонку, что это сам владелец. Код вводится в POST /api/auth/password-reset/confirm
+  // вместе с логином; после сброса все сессии закрываются.
+  router.post('/api/admin/users/:id/password-reset-code', (ctx): Result => {
+    requireRole(ctx, 'admin');
+    const id = pathId(ctx);
+    Input.body(ctx.body).done();
+    const result = transaction(ctx.db, () => {
+      const user = ctx.db.prepare('SELECT phone, email, password_hash, blocked_at FROM users WHERE id = ? AND deleted_at IS NULL').get(id) as
+        { phone: string | null; email: string | null; password_hash: string | null; blocked_at: string | null } | undefined;
+      if (!user) throw notFound('Учетная запись не найдена');
+      if (user.password_hash === null) throw conflict('NO_ACCOUNT', 'У клиента нет учетной записи: сбрасывать нечего');
+      if (user.blocked_at) throw conflict('ACCOUNT_BLOCKED', 'Доступ к учетной записи закрыт: сначала откройте его');
+      const login = user.phone ?? user.email!;
+      return { code: issueCode(ctx.db, id, 'reset_password', login, ctx.now), login };
+    });
+    return { status: 201, body: { ...result, expiresInMin: CODE_TTL_MIN } };
   });
 
   // Черный список (A-11): причина обязательна, база хранит, кто и когда внес (раздел 5.5).

@@ -11,7 +11,6 @@ import { runMigrations } from '../../src/db/migrator.js';
 import { seedDevData } from '../../src/db/seed/dev-seed.js';
 import { addDays, isoWeekday, zonedDate, zonedTimeToUtc } from '../../src/lib/studio-time.js';
 import { MemoryMailer } from '../../src/notify/mailer.js';
-import { MemorySms } from '../../src/notify/sms.js';
 
 export const TZ = 'Europe/Moscow';
 export const PASSWORDS = { adminPassword: 'admin-password-1', masterPassword: 'master-password-1', clientPassword: 'client-password-1' };
@@ -77,7 +76,6 @@ export interface TestApi {
   db: Db;
   base: string;
   mailer: MemoryMailer;
-  sms: MemorySms;
   uploadsDir: string;
   client(): Client;
   close(): void;
@@ -85,22 +83,21 @@ export interface TestApi {
 
 /**
  * База в памяти со всеми миграциями и тестовыми данными, сервер на свободном порту, папка фото во временной папке.
- * sms: false — SMS-шлюз не подключен, как сейчас в production.
+ * mail: false — почта не настроена: коды и ссылки заменяет администратор.
  */
-export async function startApi(options: { sms?: boolean } = {}): Promise<TestApi> {
+export async function startApi(options: { mail?: boolean } = {}): Promise<TestApi> {
   const db = openDatabase(':memory:');
   runMigrations(db);
   seedDevData(db, PASSWORDS);
   const mailer = new MemoryMailer();
-  const sms = new MemorySms();
   const uploadsDir = mkdtempSync(path.join(tmpdir(), 'nogotochki-uploads-'));
   const server = createServer(createApp(db, {
-    rateLimit: false, mailer, sms: options.sms === false ? null : sms, appUrl: 'https://nogotochki.test', uploadsDir,
+    rateLimit: false, mailer: options.mail === false ? null : mailer, appUrl: 'https://nogotochki.test', uploadsDir,
   }).handle);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return {
-    db, base, mailer, sms, uploadsDir,
+    db, base, mailer, uploadsDir,
     client: () => new Client(() => base),
     close: () => {
       server.close();

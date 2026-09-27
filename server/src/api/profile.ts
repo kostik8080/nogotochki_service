@@ -92,19 +92,26 @@ export function profileRoutes(router: Router): void {
     return { status: 200, body: { user: selfView(ctx.db, user.id) } };
   });
 
-  // Новый телефон: код в SMS. Пока шлюз не подключен — 503, телефон меняет администратор студии.
-  router.post('/api/profile/phone', async (ctx): Promise<Result> => {
+  // Новый телефон. SMS в сервисе нет, поэтому номер подтверждает администратор: запрос запоминается,
+  // клиент звонит в студию, администратор убеждается, что это он, и диктует код
+  // (POST /api/admin/users/:id/phone-code). Код вводится здесь же — в /api/profile/phone/confirm.
+  router.post('/api/profile/phone', (ctx): Result => {
     const user = requireUser(ctx);
     ctx.limit('code', ctx.ip);
     const input = Input.body(ctx.body);
     const phone = input.phone('phone');
     input.done();
 
-    const { sms } = ctx.services;
-    if (!sms) throw new HttpError(503, 'SMS_UNAVAILABLE', 'Подтверждение телефона по SMS пока не подключено. Сменить телефон поможет администратор студии');
-    const code = issueContactCode(ctx, user.id, 'verify_phone', 'phone', phone);
-    await deliver(() => sms.send(phone, `Ноготочки: код подтверждения телефона ${code}. Действует ${CODE_TTL_MIN} минут.`));
-    return { status: 202, body: { sentTo: phone, expiresInMin: CODE_TTL_MIN } };
+    // Код создается, но никуда не отправляется: он только отмечает запрос. Администратор выдаст новый.
+    issueContactCode(ctx, user.id, 'verify_phone', 'phone', phone);
+    return {
+      status: 202,
+      body: {
+        requested: phone,
+        delivery: 'studio',
+        message: 'Позвоните в студию: администратор убедится, что это вы, и продиктует код подтверждения нового номера',
+      },
+    };
   });
 
   router.post('/api/profile/phone/confirm', (ctx): Result => {
@@ -166,7 +173,7 @@ export function profileRoutes(router: Router): void {
   });
 }
 
-/** Отправка кода: сбой почты или SMS — 503, а не «что-то пошло не так». */
+/** Отправка кода: сбой почты — 503, а не «что-то пошло не так». */
 async function deliver(send: () => Promise<void>): Promise<void> {
   try {
     await send();

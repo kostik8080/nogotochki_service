@@ -74,6 +74,24 @@ function readServiceFields(input: Input, creating: boolean) {
 
 type ServiceFields = ReturnType<typeof readServiceFields>;
 
+/**
+ * Название категории не повторяется без учета регистра. Как и у услуг, сравнение — здесь:
+ * COLLATE NOCASE в SQLite не различает регистр только латиницы.
+ */
+function checkCategoryName(db: Db, name: string, selfId: number | null): void {
+  const wanted = name.toLocaleLowerCase('ru');
+  const names = db.prepare('SELECT name FROM service_categories WHERE id IS NOT ?').all(selfId) as { name: string }[];
+  if (names.some((r) => r.name.toLocaleLowerCase('ru') === wanted)) throw conflict('CATEGORY_NAME_TAKEN', 'Категория с таким названием уже есть');
+}
+
+function categoryView(db: Db, id: number) {
+  const c = db.prepare(`
+    SELECT c.id, c.name, c.sort_order, c.is_active, (SELECT count(*) FROM services s WHERE s.category_id = c.id) AS services
+    FROM service_categories c WHERE c.id = ?
+  `).get(id) as { id: number; name: string; sort_order: number; is_active: number; services: number };
+  return { id: c.id, name: c.name, sortOrder: c.sort_order, isActive: c.is_active === 1, servicesCount: c.services };
+}
+
 /** Проверки, которым нужна база: категория, мастера и основные услуги существуют, имя не занято. */
 function checkReferences(db: Db, f: ServiceFields, kind: 'main' | 'addon', selfId: number | null): void {
   if (f.categoryId !== undefined && !db.prepare('SELECT 1 FROM service_categories WHERE id = ?').get(f.categoryId)) {
@@ -215,6 +233,44 @@ export function adminServiceRoutes(router: Router): void {
       saveLinks(ctx.db, id, f);
     });
     return { status: 200, body: { service: serviceView(ctx.db, getService(ctx.db, id)!) } };
+  });
+
+  // Категории услуг (A-23: «+ Категория», переименование, порядок). В новой базе категорий нет,
+  // и без них нельзя завести ни одной услуги. Удаления нет, как в прототипе: на категорию ссылаются услуги;
+  // ненужную категорию отключают (isActive: false) — она и ее услуги пропадают из каталога.
+  router.post('/api/admin/service-categories', (ctx): Result => {
+    requireRole(ctx, 'admin');
+    const input = Input.body(ctx.body);
+    const name = input.string('name', { max: 100 });
+    const sortOrder = input.int('sortOrder', { optional: true, min: 0, max: 100_000 });
+    const isActive = input.bool('isActive', { optional: true }) ?? true;
+    input.done();
+    const id = transaction(ctx.db, () => {
+      checkCategoryName(ctx.db, name, null);
+      const order = sortOrder ?? (ctx.db.prepare('SELECT coalesce(max(sort_order), 0) + 1 AS next FROM service_categories').get() as { next: number }).next;
+      return Number(ctx.db.prepare('INSERT INTO service_categories (name, sort_order, is_active) VALUES (?, ?, ?)')
+        .run(name, order, isActive ? 1 : 0).lastInsertRowid);
+    });
+    return { status: 201, body: { category: categoryView(ctx.db, id) } };
+  });
+
+  router.patch('/api/admin/service-categories/:id', (ctx): Result => {
+    requireRole(ctx, 'admin');
+    const id = pathId(ctx);
+    const input = Input.body(ctx.body);
+    const name = input.string('name', { optional: true, max: 100 });
+    const sortOrder = input.int('sortOrder', { optional: true, min: 0, max: 100_000 });
+    const isActive = input.bool('isActive', { optional: true });
+    input.done();
+    transaction(ctx.db, () => {
+      if (!ctx.db.prepare('SELECT 1 FROM service_categories WHERE id = ?').get(id)) throw notFound('Категория не найдена');
+      if (name !== undefined) checkCategoryName(ctx.db, name, id);
+      ctx.db.prepare(`
+        UPDATE service_categories SET name = coalesce(?, name), sort_order = coalesce(?, sort_order), is_active = coalesce(?, is_active)
+        WHERE id = ?
+      `).run(name ?? null, sortOrder ?? null, isActive === undefined ? null : isActive ? 1 : 0, id);
+    });
+    return { status: 200, body: { category: categoryView(ctx.db, id) } };
   });
 
   // Несовместимые услуги (паспорт, функция 2): пара хранится одной строкой, меньший номер первым (раздел 5.12).

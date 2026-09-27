@@ -1,6 +1,7 @@
 // Тесты второй части API: восстановление пароля, профиль и удаление аккаунта, статусы визита, баннер
 // «изменено студией», расписание (блокировки, смены, особые дни), клиентская база, фото, настройки.
-// Письма и SMS не отправляются, а складываются в память (MemoryMailer, MemorySms).
+// Письма не отправляются, а складываются в память (MemoryMailer). SMS в сервисе нет: телефон и сброс пароля
+// без e-mail подтверждает администратор кодом, который он диктует по телефону.
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -85,10 +86,22 @@ describe('восстановление пароля', () => {
     assert.equal(api.mailer.sent.length, before + 1);
   });
 
-  it('код из SMS: после трех неверных попыток перестает действовать', async () => {
-    await register('sms@example.com', { phone: '+79001112233' });
-    await fresh().post('/api/auth/password-reset/request', { login: '+7 900 111-22-33' });
-    const code = /(\d{6})/.exec(api.sms.sent.at(-1)!.text)![1]!;
+  it('без e-mail в аккаунте код для сброса выдает администратор; после трех неверных попыток код не действует', async () => {
+    const c = await register('x@example.com', { phone: '+79001112233' });
+    // Аккаунт только с телефоном: e-mail убираем напрямую, как у клиента, зарегистрированного по номеру.
+    db.prepare("UPDATE users SET email = NULL WHERE email = 'x@example.com'").run();
+    const mails = api.mailer.sent.length;
+    const req = await fresh().post('/api/auth/password-reset/request', { login: '+7 900 111-22-33' });
+    assert.equal(req.status, 202);
+    assert.match(req.body.message, /позвоните в студию/);
+    assert.equal(api.mailer.sent.length, mails); // письма некуда отправить
+
+    const userId = (await c.get('/api/auth/me')).body.user.id;
+    assert.equal((await fresh().login('maria@example.com', PASSWORDS.clientPassword).then((m) => m.post(`/api/admin/users/${userId}/password-reset-code`))).status, 403);
+    const issued = await admin.post(`/api/admin/users/${userId}/password-reset-code`);
+    assert.equal(issued.status, 201);
+    assert.equal(issued.body.login, '+79001112233');
+    const code = issued.body.code as string;
     const wrong = code === '000000' ? '111111' : '000000';
     const first = await fresh().post('/api/auth/password-reset/confirm', { login: '+79001112233', code: wrong, password: 'new-password-1' });
     assert.equal(first.status, 400);
@@ -97,6 +110,13 @@ describe('восстановление пароля', () => {
     await fresh().post('/api/auth/password-reset/confirm', { login: '+79001112233', code: wrong, password: 'new-password-1' });
     const right = await fresh().post('/api/auth/password-reset/confirm', { login: '+79001112233', code, password: 'new-password-1' });
     assert.equal(right.status, 400);
+
+    // Новый код от администратора работает, старые сессии закрываются.
+    const again = await admin.post(`/api/admin/users/${userId}/password-reset-code`);
+    const ok = await fresh().post('/api/auth/password-reset/confirm', { login: '+79001112233', code: again.body.code, password: 'new-password-1' });
+    assert.equal(ok.status, 204);
+    assert.equal((await c.get('/api/auth/me')).status, 401);
+    await fresh().login('+79001112233', 'new-password-1');
   });
 });
 
@@ -128,11 +148,22 @@ describe('профиль', () => {
     assert.equal(ok.body.user.emailVerified, true);
   });
 
-  it('новый телефон подтверждается кодом из SMS', async () => {
+  it('новый телефон подтверждает администратор: клиент запрашивает, администратор диктует код', async () => {
     const c = await register('phone@example.com');
+    const userId = (await c.get('/api/auth/me')).body.user.id;
+    assert.equal((await admin.post(`/api/admin/users/${userId}/phone-code`)).body.error.code, 'NO_PENDING_REQUEST');
     assert.equal((await c.post('/api/profile/phone', { phone: '+79035556677' })).status, 409); // Ольга, записанная по звонку
-    assert.equal((await c.post('/api/profile/phone', { phone: '8 912 000-11-22' })).status, 202);
-    const code = /(\d{6})/.exec(api.sms.sent.at(-1)!.text)![1]!;
+    const requested = await c.post('/api/profile/phone', { phone: '8 912 000-11-22' });
+    assert.equal(requested.status, 202);
+    assert.equal(requested.body.delivery, 'studio');
+    assert.equal((await c.get('/api/auth/me')).body.user.phone, null); // до подтверждения номер не меняется
+
+    const card = await admin.get(`/api/admin/clients/${userId}`);
+    assert.equal(card.body.client.pendingPhoneConfirmation.phone, '+79120001122');
+    const issued = await admin.post(`/api/admin/users/${userId}/phone-code`);
+    assert.equal(issued.body.phone, '+79120001122');
+    assert.equal(issued.body.purpose, 'change_phone');
+    const code = issued.body.code as string;
     const ok = await c.post('/api/profile/phone/confirm', { code });
     assert.equal(ok.body.user.phone, '+79120001122');
     assert.equal(ok.body.user.phoneVerified, true);

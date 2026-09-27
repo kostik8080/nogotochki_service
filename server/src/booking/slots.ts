@@ -59,10 +59,10 @@ export interface SlotQuery {
   /** Переносимая запись: ее время не считается занятым (CAB-04, A-04). */
   excludeBookingId?: number | null;
   /**
-   * Осознанное наложение администратором (решение 40): записи других клиентов не считаются занятым временем.
-   * Рабочее время, блокировки и чужие действующие брони по-прежнему учитываются.
+   * Осознанное наложение администратором (решение 40): записи других клиентов и блокировки мастера (обед,
+   * личное время, отпуск) не считаются занятым временем. Рабочее время и чужие действующие брони учитываются.
    */
-  ignoreBookings?: boolean;
+  overbooking?: boolean;
 }
 
 interface Settings {
@@ -155,9 +155,9 @@ interface Busy {
 }
 
 /** Занятое время мастера, которое задевает промежуток [from, to). */
-function loadBusy(db: Db, masterId: number, from: number, to: number, q: Pick<SlotQuery, 'now' | 'viewerId' | 'excludeBookingId' | 'ignoreBookings'>): Busy {
+function loadBusy(db: Db, masterId: number, from: number, to: number, q: Pick<SlotQuery, 'now' | 'viewerId' | 'excludeBookingId' | 'overbooking'>): Busy {
   const params = { master: masterId, from: toIso(from), to: toIso(to) };
-  const bookings = q.ignoreBookings ? [] : db.prepare(`
+  const bookings = q.overbooking ? [] : db.prepare(`
     SELECT starts_at, busy_until FROM bookings
     WHERE master_id = @master AND status IN ${OCCUPYING}
       AND starts_at < @to AND busy_until > @from
@@ -170,7 +170,7 @@ function loadBusy(db: Db, masterId: number, from: number, to: number, q: Pick<Sl
       AND starts_at < @to AND busy_until > @from
       AND owner_id IS NOT @viewer
   `).all({ ...params, now: q.now.toISOString(), viewer: q.viewerId ?? null }) as { starts_at: string; busy_until: string }[];
-  const blocks = db.prepare(`
+  const blocks = q.overbooking ? [] : db.prepare(`
     SELECT starts_at, ends_at FROM time_blocks
     WHERE master_id = @master AND starts_at < @to AND ends_at > @from
   `).all(params) as { starts_at: string; ends_at: string }[];

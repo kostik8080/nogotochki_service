@@ -66,7 +66,7 @@ export function bookingRoutes(router: Router): void {
     return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now, withEvents: true }) } };
   });
 
-  // Перенос той же записи (сценарий 5, CAB-04, A-04) — rescheduleBooking.
+  // Перенос той же записи (сценарий 5, CAB-04, A-04) — rescheduleBooking. isOverbooking действует только у администратора.
   router.post('/api/bookings/:id/reschedule', (ctx): Result => {
     const user = requireUser(ctx);
     const id = pathId(ctx);
@@ -75,8 +75,9 @@ export function bookingRoutes(router: Router): void {
     const masterId = input.id('masterId', { optional: true });
     const reason = input.string('reason', { optional: true, nullable: true, max: MAX_TEXT }) ?? null;
     const version = input.int('version', { optional: true, min: 1 });
+    const isOverbooking = input.bool('isOverbooking', { optional: true }) ?? false;
     input.done();
-    rescheduleBooking(ctx.db, user, id, { startsAt, masterId, reason, version }, ctx.now);
+    rescheduleBooking(ctx.db, user, id, { startsAt, masterId, reason, version, isOverbooking }, ctx.now);
     return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now, withEvents: true }) } };
   });
 

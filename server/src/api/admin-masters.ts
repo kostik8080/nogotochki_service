@@ -4,7 +4,8 @@
 import { applyOrPreview, bookingsOutsideWorkingHours } from '../booking/affected.js';
 import type { Db } from '../db/connection.js';
 import { transaction } from '../db/connection.js';
-import { badRequest, notFound } from '../http/errors.js';
+import { hashPassword } from '../auth/password.js';
+import { badRequest, conflict, notFound } from '../http/errors.js';
 import { pathId, type Result, type Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
 import { addDays, zonedDate, zonedTimeToUtc } from '../lib/studio-time.js';
@@ -50,8 +51,17 @@ function masterView(db: Db, m: MasterRow, today: string) {
     id: m.id, name: m.name, level: m.level, specialty: m.specialty, experienceYears: m.experience_years, bio: m.bio,
     photoUrl: m.photo_url, sortOrder: m.sort_order, isActive: m.is_active === 1, serviceIds,
     schedule: schedule.map((s) => ({ weekday: s.weekday, validFrom: s.valid_from, validTo: s.valid_to, start: s.start_time, end: s.end_time })),
+    account: accountOf(db, m.id),
     createdAt: m.created_at, updatedAt: m.updated_at,
   };
+}
+
+/** Учетная запись мастера для входа (masters.user_id, роль master): логин и закрыт ли доступ. Пароль не отдается. */
+function accountOf(db: Db, masterId: number) {
+  const a = db.prepare(`
+    SELECT u.id, u.email, u.phone, u.blocked_at FROM masters m JOIN users u ON u.id = m.user_id WHERE m.id = ?
+  `).get(masterId) as { id: number; email: string | null; phone: string | null; blocked_at: string | null } | undefined;
+  return a ? { userId: a.id, email: a.email, phone: a.phone, isBlocked: a.blocked_at !== null } : null;
 }
 
 function readMasterFields(input: Input, creating: boolean) {
@@ -192,6 +202,36 @@ export function adminMasterRoutes(router: Router): void {
         ...(master.is_active ? {} : { upcomingBookings: bookingViews(ctx.db, upcoming, { viewer: user.role, now: ctx.now }) }),
       },
     };
+  });
+
+  // Учетная запись мастера (паспорт: заводит администратор). Мастер входит с ней и видит свое расписание
+  // (GET /api/master/schedule); записи менять не может. Пароль задает администратор, мастер меняет его
+  // в профиле (POST /api/profile/password). Закрыть доступ — PUT /api/admin/users/:id/block.
+  router.post('/api/admin/masters/:id/account', (ctx): Result => {
+    requireRole(ctx, 'admin');
+    const id = pathId(ctx);
+    const input = Input.body(ctx.body);
+    const email = input.email('email', { optional: true });
+    const phone = input.phone('phone', { optional: true });
+    const password = input.password('password');
+    if (!input.has('email') && !input.has('phone')) input.fail('email', 'Укажите e-mail или телефон для входа');
+    input.done();
+
+    const passwordHash = hashPassword(password);
+    const now = ctx.now.toISOString();
+    const today = zonedDate(ctx.now.getTime(), readSettings(ctx.db).timezone);
+    transaction(ctx.db, () => {
+      const master = getMaster(ctx.db, id);
+      if (!master) throw notFound('Мастер не найден');
+      if (accountOf(ctx.db, id)) throw conflict('MASTER_HAS_ACCOUNT', 'У мастера уже есть учетная запись');
+      if (email && ctx.db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) throw conflict('EMAIL_TAKEN', 'Этот e-mail уже используется');
+      if (phone && ctx.db.prepare('SELECT 1 FROM users WHERE phone = ?').get(phone)) throw conflict('PHONE_TAKEN', 'Этот телефон уже используется');
+      const userId = Number(ctx.db.prepare(`
+        INSERT INTO users (role, name, email, phone, password_hash, created_at, updated_at) VALUES ('master', ?, ?, ?, ?, ?, ?)
+      `).run(master.name, email ?? null, phone ?? null, passwordHash, now, now).lastInsertRowid);
+      ctx.db.prepare('UPDATE masters SET user_id = ?, updated_at = ? WHERE id = ?').run(userId, now, id);
+    });
+    return { status: 201, body: { master: masterView(ctx.db, getMaster(ctx.db, id)!, today) } };
   });
 
   // Новый недельный график с даты (A-22p, сценарий 14): «с 1 октября Анна работает ср–сб».

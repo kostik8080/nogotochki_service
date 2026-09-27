@@ -145,7 +145,11 @@ export function insertBookingRows(db: Db, r: BookingRows): number {
 export function writeReschedule(
   db: Db,
   b: ExistingBooking,
-  change: { masterId: number; level: Level; startsAt: string; actorId: number | null; reason: string | null; at: string },
+  change: {
+    masterId: number; level: Level; startsAt: string; actorId: number | null; reason: string | null; at: string;
+    /** Перенос поверх занятого времени — только администратором (решение 40). Обычный перенос снимает признак. */
+    isOverbooking?: boolean;
+  },
 ): void {
   const endsAt = addMin(change.startsAt, b.durationMin);
   const busyUntil = addMin(endsAt, b.cleanupMin);
@@ -160,11 +164,13 @@ export function writeReschedule(
     VALUES (?, 'rescheduled', ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(b.id, change.actorId, b.master_id, change.masterId, b.starts_at, change.startsAt,
     prices.changed ? b.totalKop : null, prices.changed ? prices.totalKop : null, change.reason, change.at);
-  // Пересечение с другой записью — в том числе при смене мастера — отклонит триггер bookings_no_overlap_update.
+  // Пересечение с другой записью — в том числе при смене мастера — отклонит триггер bookings_no_overlap_update;
+  // наложение без администратора в последнем событии — триггер bookings_overbooking_admin_only_update.
   const updated = db.prepare(`
-    UPDATE bookings SET master_id = ?, starts_at = ?, ends_at = ?, busy_until = ?, price_level = ?, version = version + 1, updated_at = ?
+    UPDATE bookings SET master_id = ?, starts_at = ?, ends_at = ?, busy_until = ?, price_level = ?, is_overbooking = ?,
+                        version = version + 1, updated_at = ?
     WHERE id = ? AND version = ?
-  `).run(change.masterId, change.startsAt, endsAt, busyUntil, change.level, change.at, b.id, b.version);
+  `).run(change.masterId, change.startsAt, endsAt, busyUntil, change.level, change.isOverbooking ? 1 : 0, change.at, b.id, b.version);
   if (updated.changes !== 1) throw versionConflict();
 }
 
@@ -220,7 +226,8 @@ export interface CreateBookingRequest {
 /**
  * Создать запись (BOOK-04, A-02). Одна функция для всех ролей:
  *   клиент — только на себя и только по своей действующей брони на это время (раздел 8, шаг 2);
- *   администратор — за клиента из базы или нового, без брони, с наложением поверх записи при isOverbooking;
+ *   администратор — за клиента из базы или нового, без брони, при isOverbooking — поверх записей других
+ *   клиентов и блокировок (рабочее время мастера и чужие брони наложение не перекрывает);
  *   мастер — 403.
  * Транзакция BEGIN IMMEDIATE: повторная проверка времени и вставка неразделимы. Если время занято —
  * по проверке сервера или по триггеру базы, — 409 с ближайшим свободным временем мастера.
@@ -262,10 +269,10 @@ export function createBooking(db: Db, actor: Actor, req: CreateBookingRequest, n
 
       // Уровень 1 защиты от двойной записи: время заново считается в той же транзакции — с момента брони
       // могли добавить блокировку или изменить график. Ограничения клиента (2 часа, горизонт) проверены
-      // при брони, а бронь гарантирует время. При наложении записи других клиентов не мешают.
+      // при брони, а бронь гарантирует время. При наложении записи других клиентов и блокировки не мешают.
       const check = checkSlot(db, {
         masterId: req.masterId, startsAt: req.startsAt, ...timing, now, audience: 'admin', viewerId: actor.id,
-        ignoreBookings: isOverbooking,
+        overbooking: isOverbooking,
       });
       if (!check.available) throw new SlotUnavailable();
 
@@ -298,15 +305,20 @@ export interface RescheduleRequest {
   masterId?: number;
   reason: string | null;
   version?: number;
+  /** Перенос поверх занятого времени (решение 40). Действует только у администратора; у остальных отбрасывается. */
+  isOverbooking?: boolean;
 }
 
 /**
  * Перенос той же записи (сценарий 5, CAB-04, A-04). Клиент — своей записи, до срока правила 24 часов
- * и по брони на перенос (POST /api/holds с bookingId); администратор — любой, без брони; мастер — 403.
+ * и по брони на перенос (POST /api/holds с bookingId); администратор — любой, без брони, при isOverbooking —
+ * поверх записей других клиентов и блокировок; мастер — 403.
  * Цена пересчитывается только у мастера другого уровня (решение 11).
  */
 export function rescheduleBooking(db: Db, actor: Actor, bookingId: number, req: RescheduleRequest, now: Date): void {
   requireBookingRole(actor);
+  // Наложение при переносе — только у администратора; у клиента признак молча отбрасывается.
+  const isOverbooking = actor.role === 'admin' && req.isOverbooking === true;
   let target: { masterId: number; durationMin: number; cleanupMin: number } | undefined;
   try {
     transaction(db, () => {
@@ -333,12 +345,14 @@ export function rescheduleBooking(db: Db, actor: Actor, bookingId: number, req: 
 
       const check = checkSlot(db, {
         masterId, startsAt: req.startsAt, durationMin: booking.durationMin, cleanupMin: booking.cleanupMin, now,
-        audience: 'admin', viewerId: actor.id, excludeBookingId: bookingId,
+        audience: 'admin', viewerId: actor.id, excludeBookingId: bookingId, overbooking: isOverbooking,
       });
       if (!check.available) throw new SlotUnavailable();
 
       db.prepare('DELETE FROM slot_holds WHERE owner_id = ?').run(actor.id);
-      writeReschedule(db, booking, { masterId, level: master.level, startsAt: req.startsAt, actorId: actor.id, reason: req.reason, at: now.toISOString() });
+      writeReschedule(db, booking, {
+        masterId, level: master.level, startsAt: req.startsAt, actorId: actor.id, reason: req.reason, at: now.toISOString(), isOverbooking,
+      });
     });
   } catch (error) {
     if (isSlotConflict(error) && target) {

@@ -7,7 +7,6 @@ import { config } from './config.js';
 import { openDatabase } from './db/connection.js';
 import { pendingMigrations } from './db/migrator.js';
 import { ConsoleMailer, type Mailer, SmtpMailer } from './notify/mailer.js';
-import { ConsoleSms } from './notify/sms.js';
 
 const CLEANUP_INTERVAL_MS = 60_000;
 
@@ -21,7 +20,8 @@ if (pending.length > 0) {
 }
 
 // Почта: SMTP, если он настроен; при разработке без него письма печатаются в консоль.
-// В production без SMTP восстановление пароля и смена e-mail отвечают 503.
+// SMS в сервисе нет: коды приходят на e-mail, а телефон подтверждает администратор (решение студии).
+// В production без SMTP ссылки и коды на e-mail не уходят — их заменяет администратор.
 const { smtp } = config;
 if (smtp.host && !smtp.from) {
   console.error('SMTP_HOST задан, а SMTP_FROM нет: укажите адрес отправителя, например "Ноготочки <noreply@nogotochki.ru>".');
@@ -30,8 +30,6 @@ if (smtp.host && !smtp.from) {
 const mailer: Mailer | null = smtp.host
   ? new SmtpMailer({ host: smtp.host, port: smtp.port, user: smtp.user, password: smtp.password, from: smtp.from! })
   : config.isProduction ? null : new ConsoleMailer();
-// SMS-шлюз еще не выбран: при разработке коды печатаются в консоль, в production SMS недоступны.
-const sms = config.isProduction ? null : new ConsoleSms();
 if (config.isProduction && !config.appUrl.startsWith('https://')) {
   console.error(`APP_URL=${config.appUrl}: в production нужен адрес с https:// — из него строятся ссылки в письмах.`);
   process.exit(1);
@@ -39,7 +37,7 @@ if (config.isProduction && !config.appUrl.startsWith('https://')) {
 
 const app = createApp(db, {
   secureCookies: config.isProduction, trustProxy: config.trustProxy,
-  mailer, sms, appUrl: config.appUrl, uploadsDir: config.uploadsDir,
+  mailer, appUrl: config.appUrl, uploadsDir: config.uploadsDir,
 });
 const server = createServer(app.handle);
 

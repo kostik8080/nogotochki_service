@@ -35,9 +35,9 @@ export function authRoutes(router: Router, options: { secureCookies: boolean }):
   // Сценарий 16: номер уже есть в карточке клиента, которого администратор записал по телефону (без пароля).
   // Второй клиент не создается: первый запрос отвечает 202 и требует код подтверждения номера, повторный
   // запрос с тем же набором полей и code добавляет пароль к существующей карточке — ее записи сразу видны
-  // в кабинете. Код приходит в SMS; пока шлюз не подключен, его выдает администратор после звонка клиентки
-  // (POST /api/admin/clients/:id/phone-code). Без кода привязка не выполняется: иначе любой, кто знает
-  // чужой номер, получил бы доступ к чужим записям.
+  // в кабинете. SMS в сервисе нет: код приходит на e-mail из карточки клиентки, а если его там нет — его выдает
+  // администратор после звонка (POST /api/admin/users/:id/phone-code). Без кода привязка не выполняется:
+  // иначе любой, кто знает чужой номер, получил бы доступ к чужим записям.
   router.post('/api/auth/register', async (ctx): Promise<Result> => {
     ctx.limit('register', ctx.ip);
     const input = Input.body(ctx.body);
@@ -66,22 +66,37 @@ export function authRoutes(router: Router, options: { secureCookies: boolean }):
     }
 
     if (card && code === undefined) {
-      // Шаг 1 сценария 16: нужен код. С SMS-шлюзом — отправляем (не чаще раза в минуту), без него код выдаст администратор.
-      const { sms } = ctx.services;
-      if (sms) {
-        const last = lastCodeAt(ctx.db, card.id, 'verify_phone');
-        if (last === null || ctx.now.getTime() - last >= RESEND_INTERVAL_MS) {
-          const sent = transaction(ctx.db, () => issueCode(ctx.db, card.id, 'verify_phone', phone!, ctx.now));
-          await sms.send(phone!, `Ноготочки: код подтверждения номера ${sent}. Действует ${CODE_TTL_MIN} минут.`);
+      // Шаг 1 сценария 16: нужен код. SMS в сервисе нет. Если в карточке есть e-mail, который студия записала
+      // со слов клиентки, код уходит туда; иначе его продиктует администратор после звонка. Код создается
+      // в любом случае (не чаще раза в минуту): он отмечает запрос, по которому администратор выдаст свой код.
+      const { mailer } = ctx.services;
+      const cardEmail = (ctx.db.prepare('SELECT email FROM users WHERE id = ?').get(card.id) as { email: string | null }).email;
+      const byEmail = mailer !== null && cardEmail !== null;
+      const last = lastCodeAt(ctx.db, card.id, 'verify_phone');
+      if (last === null || ctx.now.getTime() - last >= RESEND_INTERVAL_MS) {
+        const sent = transaction(ctx.db, () => issueCode(ctx.db, card.id, 'verify_phone', phone!, ctx.now));
+        if (byEmail) {
+          try {
+            await mailer!.send({
+              to: cardEmail!,
+              subject: 'Код подтверждения — Ноготочки',
+              text: `Код для доступа к вашим записям в студии «Ноготочки»: ${sent}
+
+Код действует ${CODE_TTL_MIN} минут. Если вы не регистрировались на сайте, просто удалите это письмо.`,
+            });
+          } catch (error) {
+            console.error('Не удалось отправить код подтверждения номера:', error);
+          }
         }
       }
       return {
         status: 202,
         body: {
           status: 'phone_verification_required',
-          delivery: sms ? 'sms' : 'studio',
-          message: sms
-            ? 'Этот номер уже есть в базе студии: вас записывали по телефону. Мы отправили код в SMS — введите его, и прежние записи появятся в кабинете'
+          delivery: byEmail ? 'email' : 'studio',
+          ...(byEmail ? { sentTo: maskEmail(cardEmail!) } : {}),
+          message: byEmail
+            ? `Этот номер уже есть в базе студии: вас записывали по телефону. Мы отправили код на e-mail ${maskEmail(cardEmail!)} — введите его, и прежние записи появятся в кабинете`
             : 'Этот номер уже есть в базе студии: вас записывали по телефону. Позвоните в студию — администратор убедится, что это вы, и продиктует код',
           expiresInMin: CODE_TTL_MIN,
         },
@@ -193,4 +208,10 @@ export function authRoutes(router: Router, options: { secureCookies: boolean }):
     const user = requireUser(ctx);
     return { status: 200, body: { user: selfView(ctx.db, user.id) } };
   });
+}
+
+/** Адрес для подсказки «код отправлен на m***@mail.ru»: ровно столько, чтобы узнать свой, но не чужой. */
+function maskEmail(email: string): string {
+  const [local = '', domain = ''] = email.split('@');
+  return `${local.slice(0, 1)}***@${domain}`;
 }

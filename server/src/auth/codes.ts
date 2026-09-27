@@ -1,4 +1,5 @@
 // Одноразовые коды и ссылки (docs/db-schema.md, раздел 5.7): подтверждение телефона и e-mail, сброс пароля.
+// SMS в сервисе нет: код приходит на e-mail или его выдает администратор, убедившись по звонку, что это сам человек.
 // Сам код, как и пароль, не хранится — в базе только хеш. Код перестает действовать после трех неверных
 // попыток, по истечении срока и после использования (паспорт, риск «Подбор паролей, кодов»).
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
@@ -30,6 +31,19 @@ interface CodeRow {
   attempts: number;
   expires_at: string;
   created_at: string;
+}
+
+/**
+ * Адрес из последнего неиспользованного запроса кода этой цели за последние сутки — например, новый телефон,
+ * который клиент попросил подтвердить. По нему администратор выдает код, если подтверждает сам.
+ */
+export function pendingTarget(db: Db, userId: number, purpose: CodePurpose, now: Date): { target: string; requestedAt: string } | null {
+  const row = db.prepare(`
+    SELECT target, created_at FROM auth_codes
+    WHERE user_id = ? AND purpose = ? AND consumed_at IS NULL AND created_at > ?
+    ORDER BY created_at DESC, id DESC LIMIT 1
+  `).get(userId, purpose, new Date(now.getTime() - 86_400_000).toISOString()) as { target: string; created_at: string } | undefined;
+  return row ? { target: row.target, requestedAt: row.created_at } : null;
 }
 
 /** Когда пользователь последний раз получал код этой цели — для ограничения повторной отправки. */

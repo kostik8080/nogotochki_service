@@ -5,15 +5,12 @@ import type { IncomingMessage } from 'node:http';
 import type { Db } from '../db/connection.js';
 import type { SessionUser } from '../auth/sessions.js';
 import type { Mailer } from '../notify/mailer.js';
-import type { SmsSender } from '../notify/sms.js';
 import { HttpError } from './errors.js';
 
 /** Внешние службы и настройки, которые нужны обработчикам. Тесты подставляют свои. */
 export interface Services {
   /** Почта для кодов и ссылок; null — почта не настроена. */
   mailer: Mailer | null;
-  /** SMS-шлюз; null — не подключен. */
-  sms: SmsSender | null;
   /** Публичный адрес сервиса для ссылок в письмах. */
   appUrl: string;
   /** Папка фото работ. */

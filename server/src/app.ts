@@ -10,6 +10,7 @@ import { authRoutes } from './api/auth.js';
 import { bookingRoutes } from './api/bookings.js';
 import { catalogRoutes } from './api/catalog.js';
 import { holdRoutes } from './api/holds.js';
+import { masterRoutes } from './api/master.js';
 import { passwordResetRoutes } from './api/password-reset.js';
 import { photoRoutes } from './api/photos.js';
 import { profileRoutes } from './api/profile.js';
@@ -20,7 +21,6 @@ import { parseCookies, readJson, readRaw, sendFile, sendJson } from './http/io.j
 import { RateLimiter } from './http/rate-limit.js';
 import { type Context, type LimitBucket, Router, type Services } from './http/router.js';
 import type { Mailer } from './notify/mailer.js';
-import type { SmsSender } from './notify/sms.js';
 
 export interface AppOptions {
   /** Текущий момент; тесты подставляют свой. */
@@ -35,8 +35,6 @@ export interface AppOptions {
   logError?: (error: unknown) => void;
   /** Почта для кодов и ссылок; null — не настроена. */
   mailer?: Mailer | null;
-  /** SMS-шлюз; null — не подключен. */
-  sms?: SmsSender | null;
   /** Публичный адрес сервиса для ссылок в письмах. */
   appUrl?: string;
   /** Папка фото работ. */
@@ -55,7 +53,6 @@ export function createApp(db: Db, options: AppOptions): App {
   const logError = options.logError ?? ((error) => console.error(error));
   const services: Services = {
     mailer: options.mailer ?? null,
-    sms: options.sms ?? null,
     appUrl: options.appUrl ?? 'http://localhost:3000',
     uploadsDir: options.uploadsDir,
     secureCookies,
@@ -77,6 +74,7 @@ export function createApp(db: Db, options: AppOptions): App {
   catalogRoutes(router);
   holdRoutes(router);
   bookingRoutes(router);
+  masterRoutes(router);
   photoRoutes(router);
   adminServiceRoutes(router);
   adminMasterRoutes(router);

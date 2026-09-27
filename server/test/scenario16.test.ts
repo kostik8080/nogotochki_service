@@ -1,7 +1,7 @@
 // Сценарий 16 паспорта: клиентку записали по телефону, через неделю она регистрируется на сайте с тем же номером.
 // Второй клиент не создается: после подтверждения номера кодом к существующей карточке добавляется пароль,
-// и прежняя запись сразу видна в кабинете. Без кода привязки нет. Пока SMS-шлюз не подключен,
-// код выдает администратор, убедившись по звонку, что это сама клиентка.
+// и прежняя запись сразу видна в кабинете. Без кода привязки нет. SMS в сервисе нет: код приходит на e-mail
+// из карточки клиентки, а если его там нет — код выдает администратор, убедившись по звонку, что это она.
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { PASSWORDS, startApi, type TestApi } from './helpers/api.js';
@@ -15,7 +15,7 @@ function olga(api: TestApi): { id: number; bookings: number } {
   return { id: row.id, bookings: n };
 }
 
-describe('сценарий 16 с SMS-шлюзом', () => {
+describe('сценарий 16: код на e-mail из карточки', () => {
   let api: TestApi;
   before(async () => {
     api = await startApi();
@@ -23,6 +23,8 @@ describe('сценарий 16 с SMS-шлюзом', () => {
   after(() => api.close());
 
   it('регистрация на номер из карточки требует код, с кодом пароль добавляется к той же карточке', async () => {
+    // Администратор записал в карточку Ольги ее e-mail, когда она звонила.
+    api.db.prepare('UPDATE users SET email = ? WHERE phone = ?').run('olga.card@example.com', OLGA_PHONE);
     const before = olga(api);
     assert.equal(before.bookings, 1); // запись на маникюр, созданная администратором по звонку
     const users = (api.db.prepare('SELECT count(*) AS n FROM users').get() as { n: number }).n;
@@ -31,11 +33,12 @@ describe('сценарий 16 с SMS-шлюзом', () => {
     const first = await c.post('/api/auth/register', registration);
     assert.equal(first.status, 202);
     assert.equal(first.body.status, 'phone_verification_required');
-    assert.equal(first.body.delivery, 'sms');
+    assert.equal(first.body.delivery, 'email');
+    assert.equal(first.body.sentTo, 'o***@example.com');
     assert.equal(c.cookie, null); // сессии нет: без кода доступа к записям нет
-    const sms = api.sms.sent.at(-1)!;
-    assert.equal(sms.phone, OLGA_PHONE);
-    const code = /(\d{6})/.exec(sms.text)![1]!;
+    const mail = api.mailer.sent.at(-1)!;
+    assert.equal(mail.to, 'olga.card@example.com'); // на адрес из карточки, а не на тот, что ввели при регистрации
+    const code = /(\d{6})/.exec(mail.text)![1]!;
 
     const wrong = await c.post('/api/auth/register', { ...registration, code: code === '000000' ? '111111' : '000000' });
     assert.equal(wrong.status, 400);
@@ -56,16 +59,16 @@ describe('сценарий 16 с SMS-шлюзом', () => {
   it('после привязки номер занят как обычно, а код для нее администратору больше не выдается', async () => {
     assert.equal((await api.client().post('/api/auth/register', registration)).status, 409);
     const admin = await api.client().login('admin@example.com', PASSWORDS.adminPassword);
-    const res = await admin.post(`/api/admin/clients/${olga(api).id}/phone-code`);
+    const res = await admin.post(`/api/admin/users/${olga(api).id}/phone-code`);
     assert.equal(res.status, 409);
-    assert.equal(res.body.error.code, 'CLIENT_HAS_ACCOUNT');
+    assert.equal(res.body.error.code, 'NO_PENDING_REQUEST');
   });
 });
 
-describe('сценарий 16 без SMS-шлюза: код выдает администратор', () => {
+describe('сценарий 16: в карточке нет e-mail — код выдает администратор', () => {
   let api: TestApi;
   before(async () => {
-    api = await startApi({ sms: false });
+    api = await startApi();
   });
   after(() => api.close());
 
@@ -81,12 +84,13 @@ describe('сценарий 16 без SMS-шлюза: код выдает адм�
     assert.equal(guess.status, 400);
 
     const client = await api.client().login('maria@example.com', PASSWORDS.clientPassword);
-    assert.equal((await client.post(`/api/admin/clients/${olga(api).id}/phone-code`)).status, 403);
+    assert.equal((await client.post(`/api/admin/users/${olga(api).id}/phone-code`)).status, 403);
 
     const admin = await api.client().login('admin@example.com', PASSWORDS.adminPassword);
-    const issued = await admin.post(`/api/admin/clients/${olga(api).id}/phone-code`);
+    const issued = await admin.post(`/api/admin/users/${olga(api).id}/phone-code`);
     assert.equal(issued.status, 201);
     assert.equal(issued.body.phone, OLGA_PHONE);
+    assert.equal(issued.body.purpose, 'link_account');
     assert.match(issued.body.code, /^\d{6}$/);
 
     const done = await c.post('/api/auth/register', { ...registration, code: issued.body.code });
