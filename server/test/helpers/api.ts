@@ -1,11 +1,12 @@
 // Общее для тестов API: сервер поверх базы в памяти с тестовыми данными и клиент с cookie сессии.
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../src/app.js';
+import { SERVER_ROOT } from '../../src/config.js';
 import { type Db, openDatabase } from '../../src/db/connection.js';
 import { runMigrations } from '../../src/db/migrator.js';
 import { seedDevData } from '../../src/db/seed/dev-seed.js';
@@ -13,7 +14,43 @@ import { addDays, isoWeekday, zonedDate, zonedTimeToUtc } from '../../src/lib/st
 import { MemoryMailer } from '../../src/notify/mailer.js';
 
 export const TZ = 'Europe/Moscow';
-export const PASSWORDS = { adminPassword: 'admin-password-1', masterPassword: 'master-password-1', clientPassword: 'client-password-1' };
+
+/**
+ * Пароли тестовых учетных записей задаются переменными TEST_ADMIN_PASSWORD, TEST_MASTER_PASSWORD
+ * и TEST_CLIENT_PASSWORD, а не строками в коде. Порядок: окружение (в том числе server/.env,
+ * который подключает config.ts), затем server/.env.example — там они заполнены намеренно,
+ * чтобы npm test работал сразу после git clone. Это не секрет: база тестов живет в памяти.
+ */
+function envFileValues(file: string): Record<string, string> {
+  let text: string;
+  try {
+    text = readFileSync(file, 'utf8');
+  } catch {
+    return {};
+  }
+  const values: Record<string, string> = {};
+  for (const line of text.split(/\r?\n/)) {
+    const m = /^\s*([A-Z_][A-Z0-9_]*)\s*=(.*)$/.exec(line);
+    if (m) values[m[1]!] = m[2]!.trim();
+  }
+  return values;
+}
+
+const exampleEnv = envFileValues(path.join(SERVER_ROOT, '.env.example'));
+
+function testPassword(name: string): string {
+  const value = process.env[name]?.trim() || exampleEnv[name];
+  if (!value || value.length < 8) {
+    throw new Error(`Нет пароля для тестов: задайте ${name} в окружении или в server/.env.example (не короче 8 символов)`);
+  }
+  return value;
+}
+
+export const PASSWORDS = {
+  adminPassword: testPassword('TEST_ADMIN_PASSWORD'),
+  masterPassword: testPassword('TEST_MASTER_PASSWORD'),
+  clientPassword: testPassword('TEST_CLIENT_PASSWORD'),
+};
 
 export const today = zonedDate(Date.now(), TZ);
 /** Ближайшая дата с этим днем недели не раньше чем через minDays дней, минуя закрытый санитарный день. */
