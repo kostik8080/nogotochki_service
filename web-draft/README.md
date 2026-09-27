@@ -8,7 +8,7 @@ React + Vite + TypeScript. Запросы идут на `/api` того же а�
 
 ```bash
 cd server && npm start       # API на http://localhost:3000
-cd web && npm install
+cd web-draft && npm install
 npm run dev                  # интерфейс на http://127.0.0.1:5173
 ```
 
