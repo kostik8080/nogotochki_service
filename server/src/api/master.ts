@@ -5,12 +5,11 @@
 // особенности). Телефон и e-mail клиента мастеру не показываются.
 import { getMasterDay } from '../booking/slots.js';
 import type { Db } from '../db/connection.js';
-import { forbidden } from '../http/errors.js';
 import type { Result, Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
 import { addDays, zonedDate, zonedTimeToUtc } from '../lib/studio-time.js';
 import { readSettings } from '../studio/settings.js';
-import { requireRole } from './guards.js';
+import { requireMasterProfile, requireRole } from './guards.js';
 
 /** Самый длинный период за один запрос — месяц. */
 const MAX_DAYS = 31;
@@ -27,10 +26,8 @@ export function masterRoutes(router: Router): void {
     if (input.valid && to > addDays(from, MAX_DAYS - 1)) input.fail('to', `Период не длиннее ${MAX_DAYS} дней`);
     input.done();
 
-    // Учетная запись мастера связана с профилем полем masters.user_id; без связи смотреть нечего.
-    const master = ctx.db.prepare('SELECT id, name, level FROM masters WHERE user_id = ?').get(user.id) as
-      { id: number; name: string; level: string } | undefined;
-    if (!master) throw forbidden('Учетная запись не связана с профилем мастера. Обратитесь к администратору', 'MASTER_NOT_LINKED');
+    // Третья проверка: мастер смотрит только свое расписание — профиль ищется по masters.user_id.
+    const master = requireMasterProfile(ctx, user);
 
     const days = [];
     for (let date = from; date <= to; date = addDays(date, 1)) days.push(dayView(ctx.db, master.id, date, timezone));

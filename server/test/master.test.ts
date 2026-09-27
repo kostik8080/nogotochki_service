@@ -53,4 +53,33 @@ it('администратор заводит учетную запись мас
   const client = await api.client().login('maria@example.com', PASSWORDS.clientPassword);
   assert.equal((await client.get('/api/master/schedule')).status, 403);
   assert.equal((await api.client().get('/api/master/schedule')).status, 401);
+
+  // Карточка записи: три проверки — вход, роль, владение объектом.
+  // Мастер открывает запись своего расписания: состав, комментарий, имя клиента и «Важно».
+  const card = await marina.get(`/api/bookings/${b.id}`);
+  assert.equal(card.status, 200, JSON.stringify(card.body));
+  assert.equal(card.body.booking.client.name, 'Мария Кузнецова');
+  assert.equal(card.body.booking.client.importantNote, 'Предпочитает короткую форму ногтей');
+  assert.equal(card.body.booking.comment, 'Мягкий состав');
+  assert.equal(card.body.booking.isOverbooking, false);
+  // Ни цен, ни контактов, ни истории изменений мастеру не видно.
+  assert.equal(card.body.booking.totalPriceKop, undefined);
+  assert.equal(card.body.booking.priceLevel, undefined);
+  assert.equal(card.body.booking.items[0].priceKop, undefined);
+  assert.equal(card.body.booking.client.phone, undefined);
+  assert.equal(card.body.booking.events, undefined);
+  assert.doesNotMatch(JSON.stringify(card.body), /\+7911|maria@example\.com|PriceKop/);
+
+  // Чужая запись из расписания другого мастера мастеру не видна, хотя роль подходит.
+  const annaBooking = (api.db.prepare("SELECT id FROM bookings WHERE master_id = 1 AND status = 'active' ORDER BY id LIMIT 1")
+    .get() as { id: number } | undefined);
+  assert.ok(annaBooking, 'в тестовых данных нет активной записи к Анне');
+  const foreign = await marina.get(`/api/bookings/${annaBooking.id}`);
+  assert.equal(foreign.status, 403);
+  assert.equal(foreign.body.error.message, 'Эта запись не из вашего расписания');
+
+  // Та же запись: администратору видна целиком, клиентке — как своя, гостю — 401.
+  assert.equal((await admin.get(`/api/bookings/${b.id}`)).body.booking.client.phone, '+79112223344');
+  assert.ok((await client.get(`/api/bookings/${b.id}`)).body.booking.totalPriceKop > 0);
+  assert.equal((await api.client().get(`/api/bookings/${b.id}`)).status, 401);
 });

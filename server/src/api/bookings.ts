@@ -8,7 +8,7 @@ import { pathId, type Result, type Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
 import { addDays, zonedTimeToUtc } from '../lib/studio-time.js';
 import { readSettings } from '../studio/settings.js';
-import { requireRole, requireUser } from './guards.js';
+import { requireBookingAccess, requireRole, requireUser } from './guards.js';
 import { BOOKING_STATUSES, bookingView, bookingViews } from './views.js';
 
 const MAX_TEXT = 500;
@@ -56,13 +56,16 @@ export function bookingRoutes(router: Router): void {
     return { status: 200, body: { bookings: bookingViews(ctx.db, ids, { viewer: user.role, now: ctx.now }) } };
   });
 
-  // Карточка записи (CAB-03, A-03). Клиент видит только свою запись, администратор — любую и с историей изменений.
+  // Карточка записи (CAB-03, A-03, BOOK-M1). Три проверки по порядку: вход, роль, владение объектом.
+  // Клиент видит только свою запись, мастер — только запись из своего расписания и без цен и контактов
+  // клиента, администратор — любую и с историей изменений. Владение проверяет requireBookingAccess.
   router.get('/api/bookings/:id', (ctx): Result => {
-    const user = requireRole(ctx, 'client', 'admin');
+    const user = requireRole(ctx, 'client', 'admin', 'master');
     const id = pathId(ctx);
-    const row = ctx.db.prepare('SELECT client_id FROM bookings WHERE id = ?').get(id) as { client_id: number } | undefined;
+    const row = ctx.db.prepare('SELECT client_id, master_id FROM bookings WHERE id = ?').get(id) as
+      { client_id: number; master_id: number } | undefined;
     if (!row) throw notFound('Запись не найдена');
-    if (user.role !== 'admin' && row.client_id !== user.id) throw forbidden('Это чужая запись');
+    requireBookingAccess(ctx, user, row);
     return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now, withEvents: true }) } };
   });
 

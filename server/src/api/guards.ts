@@ -1,4 +1,7 @@
-// Проверки доступа для обработчиков: вход выполнен (401) и роль подходит (403).
+// Проверки доступа для обработчиков, три по порядку: вход выполнен (401), роль подходит (403)
+// и запрошенный объект принадлежит пользователю (403). Третью проверку нельзя пропускать даже там,
+// где роль уже совпала: клиент видит только свои записи, мастер — записи своего расписания,
+// администратор — все записи студии.
 import type { Role, SessionUser } from '../auth/sessions.js';
 import { assertCanChange, assertNotMaintenance } from '../booking/booking-service.js';
 import { forbidden, unauthorized } from '../http/errors.js';
@@ -16,6 +19,35 @@ export function requireRole(ctx: Context, ...roles: Role[]): SessionUser {
     throw forbidden(roles.includes('admin') && roles.length === 1 ? 'Раздел только для администратора' : 'Действие недоступно для этой учетной записи');
   }
   return user;
+}
+
+/**
+ * Профиль мастера, привязанный к учетной записи (`masters.user_id`). Без связи мастеру смотреть нечего:
+ * учетная запись есть, а расписания у нее нет — это заводит администратор.
+ */
+export function requireMasterProfile(ctx: Context, user: SessionUser): { id: number; name: string; level: string } {
+  const master = ctx.db.prepare('SELECT id, name, level FROM masters WHERE user_id = ?').get(user.id) as
+    { id: number; name: string; level: string } | undefined;
+  if (!master) throw forbidden('Учетная запись не связана с профилем мастера. Обратитесь к администратору', 'MASTER_NOT_LINKED');
+  return master;
+}
+
+/**
+ * Третья проверка для карточки записи: объект принадлежит пользователю. Администратор видит любую запись,
+ * клиент — только свою, мастер — только ту, что стоит в его расписании. Роль здесь уже проверена
+ * через requireRole, но одной роли мало: клиент с правильной ролью не должен открыть чужую запись.
+ */
+export function requireBookingAccess(
+  ctx: Context,
+  user: SessionUser,
+  booking: { client_id: number; master_id: number },
+): void {
+  if (user.role === 'admin') return;
+  if (user.role === 'master') {
+    if (booking.master_id !== requireMasterProfile(ctx, user).id) throw forbidden('Эта запись не из вашего расписания');
+    return;
+  }
+  if (booking.client_id !== user.id) throw forbidden('Это чужая запись');
 }
 
 /** Режим технических работ: клиенты не создают бронь и запись. Правило — в booking-service.ts. */

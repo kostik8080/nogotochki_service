@@ -56,6 +56,8 @@ interface BookingRow {
   client_name: string;
   client_phone: string | null;
   client_email: string | null;
+  /** Поле «Важно» из карточки клиента: аллергии и особенности. Его видят администратор и мастер. */
+  important_note: string | null;
   creator_name: string;
   creator_role: Role;
 }
@@ -90,7 +92,10 @@ interface EventRow {
 }
 
 export interface BookingViewOptions {
-  /** Кто смотрит: клиент видит свою запись без служебных полей, администратор — все. */
+  /**
+   * Кто смотрит: клиент видит свою запись без служебных полей, администратор — все,
+   * мастер — только нужное для визита: состав, комментарий, имя клиента и «Важно», но не цены и не контакты.
+   */
   viewer: Role;
   now: Date;
   /** Добавить историю изменений (карточка записи у администратора). */
@@ -108,10 +113,12 @@ export function bookingViews(db: Db, ids: number[], options: BookingViewOptions)
            b.starts_at, b.ends_at, b.busy_until, b.status, b.price_level, b.comment, b.created_by, b.client_acknowledged_at, b.version,
            b.created_at, b.updated_at,
            c.name AS client_name, c.phone AS client_phone, c.email AS client_email,
+           cp.important_note,
            cr.name AS creator_name, cr.role AS creator_role
     FROM bookings b
     JOIN masters m ON m.id = b.master_id
     JOIN users c ON c.id = b.client_id
+    LEFT JOIN client_profiles cp ON cp.user_id = b.client_id
     JOIN users cr ON cr.id = b.created_by
     WHERE b.id IN (${placeholders(ids.length)})
   `).all(...ids) as unknown as BookingRow[];
@@ -140,6 +147,7 @@ export function bookingViews(db: Db, ids: number[], options: BookingViewOptions)
       && (b.client_acknowledged_at === null || e.created_at > b.client_acknowledged_at));
     const changeDeadline = new Date(Date.parse(b.starts_at) - deadlineMs);
     const isAdmin = options.viewer === 'admin';
+    const isMaster = options.viewer === 'master';
     return [b.id, {
       id: b.id,
       status: b.status,
@@ -148,25 +156,35 @@ export function bookingViews(db: Db, ids: number[], options: BookingViewOptions)
       durationMin: lines.reduce((sum, l) => sum + l.duration_min, 0),
       master: { id: b.master_id, name: b.master_name, level: b.master_level },
       isAnyMaster: b.is_any_master === 1,
-      priceLevel: b.price_level,
       items: lines.map((l) => ({
-        serviceId: l.service_id, name: l.service_name, quantity: l.quantity,
-        unitPriceKop: l.unit_price_kop, priceKop: l.price_kop, durationMin: l.duration_min,
+        serviceId: l.service_id, name: l.service_name, quantity: l.quantity, durationMin: l.duration_min,
+        // Цены мастеру не показываются (паспорт, раздел мастера: «цены и чужие записи мастеру не видны»).
+        ...(isMaster ? {} : { unitPriceKop: l.unit_price_kop, priceKop: l.price_kop }),
       })),
-      totalPriceKop: lines.reduce((sum, l) => sum + l.price_kop, 0),
       comment: b.comment,
       cancellation: cancel ? {
         at: cancel.created_at,
         by: cancel.new_status === 'cancelled_by_client' ? 'client' : 'studio',
         reason: cancel.reason,
       } : null,
-      // Правило 24 часов (раздел 6): клиент меняет запись сам только до этого момента.
-      changeDeadline: changeDeadline.toISOString(),
-      canChange: b.status === 'active' && options.now < changeDeadline,
-      studioChange: studioChange ? { type: studioChange.event_type, at: studioChange.created_at } : null,
       version: b.version,
       createdAt: b.created_at,
       updatedAt: b.updated_at,
+      // Цены и правило 24 часов — клиенту и администратору. Мастер запись не меняет и цен не видит.
+      ...(isMaster ? {} : {
+        priceLevel: b.price_level,
+        totalPriceKop: lines.reduce((sum, l) => sum + l.price_kop, 0),
+        // Правило 24 часов (раздел 6): клиент меняет запись сам только до этого момента.
+        changeDeadline: changeDeadline.toISOString(),
+        canChange: b.status === 'active' && options.now < changeDeadline,
+        studioChange: studioChange ? { type: studioChange.event_type, at: studioChange.created_at } : null,
+      }),
+      // Мастеру — то, что нужно для визита: имя клиента, его «Важно» (аллергии, особенности)
+      // и отметка о наложении, чтобы он знал, что время делят две записи. Телефона и e-mail здесь нет.
+      ...(isMaster ? {
+        client: { name: b.client_name, importantNote: b.important_note },
+        isOverbooking: b.is_overbooking === 1,
+      } : {}),
       // Только администратору: контакты клиента, уборка после визита, кто создал запись, история.
       ...(isAdmin ? {
         client: { id: b.client_id, name: b.client_name, phone: b.client_phone, email: b.client_email },
