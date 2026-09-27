@@ -1,0 +1,151 @@
+/*
+ * Токены дизайн-системы «Ноготочки».
+ * Источник — Prototype/Дизайн-система Ноготочки.html: блок «05 · Токены», палитра «02 · Основы»,
+ * шкала отступов, типографика и примеры в «03 · Компоненты». Чего в дизайн-системе нет, взято из
+ * прототипа экранов (Prototype/Прототип - Ноготочки.dc.html, лендинг) — там, где значение
+ * повторяется. У каждой переменной, которой нет в блоке «Токены», в комментарии указано, откуда она.
+ *
+ * Темы — как в дизайн-системе:
+ *   :root                  — темная (главная, вход, шапка и подвал, подтверждение записи);
+ *   [data-theme="powder"]  — светлая пудровая (шаги записи, личный кабинет);
+ *   [data-theme="admin"]   — светлая для раздела администратора.
+ *
+ * Не заданы намеренно: текст и фон информационного сообщения (в дизайн-системе только основной
+ * цвет, в экранах клиента такого сообщения нет) и межстрочный у Caption (наследуется).
+ */
+
+:root {
+  /* ---------- Фон и поверхности ---------- */
+  --color-bg: #0F0B0C;                 /* токен --color-bg-base */
+  --color-surface: #1A1415;            /* токен --color-bg-surface: карточки и тосты на темном фоне */
+  --color-surface-accent: #F4E6E3;     /* палитра «blush»: полоса навигации, круг иконки пустого состояния */
+
+  /* ---------- Текст ---------- */
+  --color-text: #FFFFFF;               /* токен --color-text-primary */
+  --color-text-muted: #C7BFBC;         /* токен --color-text-muted */
+  --color-text-accent: #8E4B48;        /* токен --color-accent-text (rose-700 «текст»): ссылки, акцентный текст */
+  --color-text-secondary: rgba(251, 247, 245, 0.75); /* прототип: подпись на темной карточке «Вы записаны!» */
+
+  /* ---------- Граница ---------- */
+  --color-border: rgba(251, 247, 245, 0.10);  /* «Тёмная тема — обводка + свечение»: 0 0 0 1px этого цвета */
+  --color-divider: rgba(251, 247, 245, 0.10); /* та же обводка; прототип: строки корзины на темной плашке */
+
+  /* ---------- Кнопка ---------- */
+  --color-button-bg: #C98B84;          /* токен --color-accent (rose-500 «базовый») */
+  --color-button-bg-hover: #D9A099;    /* токен --color-accent-hover */
+  --color-button-bg-active: #B06F68;   /* токен --color-accent-active */
+  --color-button-text: #0F0B0C;        /* правило «Розовая кнопка»: текст всегда темный, белый не проходит контраст */
+
+  /* ---------- Фокус ---------- */
+  --color-focus-border: #C98B84;       /* компоненты: поле в фокусе */
+  --color-focus-ring: rgba(201, 139, 132, 0.4); /* компоненты: box-shadow поля в фокусе */
+
+  /* ---------- Ошибка ---------- */
+  --color-error: #C13B3B;              /* токен --color-error: рамка поля с ошибкой, кнопка «Отменить запись» */
+  --color-error-text: #8F2A2A;         /* таблица контраста «Ошибка-текст», подпись под полем, текст алерта */
+  --color-error-bg: #EFC8C6;           /* компоненты: фон алерта «Это время только что заняли» */
+
+  /* ---------- Успех ---------- */
+  --color-success: #7C9473;            /* токен --color-success */
+  --color-success-text: #4E6B47;       /* таблица контраста «Sage-текст», текст алерта «Запись подтверждена» */
+  --color-success-bg: #C7D6BF;         /* компоненты: фон алерта «Запись подтверждена» */
+
+  /* ---------- Предупреждение и информация ---------- */
+  --color-warning: #C99A3F;            /* токен --color-warning */
+  --color-warning-text: #8A5F1E;       /* таблица контраста «Амбер-текст / ivory» */
+  --color-warning-bg: #F0DDB1;         /* прототип: фон предупреждений с текстом #8A5F1E («Бронь скоро истечет» и др.) */
+  --color-info: #5E7FA3;               /* токен --color-info */
+
+  /* ---------- Статусы записи: точка, фон и текст бейджа ---------- */
+  --color-status-active: #7C9473;      /* «Активна» */
+  --color-status-active-bg: #C7D6BF;
+  --color-status-active-text: #4E6B47;
+  --color-status-completed: #8C7A72;   /* «Завершена» */
+  --color-status-completed-bg: #F1EAE7;
+  --color-status-completed-text: #6E5D55;
+  --color-status-cancelled: #9B9491;   /* «Отменена клиентом», «Отменена студией» */
+  --color-status-cancelled-bg: #F1EAE7;
+  --color-status-cancelled-text: #6C6663;
+  --color-status-no-show: #C13B3B;     /* «Клиент не пришел» */
+  --color-status-no-show-bg: #EFC8C6;
+  --color-status-no-show-text: #8F2A2A;
+  --color-status-disabled: #A69D99;    /* «Отключено» */
+  --color-status-disabled-bg: #F1EAE7;
+  --color-status-disabled-text: #6B615D;
+
+  /* ---------- Бренд ---------- */
+  --color-brand-gold: #C2A278;         /* палитра «розовое золото»: эмблема */
+  --color-avatar-bg: #E3BDB7;          /* палитра rose-300: круг с инициалами мастера в карточке */
+
+  /* ---------- Шрифты ---------- */
+  --font-display: 'Playfair Display', serif;  /* заголовки, капслок */
+  --font-script: 'Great Vibes', cursive;      /* только 1–2 слова-акцента, никогда в формах и кнопках */
+  --font-ui: 'Manrope', sans-serif;           /* весь интерфейс */
+
+  /* ---------- Размеры текста (раздел «Типографика») ---------- */
+  --text-display-size: 44px;           /* Display · Playfair Display 700, капслок */
+  --text-display-line: 1.05;           /* межстрочный — из образца Display, в подписи не указан */
+  --text-display-weight: 700;
+  --text-h1-size: 44px;                /* H1 · 44/1.1 · 600 */
+  --text-h1-line: 1.1;
+  --text-h1-weight: 600;
+  --text-h2-size: 32px;                /* образец двухцветного заголовка «Забота. Стиль. Уверенность.»; заголовки секций лендинга */
+  --text-h3-size: 22px;                /* прототип: заголовки экранов «Подтверждение», «Новый пароль», разделы кабинета */
+  --text-body-l-size: 18px;            /* Body L 18/1.5 */
+  --text-body-l-line: 1.5;
+  --text-body-m-size: 16px;            /* Body M 16/1.55 */
+  --text-body-m-line: 1.55;
+  --text-body-s-size: 14px;            /* Body S 14/1.5 */
+  --text-body-s-line: 1.5;
+  --text-caption-size: 12px;           /* Caption 12 */
+  --text-label-size: 13px;             /* компоненты: подпись над полем ввода */
+  --text-label-weight: 600;
+  --text-button-size: 14px;            /* Button 14 caps */
+  --text-button-weight: 700;
+  --text-button-letter-spacing: 0.08em;
+  --text-table-size: 14px;             /* Table 14 tabular: цифры — font-variant-numeric: tabular-nums */
+
+  /* ---------- Отступы (шкала 4–96, названия — в шагах по 4px, как --space-4 и --space-8 в токенах) ---------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  /* Поля страницы по сетке: 360px — 4 колонки, 768px — 8, 1024–1440px — 12 */
+  --page-gutter-mobile: 16px;
+  --page-gutter-tablet: 24px;
+  --page-gutter-desktop: 32px;
+
+  /* ---------- Скругления ---------- */
+  --radius-control: 4px;               /* токен --radius-sm: кнопки, поля, чекбоксы */
+  --radius-card: 8px;                  /* токен --radius-md: карточки, алерты */
+  --radius-modal: 12px;                /* токен --radius-lg: модальное окно, нижняя шторка */
+  --radius-pill: 999px;                /* токен --radius-pill: бейджи, переключатель */
+}
+
+/* Светлая пудровая тема: шаги записи, личный кабинет */
+[data-theme="powder"] {
+  --color-bg: #FBF7F5;                 /* токен темы powder («ivory» в палитре) */
+  --color-text: #0F0B0C;               /* токен темы powder */
+  --color-surface: #FFFFFF;            /* в токенах не задан; белый — фон модалки, слотов и полей в «Компонентах» */
+  --color-text-muted: #857B77;         /* в токенах не задан; компоненты: плейсхолдер, подписи, «показать» */
+  --color-text-secondary: #4A423F;     /* компоненты: текст в модальном окне */
+  --color-border: #E2D8D4;             /* компоненты: рамки полей, слотов, счетчика */
+  --color-divider: #F1EAE7;            /* компоненты: линии между строками в сводке и таблицах */
+}
+
+/* Светлая тема раздела администратора */
+[data-theme="admin"] {
+  --color-bg: #F7F5F4;                 /* токен темы admin («admin bg» в палитре) */
+  --color-text: #0F0B0C;               /* токен темы admin */
+  --color-surface: #FFFFFF;            /* как в теме powder */
+  --color-text-muted: #857B77;
+  --color-text-secondary: #4A423F;
+  --color-border: #E2D8D4;
+  --color-divider: #F1EAE7;
+}
