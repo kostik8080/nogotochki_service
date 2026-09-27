@@ -1,0 +1,32 @@
+/* Минимум стилей: черновой интерфейс для проверки API, дизайн не нужен. */
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.45 system-ui, sans-serif; color: #222; background: #fafafa; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 16px; background: #fff; border-bottom: 1px solid #ddd; }
+header nav { display: flex; flex-wrap: wrap; gap: 12px; }
+header .who { margin-left: auto; }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 22px; margin: 8px 0 16px; }
+h2 { font-size: 18px; margin: 20px 0 10px; }
+h3 { font-size: 16px; margin: 14px 0 8px; }
+a { color: #a0306a; }
+section, .card { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; }
+form label, .field { display: block; margin: 6px 0; }
+input:not([type=checkbox]):not([type=radio]), select, textarea { font: inherit; padding: 4px 6px; max-width: 100%; }
+textarea { width: 100%; min-height: 50px; }
+button { font: inherit; padding: 4px 10px; cursor: pointer; }
+button:disabled { cursor: default; opacity: .6; }
+table { border-collapse: collapse; width: 100%; background: #fff; }
+th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: left; vertical-align: top; }
+th { background: #f3f3f3; }
+.table-wrap { overflow-x: auto; }
+.error { background: #fdecec; border: 1px solid #e5a0a0; color: #7a1010; padding: 8px 10px; border-radius: 6px; margin: 10px 0; }
+.ok { background: #eaf7ea; border: 1px solid #9fd09f; color: #145214; padding: 8px 10px; border-radius: 6px; margin: 10px 0; }
+.warn { background: #fff6e0; border: 1px solid #e8c56b; padding: 8px 10px; border-radius: 6px; margin: 10px 0; }
+.muted { color: #777; }
+.small { font-size: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.slots { display: flex; flex-wrap: wrap; gap: 6px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.tabs button[aria-pressed=true] { font-weight: bold; background: #f3d6e5; }
+.inactive { opacity: .55; }
+pre { background: #f5f5f5; padding: 8px; overflow: auto; font-size: 12px; }
