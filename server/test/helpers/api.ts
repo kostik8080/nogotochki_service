@@ -121,15 +121,21 @@ export interface TestApi {
 /**
  * База в памяти со всеми миграциями и тестовыми данными, сервер на свободном порту, папка фото во временной папке.
  * mail: false — почта не настроена: коды и ссылки заменяет администратор.
+ * rateLimit: true — включить ограничение частоты запросов. По умолчанию выключено: счетчики общие на
+ * приложение, и тесты, которые к нему не относятся, глушили бы друг друга. Включает его rate-limit.test.ts,
+ * и там на каждый счетчик поднимается отдельное приложение — иначе один тест выбирал бы лимит другого.
  */
-export async function startApi(options: { mail?: boolean } = {}): Promise<TestApi> {
+export async function startApi(options: { mail?: boolean; rateLimit?: boolean } = {}): Promise<TestApi> {
   const db = openDatabase(':memory:');
   runMigrations(db);
   seedDevData(db, PASSWORDS);
   const mailer = new MemoryMailer();
   const uploadsDir = mkdtempSync(path.join(tmpdir(), 'nogotochki-uploads-'));
   const server = createServer(createApp(db, {
-    rateLimit: false, mailer: options.mail === false ? null : mailer, appUrl: 'https://nogotochki.test', uploadsDir,
+    rateLimit: options.rateLimit === true,
+    mailer: options.mail === false ? null : mailer,
+    appUrl: 'https://nogotochki.test',
+    uploadsDir,
   }).handle);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
