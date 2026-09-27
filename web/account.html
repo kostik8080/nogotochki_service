@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Мои записи — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/cabinet.css">
+  <link rel="stylesheet" href="css/account.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/cabinet-nav.js"></script>
+  <script type="module" src="js/account.js"></script>
+</head>
+<body class="cabinet-body">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <!-- Иконка пустого состояния «У вас пока нет записей» — календарь с крестиком, как в прототипе -->
+    <symbol id="icon-calendar-x" viewBox="0 0 24 24" fill="none">
+      <g stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M10 14l4 4M14 14l-4 4"/>
+      </g>
+    </symbol>
+  </svg>
+
+  <a class="skip-link" href="#main">К содержимому</a>
+
+  <!-- Общая шапка клиента: разметка и данные — js/header.js -->
+  <client-header></client-header>
+
+  <div class="cabinet" data-theme="powder">
+    <div class="container cabinet__inner">
+      <!-- Меню кабинета: разметка, текущая страница и выход — js/cabinet-nav.js -->
+      <cabinet-nav></cabinet-nav>
+
+      <!-- CAB-01 Мои записи -->
+      <main class="cabinet__main" id="main">
+        <!-- Пока ждем ответ API — заглушка, как в прототипе: два серых блока -->
+        <div data-view="loading" aria-busy="true">
+          <span class="skeleton skeleton--greeting" aria-hidden="true"></span>
+          <span class="skeleton skeleton--nearest" aria-hidden="true"></span>
+          <span class="skeleton skeleton--row" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем ваши записи…</span>
+        </div>
+
+        <div class="state-card" role="alert" data-view="error" hidden>
+          <p class="state-card__title">Не удалось загрузить записи</p>
+          <p class="state-card__text" data-error-text></p>
+          <button class="btn btn--primary btn--small" type="button" data-retry>Обновить</button>
+        </div>
+
+        <div data-view="content" hidden>
+          <h1 class="cabinet__title" data-greeting>Здравствуйте</h1>
+
+          <!-- Сообщения «Студия отменила / перенесла запись», пока клиент их не закроет -->
+          <div class="studio-changes" data-studio-changes></div>
+
+          <!-- Ближайшая запись и остальные предстоящие -->
+          <div data-upcoming></div>
+
+          <!-- Пустые состояния -->
+          <div data-empty></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    <div class="container page-footer__inner">
+      <span>© Ноготочки, бьюти-студия</span>
+      <span class="page-footer__links">
+        <a href="privacy.html">Политика обработки персональных данных</a>
+      </span>
+    </div>
+  </footer>
+</body>
+</html>

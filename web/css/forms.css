@@ -1,0 +1,207 @@
+/*
+ * Формы: поле с подписью, ошибка под полем, пароль с «Показать», подсказки к паролю, флажок согласия,
+ * сообщение над формой. Образец — формы входа и регистрации в Prototype/Прототип - Ноготочки.dc.html
+ * и раздел «Компоненты» дизайн-системы. Только переменные из tokens.css.
+ */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field__label {
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+}
+
+.field__hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+}
+
+.input {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-family: var(--font-ui);
+  /* 16px, а не 14px из прототипа: на телефоне поле мельче 16px браузер увеличивает при фокусе */
+  font-size: var(--text-body-m-size);
+  line-height: var(--text-body-m-line);
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-focus-border);
+  box-shadow: 0 0 0 var(--space-1) var(--color-focus-ring);
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--color-error);
+}
+
+.input[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 var(--space-1) color-mix(in srgb, var(--color-error) 25%, transparent);
+}
+
+.field__error {
+  color: var(--color-error-text);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-body-s-line);
+}
+
+.field__error[hidden] {
+  display: none;
+}
+
+/* Поле кода из письма: шесть цифр крупно */
+.input--code {
+  font-size: var(--text-h3-size);
+  font-weight: var(--text-button-weight);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--text-button-letter-spacing);
+  text-align: center;
+}
+
+/* ---------- Пароль с кнопкой «Показать» ---------- */
+
+.password {
+  position: relative;
+}
+
+.password .input {
+  padding-right: calc(var(--space-24) - var(--space-4));
+}
+
+.password__toggle {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  cursor: pointer;
+}
+
+.password__toggle:hover {
+  color: var(--color-text-accent);
+}
+
+/* ---------- Подсказки к паролю ---------- */
+
+.password-rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+}
+
+.password-rules li {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.password-rules .is-met {
+  color: var(--color-success-text);
+}
+
+/* ---------- Флажок согласия ---------- */
+
+.check {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.check__label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+  cursor: pointer;
+}
+
+.check__label input {
+  width: var(--text-body-l-size);
+  height: var(--text-body-l-size);
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--color-button-bg);
+  cursor: pointer;
+}
+
+.check.is-invalid .check__label input {
+  outline: 2px solid var(--color-error);
+  outline-offset: 1px;
+}
+
+/* ---------- Сообщение над формой ---------- */
+
+.alert {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+.alert[hidden] {
+  display: none;
+}
+
+.alert--error {
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+}
+
+.alert--warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.alert--success {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.alert .btn {
+  margin-top: var(--space-1);
+}
+
+/* ---------- Кнопка на всю ширину формы ---------- */
+
+.btn--block {
+  width: 100%;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.btn--primary:disabled:hover {
+  background: var(--color-button-bg);
+}

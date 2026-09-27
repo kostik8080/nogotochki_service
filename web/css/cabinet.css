@@ -1,0 +1,168 @@
+/*
+ * Каркас страниц кабинета (CAB-01, CAB-02, CAB-07…): поле в пудровой теме, колонка меню и колонка содержимого,
+ * меню кабинета — элемент <cabinet-nav> (js/cabinet-nav.js): слева на планшете и компьютере,
+ * темная панель внизу экрана на телефоне (лист «Навигация» карты связей, N-20…N-27; прототип).
+ * Только переменные из tokens.css.
+ */
+
+.cabinet-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+  /* Место под панель меню внизу экрана на телефоне */
+  padding-bottom: var(--space-16);
+}
+
+.cabinet {
+  flex: 1;
+  padding-block: var(--space-6) var(--space-16);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.cabinet__inner {
+  display: grid;
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.cabinet__main {
+  min-width: 0;
+}
+
+.cabinet__title {
+  margin-bottom: var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--text-h3-size);
+  font-weight: var(--text-h1-weight);
+  line-height: var(--text-h1-line);
+  text-transform: uppercase;
+}
+
+@media (min-width: 768px) {
+  .cabinet-body {
+    padding-bottom: 0;
+  }
+
+  .cabinet {
+    padding-block: var(--space-12) var(--space-24);
+  }
+
+  .cabinet__inner {
+    /* Меню 192px и колонка записей до 640px — ширины из прототипа, собранные из шкалы отступов */
+    grid-template-columns: calc(var(--space-24) * 2) minmax(0, calc(var(--space-24) * 6 + var(--space-16)));
+  }
+
+  .cabinet__title {
+    font-size: var(--text-h2-size);
+  }
+}
+
+/* ---------- Меню кабинета: слева на планшете и компьютере ---------- */
+
+cabinet-nav {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  cabinet-nav {
+    position: sticky;
+    /* Под прилипшей шапкой: ее высоту измеряет js/header.js */
+    top: calc(var(--site-header-height, 0px) + var(--space-6));
+    display: block;
+  }
+}
+
+.cabinet-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cabinet-nav__item {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-card);
+  color: var(--color-text);
+  font-size: var(--text-label-size);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cabinet-nav__item:hover {
+  background: var(--color-surface-accent);
+}
+
+.cabinet-nav__item[aria-current='page'] {
+  background: var(--color-surface-accent);
+  color: var(--color-text-accent);
+  font-weight: var(--text-button-weight);
+}
+
+.cabinet-nav__logout {
+  margin-top: var(--space-3);
+  color: var(--color-error);
+  font-weight: var(--text-label-weight);
+}
+
+.cabinet-nav__logout:disabled,
+.tabbar__item:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.cabinet-nav__error {
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-error-text);
+  font-size: var(--text-caption-size);
+}
+
+/* ---------- Меню кабинета: темная панель внизу экрана на телефоне ---------- */
+
+.tabbar {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 100;
+  display: flex;
+  padding-block: var(--space-1);
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+}
+
+.tabbar__item {
+  flex: 1;
+  padding: var(--space-3) var(--space-1);
+  background: none;
+  border: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  text-align: center;
+  cursor: pointer;
+}
+
+.tabbar__item[aria-current='page'] {
+  color: var(--color-button-bg);
+  font-weight: var(--text-button-weight);
+}
+
+/* Ошибка выхода на телефоне — над панелью */
+.tabbar__error {
+  position: absolute;
+  left: var(--page-gutter-mobile);
+  right: var(--page-gutter-mobile);
+  bottom: calc(100% + var(--space-2));
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+  font-size: var(--text-caption-size);
+}
+
+@media (min-width: 768px) {
+  .tabbar {
+    display: none;
+  }
+}

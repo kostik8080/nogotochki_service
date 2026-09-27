@@ -1,0 +1,170 @@
+/*
+ * Общая шапка клиента — элемент <client-header> (js/header.js) на всех страницах кроме лендинга,
+ * и меню аккаунта, которое показывают и она, и шапка лендинга.
+ * Состав — лист «Навигация» карты связей: логотип → главная (N-25), «Записаться» (N-26),
+ * меню аккаунта «Мои записи», «Профиль», «Выйти» (N-09…N-11, N-27), для гостя «Войти» и «Регистрация» (N-08, N-54).
+ * Темная тема :root, как шапка лендинга. Только переменные из tokens.css.
+ */
+
+/* ---------- Шапка внутренних страниц ---------- */
+
+/* Шапка прилипает к верху окна и лежит над содержимым, в том числе над нижней панелью кабинета */
+client-header {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  display: block;
+  /* До того как скрипт нарисует шапку, место под нее уже занято — страница не прыгает */
+  min-height: calc(var(--space-8) + 2 * var(--space-3) + 1px);
+  background: var(--color-bg);
+}
+
+.page-header {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.page-header__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+}
+
+.client-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.client-header__login {
+  color: var(--color-text-secondary);
+  font-size: var(--text-label-size);
+  letter-spacing: var(--text-button-letter-spacing);
+  text-transform: uppercase;
+  transition: color 150ms ease-out;
+}
+
+.client-header__login:hover {
+  color: var(--color-button-bg-hover);
+}
+
+/* На телефоне в шапке нет места для «Записаться» рядом с аватаром: кнопка «Новая запись» есть в кабинете */
+.client-header__book {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .client-header__actions {
+    gap: var(--space-6);
+  }
+
+  .client-header__book {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 1024px) {
+  client-header {
+    min-height: calc(var(--space-8) + 2 * var(--space-6) + 1px);
+  }
+
+  .page-header__inner {
+    padding-block: var(--space-6);
+  }
+}
+
+/* ---------- Аватар с инициалами ---------- */
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-avatar-bg);
+  color: var(--color-text-accent);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-button-weight);
+}
+
+/* ---------- Меню аккаунта: аватар, имя и выпадающий список ---------- */
+
+.account-menu {
+  position: relative;
+}
+
+.account-menu__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-text);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  cursor: pointer;
+}
+
+/* Имя рядом с аватаром — с планшета; на телефоне только аватар */
+.account-menu__name {
+  display: none;
+  max-width: calc(var(--space-24) * 2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .account-menu__name {
+    display: inline;
+  }
+}
+
+.account-menu__list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-3));
+  min-width: calc(var(--space-24) * 2);
+  padding-block: var(--space-1);
+  overflow: hidden;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.account-menu__item {
+  display: block;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: 0;
+  color: inherit;
+  font-size: var(--text-label-size);
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-menu__item:hover {
+  background: var(--color-surface-accent);
+}
+
+.account-menu__item[aria-current='page'] {
+  color: var(--color-text-accent);
+  font-weight: var(--text-button-weight);
+}
+
+.account-menu__item--danger {
+  color: var(--color-error);
+}
+
+.account-menu__error {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  color: var(--color-error-text);
+  font-size: var(--text-caption-size);
+}

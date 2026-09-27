@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Регистрация — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/auth.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/register.js"></script>
+</head>
+<body class="auth-body">
+  <!-- Общая шапка клиента: разметка и данные — js/header.js -->
+  <client-header></client-header>
+
+  <main class="auth" data-theme="powder">
+    <!-- AUTH-03 Регистрация -->
+    <section class="auth__card" aria-labelledby="register-title" data-step="form">
+      <h1 class="auth__title" id="register-title">Регистрация</h1>
+      <p class="auth__lead">Займет меньше минуты</p>
+
+      <form class="form" data-register-form novalidate>
+        <div class="alert" role="alert" data-alert hidden></div>
+
+        <div class="field">
+          <label class="field__label" for="name">Имя</label>
+          <input class="input" id="name" name="name" type="text" autocomplete="name" maxlength="100"
+                 aria-describedby="name-error">
+          <p class="field__error" id="name-error" data-error-for="name" hidden></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="phone">Телефон</label>
+          <input class="input" id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel"
+                 placeholder="+7 (___) ___-__-__" aria-describedby="phone-error">
+          <p class="field__error" id="phone-error" data-error-for="phone" hidden></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="email">E-mail</label>
+          <input class="input" id="email" name="email" type="email" autocomplete="email" inputmode="email"
+                 autocapitalize="off" spellcheck="false" placeholder="you@mail.ru" aria-describedby="email-hint email-error">
+          <p class="field__hint" id="email-hint">Телефон или e-mail — хотя бы одно. По e-mail можно восстановить пароль.</p>
+          <p class="field__error" id="email-error" data-error-for="email" hidden></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="password">Пароль</label>
+          <input class="input" id="password" name="password" type="password" autocomplete="new-password"
+                 maxlength="128" aria-describedby="password-rules password-error">
+          <ul class="password-rules" id="password-rules" data-password-rules>
+            <li data-rule="length"><span data-mark aria-hidden="true">○</span>минимум 8 символов</li>
+            <li data-rule="letter"><span data-mark aria-hidden="true">○</span>есть буква</li>
+            <li data-rule="digit"><span data-mark aria-hidden="true">○</span>есть цифра</li>
+          </ul>
+          <p class="field__error" id="password-error" data-error-for="password" hidden></p>
+        </div>
+
+        <div class="check">
+          <label class="check__label">
+            <input type="checkbox" name="pdConsent" aria-describedby="pdConsent-error">
+            <span>Согласен на обработку <a class="text-link" href="privacy.html" target="_blank" rel="noopener">персональных данных</a></span>
+          </label>
+          <p class="field__error" id="pdConsent-error" data-error-for="pdConsent" hidden></p>
+        </div>
+
+        <div class="check">
+          <label class="check__label">
+            <input type="checkbox" name="marketingConsent">
+            <span>Согласен получать новости и акции</span>
+          </label>
+          <p class="field__error" data-error-for="marketingConsent" hidden></p>
+        </div>
+
+        <button class="btn btn--primary btn--block" type="submit">Зарегистрироваться</button>
+      </form>
+
+      <div class="auth__links auth__links--center">
+        <span>Уже есть аккаунт? <a class="text-link" href="login.html">Войти</a></span>
+      </div>
+    </section>
+
+    <!-- AUTH-02 Подтверждение кодом, сценарий 16: номер уже в карточке клиента, которого студия записала по телефону.
+         Шаг этой же страницы: код подтверждается повтором регистрации с теми же полями и паролем,
+         а пароль нельзя передавать на другую страницу через хранилище браузера -->
+    <section class="auth__card" aria-labelledby="code-title" data-step="code" hidden>
+      <h1 class="auth__title" id="code-title">Подтверждение</h1>
+      <p class="auth__text">Этот номер уже есть в базе студии: вас записывали по телефону. Введите код, и прежние записи появятся в кабинете.</p>
+
+      <form class="form" data-code-form novalidate>
+        <div class="alert" role="alert" data-alert hidden></div>
+
+        <div class="field">
+          <label class="field__label" for="code">Код из письма</label>
+          <input class="input input--code" id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                 maxlength="6" pattern="\d{6}" aria-describedby="code-hint code-error">
+          <p class="field__hint" id="code-hint" data-code-hint></p>
+          <p class="field__error" id="code-error" data-error-for="code" hidden></p>
+        </div>
+
+        <button class="btn btn--primary btn--block" type="submit">Подтвердить</button>
+      </form>
+
+      <div class="auth__links">
+        <button class="text-link" type="button" data-resend disabled>Отправить код повторно</button>
+        <button class="text-link" type="button" data-back>Изменить данные</button>
+      </div>
+    </section>
+
+    <!-- Сценарий 16 без e-mail в карточке: кодов по звонку нет (docs/ui-map.md, пункт 13.1) -->
+    <section class="auth__card" aria-labelledby="call-title" data-step="call" hidden>
+      <h1 class="auth__title" id="call-title" tabindex="-1">Позвоните в студию</h1>
+      <p class="auth__text">Этот номер уже есть в базе студии: вас записывали по телефону. Позвоните нам — администратор убедится, что это вы, и добавит ваш e-mail. После этого зарегистрируйтесь снова: код придет письмом.</p>
+      <a class="btn btn--primary btn--block" href="tel:" data-studio-phone hidden></a>
+      <div class="auth__links auth__links--center">
+        <button class="text-link" type="button" data-back>Вернуться к регистрации</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <div class="container page-footer__inner">
+      <span>© Ноготочки, бьюти-студия</span>
+      <span class="page-footer__links">
+        <a href="privacy.html">Политика обработки персональных данных</a>
+        <a href="staff-login.html">Вход для сотрудников</a>
+      </span>
+    </div>
+  </footer>
+</body>
+</html>
