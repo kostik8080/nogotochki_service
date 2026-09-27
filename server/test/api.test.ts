@@ -117,6 +117,35 @@ describe('регистрация, вход и выход', () => {
     assert.equal(me.status, 401);
     assert.equal(me.body.error.code, 'UNAUTHORIZED');
   });
+
+  it('срок сессии: клиенту 30 дней, администратору и мастеру 7', async () => {
+    // Срок в cookie (Max-Age) и в базе (expires_at) должны совпадать: браузер и сервер закрывают сессию вместе.
+    const days = async (login: string, password: string) => {
+      const res = await fresh().post('/api/auth/login', { login, password });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      const cookie = res.headers.getSetCookie().find((c) => c.startsWith('nogotochki_session='))!;
+      const maxAge = Number(/Max-Age=(\d+)/.exec(cookie)![1]);
+      const row = db.prepare('SELECT created_at, expires_at FROM sessions ORDER BY id DESC LIMIT 1')
+        .get() as { created_at: string; expires_at: string };
+      return {
+        cookie: Math.round(maxAge / 86_400),
+        db: Math.round((Date.parse(row.expires_at) - Date.parse(row.created_at)) / 86_400_000),
+      };
+    };
+    assert.deepEqual(await days('maria@example.com', PASSWORDS.clientPassword), { cookie: 30, db: 30 });
+    assert.deepEqual(await days('admin@example.com', PASSWORDS.adminPassword), { cookie: 7, db: 7 });
+    assert.deepEqual(await days('anna@example.com', PASSWORDS.masterPassword), { cookie: 7, db: 7 });
+  });
+
+  it('истекшая сессия — 401 SESSION_EXPIRED, а не обычный «нужно войти»', async () => {
+    const temp = await fresh().login('maria@example.com', PASSWORDS.clientPassword);
+    assert.equal((await temp.get('/api/auth/me')).status, 200);
+    db.prepare('UPDATE sessions SET expires_at = ? WHERE id = (SELECT max(id) FROM sessions)')
+      .run('2020-01-01T00:00:00.000Z');
+    const res = await temp.get('/api/auth/me');
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error.code, 'SESSION_EXPIRED');
+  });
 });
 
 describe('услуги, мастера и свободное время', () => {

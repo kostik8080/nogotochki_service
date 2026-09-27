@@ -5,11 +5,17 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Db } from '../db/connection.js';
 
 export const SESSION_COOKIE = 'nogotochki_session';
-export const SESSION_TTL_DAYS = 30;
 /** last_seen_at обновляется не на каждый запрос, а не чаще раза в 5 минут: лишние записи в базу не нужны. */
 const TOUCH_INTERVAL_MS = 5 * 60_000;
 
 export type Role = 'client' | 'admin' | 'master';
+
+/**
+ * Сколько дней действует сессия. У сотрудников срок короче: их учетная запись открывает записи и контакты
+ * всех клиентов студии, а входят они с рабочего места, где чужая cookie достается проще. Клиентка
+ * записывается со смартфона раз в месяц — ей вход на месяц.
+ */
+export const SESSION_TTL_DAYS: Record<Role, number> = { client: 30, admin: 7, master: 7 };
 
 export interface SessionUser {
   id: number;
@@ -27,9 +33,12 @@ export type SessionLookup =
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
+/** Срок берется по роли из базы, а не из аргумента: иначе вызывающий код мог бы выдать сотруднику месяц. */
 export function createSession(db: Db, userId: number, now: Date): { token: string; expiresAt: Date } {
+  const owner = db.prepare('SELECT role FROM users WHERE id = ?').get(userId) as { role: Role } | undefined;
+  if (!owner) throw new Error(`Нельзя открыть сессию: пользователя ${userId} нет`);
   const token = randomBytes(32).toString('base64url');
-  const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 24 * 3600_000);
+  const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS[owner.role] * 24 * 3600_000);
   db.prepare(`
     INSERT INTO sessions (user_id, token_hash, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?)
   `).run(userId, hashToken(token), now.toISOString(), now.toISOString(), expiresAt.toISOString());
