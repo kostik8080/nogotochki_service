@@ -65,6 +65,33 @@
   color: var(--color-text-muted);
 }
 
+/* Телефон: шаги — отдельной строкой во всю ширину, свободное место делится между стрелками поровну,
+   подпись не переносится внутри себя. Если строки не хватит (экран уже 360px), шаг целиком уходит на
+   следующую строку, а не наезжает на соседний */
+@media (max-width: 767.98px) {
+  booking-steps {
+    flex: 1 1 100%;
+  }
+
+  .steps {
+    justify-content: space-between;
+    column-gap: 0;
+    row-gap: var(--space-1);
+  }
+
+  .steps > li {
+    white-space: nowrap;
+  }
+}
+
+/* Уже 360px шаги в строку не помещаются: обычные отступы, «Подтверждение» — на второй строке */
+@media (max-width: 359.98px) {
+  .steps {
+    justify-content: flex-start;
+    column-gap: var(--space-2);
+  }
+}
+
 .booking__title {
   margin-bottom: var(--space-4);
   font-family: var(--font-display);
@@ -396,6 +423,42 @@
 
 .cart__next {
   flex-shrink: 0;
+}
+
+/* Телефон: плашка прилипает к низу экрана, но остается в потоке страницы — последние карточки не уходят
+   под нее, даже когда список услуг раскрыт или подсказка в две строки. Длинный список услуг прокручивается
+   внутри плашки, «Далее» всегда на виду. Кнопки «×», «−», «+» — не меньше 44px, чтобы попасть пальцем */
+@media (max-width: 767.98px) {
+  .booking {
+    padding-bottom: var(--space-8);
+  }
+
+  .cart {
+    position: sticky;
+  }
+
+  .cart__lines {
+    max-height: 40vh;
+    max-height: 40svh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .cart__remove,
+  .qty__button {
+    min-width: calc(var(--space-8) + var(--space-3));
+    min-height: calc(var(--space-8) + var(--space-3));
+  }
+
+  /* Строка с количеством («Дизайн ногтей») шире экрана: цена и кнопки переходят под название, вправо */
+  .cart__line {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .cart__line-side {
+    margin-left: auto;
+  }
 }
 
 /* ---------- Шаг «Мастер» ---------- */

@@ -304,6 +304,22 @@
   border-color: var(--color-button-bg);
 }
 
+/* Телефон: время — в две колонки, клетка высотой 48px, чтобы попасть пальцем. Стрелки месяцев — не меньше 44px */
+@media (max-width: 767.98px) {
+  .slot-group__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .slot {
+    min-height: var(--space-12);
+  }
+
+  .calendar__nav {
+    min-width: calc(var(--space-8) + var(--space-3));
+    min-height: calc(var(--space-8) + var(--space-3));
+  }
+}
+
 .slot.is-selected {
   background: var(--color-button-bg);
   border-color: var(--color-button-bg);
@@ -629,6 +645,27 @@
 
 .reschedule-blocked .reschedule-actions {
   justify-content: center;
+}
+
+/* Телефон: карточки «Было» и «Стало» друг под другом — стрелка смотрит вниз; «Назад» и «Подтвердить перенос»
+   прилипают к низу экрана, пока клиент читает сравнение и пишет причину */
+@media (max-width: 767.98px) {
+  .compare__arrow {
+    transform: rotate(90deg);
+  }
+
+  .compare .reschedule-actions {
+    position: sticky;
+    bottom: 0;
+    margin-inline: calc(-1 * var(--page-gutter-mobile));
+    padding: var(--space-3) var(--page-gutter-mobile);
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .compare .reschedule-actions .btn {
+    flex: 1 1 auto;
+  }
 }
 
 /* ---------- Запись перенесена ---------- */

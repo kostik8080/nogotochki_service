@@ -80,54 +80,29 @@
   margin-top: var(--space-2);
 }
 
-.site-nav__user {
-  color: var(--color-text-muted);
-  font-size: var(--text-body-s-size);
+/* «Розовая кнопка»: текст всегда темный — цвет ссылок меню его не перебивает */
+.site-nav__auth .btn--primary,
+.site-nav__auth .btn--primary:hover {
+  color: var(--color-button-text);
 }
 
-.site-nav__logout {
-  padding: var(--space-3) 0;
-  background: none;
-  border: 0;
-  color: var(--color-button-bg-hover);
-  font-size: var(--text-label-size);
-  letter-spacing: var(--text-button-letter-spacing);
-  text-transform: uppercase;
-  text-align: left;
-  cursor: pointer;
-}
+/* Кнопка «Меню» — css/header.css */
 
-.menu-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-2);
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  cursor: pointer;
-}
-
-.menu-toggle svg {
-  width: var(--space-6);
-  height: var(--space-6);
-  fill: none;
-  stroke: var(--color-text);
-  stroke-width: 1.5;
-  stroke-linecap: round;
-}
-
+/* Вход или аватар — в шапке рядом с логотипом на любой ширине. На телефоне «Регистрация» — в меню разделов:
+   рядом с логотипом для второй кнопки нет места */
 .header-auth {
-  display: none;
+  display: flex;
   align-items: center;
   gap: var(--space-6);
 }
 
-@media (min-width: 768px) {
-  .header-auth {
-    display: flex;
+@media (max-width: 767.98px) {
+  .header-auth .btn {
+    display: none;
   }
+}
 
+@media (min-width: 768px) {
   .site-nav__auth {
     display: none;
   }

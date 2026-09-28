@@ -50,8 +50,8 @@ client-header {
   color: var(--color-button-bg-hover);
 }
 
-/* На телефоне в шапке нет места для второй кнопки рядом с логотипом: «Записаться» есть в кабинете
-   («Новая запись»), «Регистрация» — на странице входа («Нет аккаунта? Зарегистрироваться») */
+/* На телефоне в шапке нет места для второй кнопки рядом с логотипом: вход или аватар остаются на месте,
+   а «Записаться» и «Регистрация» сворачиваются в меню (js/header.js) — в меню аккаунта или по кнопке «Меню» */
 .client-header__book,
 .client-header__register {
   display: none;
@@ -66,6 +66,41 @@ client-header {
   .client-header__register {
     display: inline-flex;
   }
+
+  .client-header__more {
+    display: none;
+  }
+}
+
+/* Кнопка «Меню» с тремя полосками: шапка лендинга и меню гостя на телефоне */
+.menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.menu-toggle svg {
+  width: var(--space-6);
+  height: var(--space-6);
+  fill: none;
+  stroke: var(--color-text);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+/* В шапке внутренних страниц кнопка 40px занимает по высоте столько же, сколько аватар (32px):
+   шапка гостя не выше шапки клиента и не прыгает, когда скрипт заменяет заглушку */
+.client-header__more .menu-toggle {
+  width: calc(var(--space-8) + var(--space-2));
+  height: calc(var(--space-8) + var(--space-2));
+  margin-block: calc(-1 * var(--space-1));
+  padding: 0;
+  vertical-align: top;
 }
 
 @media (min-width: 1024px) {
@@ -160,6 +195,21 @@ client-header {
 .account-menu__item[aria-current='page'] {
   color: var(--color-text-accent);
   font-weight: var(--text-button-weight);
+}
+
+/* Имя и «Записаться» в списке — только на телефоне: там их нет рядом с аватаром */
+.account-menu__user {
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 768px) {
+  .account-menu__user,
+  .account-menu__item--phone {
+    display: none;
+  }
 }
 
 .account-menu__item--danger {

@@ -443,3 +443,24 @@ button {
   justify-content: flex-end;
   gap: var(--space-2);
 }
+
+/* Телефон: окно не выше экрана с полями, текст прокручивается внутри окна, а кнопки прилипают к его низу
+   и видны всегда — даже в окне отмены с причинами и полем «Другое» на низком экране */
+@media (max-width: 767.98px) {
+  .modal {
+    max-height: calc(100vh - 2 * var(--page-gutter-mobile));
+    max-height: calc(100dvh - 2 * var(--page-gutter-mobile));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Липкий блок отсчитывается от края поля окна: сдвиг на поле прижимает кнопки к самому краю,
+     и прокрученный текст под ними не просвечивает */
+  .modal__actions {
+    position: sticky;
+    bottom: calc(-1 * var(--space-6));
+    margin: 0 calc(-1 * var(--space-6)) calc(-1 * var(--space-6));
+    padding: var(--space-3) var(--space-6) var(--space-6);
+    background: var(--color-surface);
+  }
+}

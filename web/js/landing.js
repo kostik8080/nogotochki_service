@@ -269,38 +269,15 @@ function renderAuth(user) {
     header.innerHTML = `
       <a class="header-auth__login" href="${routes.login}">Войти</a>
       <a class="btn btn--primary btn--small" href="${routes.register}">Регистрация</a>`;
-    nav.innerHTML = `
-      <a href="${routes.login}">Войти</a>
-      <a class="btn btn--primary" href="${routes.register}">Регистрация</a>`;
+    // На телефоне «Войти» остается в шапке, а «Регистрация» — в выпадающей панели разделов
+    nav.innerHTML = `<a class="btn btn--primary" href="${routes.register}">Регистрация</a>`;
     return;
   }
 
-  // Меню аккаунта в шапке — общее с шапкой остальных страниц (header.js). После выхода лендинг остается открытым (N-11)
+  // Меню аккаунта в шапке — общее с шапкой остальных страниц (header.js), на телефоне тоже.
+  // После выхода лендинг остается открытым (N-11)
   mountAccountMenu(header, user, { onLoggedOut: () => renderAuth(null) });
-
-  // На телефоне вход и меню клиента — в выпадающей панели разделов
-  const links = user.role === 'client'
-    ? [{ href: routes.account, label: 'Мои записи' }, { href: routes.profile, label: 'Профиль' }]
-    : [];
-  nav.innerHTML = `
-    <span class="site-nav__user">${esc(user.name)}</span>
-    ${links.map((l) => `<a href="${l.href}">${l.label}</a>`).join('')}
-    <button class="site-nav__logout" type="button" data-logout>Выйти</button>
-    <p class="account-menu__error" role="alert" data-logout-error hidden></p>`;
-
-  const navLogout = /** @type {HTMLButtonElement} */ (nav.querySelector('[data-logout]'));
-  navLogout.addEventListener('click', async () => {
-    navLogout.disabled = true;
-    try {
-      await api.logout();
-      renderAuth(null);
-    } catch (error) {
-      const box = /** @type {HTMLElement} */ (nav.querySelector('[data-logout-error]'));
-      box.textContent = `Не удалось выйти. ${error.message}`;
-      box.hidden = false;
-      navLogout.disabled = false;
-    }
-  });
+  nav.innerHTML = '';
 }
 
 async function loadAuth() {

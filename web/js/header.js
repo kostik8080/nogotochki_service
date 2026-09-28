@@ -6,6 +6,8 @@
 //   вошел клиент: «Записаться» → BOOK-01 (N-26), аватар с инициалами и имя, меню «Мои записи» (N-09),
 //                 «Профиль» (N-10), «Выйти» → главная (N-11, N-27);
 //   не вошел: «Войти» (N-08) и «Регистрация» (N-54) вместо аватара.
+// На телефоне рядом с логотипом остаются только вход или аватар, остальное сворачивается в меню:
+// клиенту «Записаться» и имя — в меню аккаунта, гостю «Регистрация» — в меню по кнопке с тремя полосками.
 // Имя — из GET /api/auth/me (один запрос на страницу, см. api.getMe). Меню аккаунта использует и шапка лендинга.
 import * as api from './api.js';
 import { escapeHtml as esc, initials } from './format.js';
@@ -27,39 +29,17 @@ const currentPage = () => window.location.pathname.split('/').pop() || routes.ho
 
 let menuCounter = 0;
 
+const BURGER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+
 /**
- * Меню аккаунта: аватар, имя и выпадающий список. Клиенту — «Мои записи» и «Профиль»; у сотрудника
- * клиентских экранов нет, ему — только «Выйти». Закрывается кликом мимо и клавишей Escape.
- * @param {HTMLElement} container куда нарисовать
- * @param {{ name: string, role: string }} user
- * @param {{ onLoggedOut: () => void }} options что сделать после выхода
+ * Выпадающий список по кнопке [data-dropdown-toggle]: открывается и закрывается ею, закрывается кликом мимо
+ * и клавишей Escape.
+ * @param {HTMLElement} root блок, внутри которого кнопка и список [data-dropdown-list]
+ * @returns {AbortController} снимает слушатели документа
  */
-export function mountAccountMenu(container, user, { onLoggedOut }) {
-  const id = `account-menu-${++menuCounter}`;
-  const links = user.role === 'client'
-    ? [{ href: routes.account, label: 'Мои записи' }, { href: routes.profile, label: 'Профиль' }]
-    : [];
-  const page = currentPage();
-
-  container.innerHTML = `
-    <div class="account-menu">
-      <button class="account-menu__toggle" type="button" aria-expanded="false" aria-controls="${id}"
-              aria-label="Меню аккаунта: ${esc(user.name)}">
-        <span class="avatar" aria-hidden="true">${esc(initials(user.name))}</span>
-        <span class="account-menu__name">${esc(user.name)}</span>
-      </button>
-      <div class="account-menu__list" id="${id}" data-theme="powder" hidden>
-        ${links.map((l) => `<a class="account-menu__item" href="${esc(l.href)}"${l.href === page ? ' aria-current="page"' : ''}>${esc(l.label)}</a>`).join('')}
-        <button class="account-menu__item account-menu__item--danger" type="button" data-menu-logout>Выйти</button>
-        <p class="account-menu__error" role="alert" hidden></p>
-      </div>
-    </div>`;
-
-  const root = /** @type {HTMLElement} */ (container.querySelector('.account-menu'));
-  const toggle = /** @type {HTMLButtonElement} */ (root.querySelector('.account-menu__toggle'));
-  const list = /** @type {HTMLElement} */ (root.querySelector('.account-menu__list'));
-  const logout = /** @type {HTMLButtonElement} */ (root.querySelector('[data-menu-logout]'));
-  const errorBox = /** @type {HTMLElement} */ (root.querySelector('.account-menu__error'));
+function bindDropdown(root) {
+  const toggle = /** @type {HTMLButtonElement} */ (root.querySelector('[data-dropdown-toggle]'));
+  const list = /** @type {HTMLElement} */ (root.querySelector('[data-dropdown-list]'));
 
   // Слушатели документа снимаются, когда меню перерисовывают (например, после выхода)
   const listeners = new AbortController();
@@ -78,6 +58,48 @@ export function mountAccountMenu(container, user, { onLoggedOut }) {
       toggle.focus();
     }
   }, { signal: listeners.signal });
+  return listeners;
+}
+
+/**
+ * Меню аккаунта: аватар, имя и выпадающий список. Клиенту — «Мои записи» и «Профиль»; у сотрудника
+ * клиентских экранов нет, ему — только «Выйти». Закрывается кликом мимо и клавишей Escape.
+ * @param {HTMLElement} container куда нарисовать
+ * @param {{ name: string, role: string }} user
+ * @param {{ onLoggedOut: () => void, bookOnPhone?: boolean }} options onLoggedOut — что сделать после выхода;
+ *   bookOnPhone — на телефоне показать в списке «Записаться»: кнопке рядом с логотипом там нет места
+ */
+export function mountAccountMenu(container, user, { onLoggedOut, bookOnPhone = false }) {
+  const id = `account-menu-${++menuCounter}`;
+  const links = user.role === 'client'
+    ? [{ href: routes.account, label: 'Мои записи' }, { href: routes.profile, label: 'Профиль' }]
+    : [];
+  const page = currentPage();
+  const book = bookOnPhone && user.role === 'client'
+    ? `<a class="account-menu__item account-menu__item--phone" href="${esc(routes.booking())}">Записаться</a>`
+    : '';
+
+  // Имя в начале списка — только на телефоне: рядом с аватаром ему там нет места
+  container.innerHTML = `
+    <div class="account-menu">
+      <button class="account-menu__toggle" type="button" aria-expanded="false" aria-controls="${id}"
+              aria-label="Меню аккаунта: ${esc(user.name)}" data-dropdown-toggle>
+        <span class="avatar" aria-hidden="true">${esc(initials(user.name))}</span>
+        <span class="account-menu__name">${esc(user.name)}</span>
+      </button>
+      <div class="account-menu__list" id="${id}" data-theme="powder" data-dropdown-list hidden>
+        <p class="account-menu__user" aria-hidden="true">${esc(user.name)}</p>
+        ${book}
+        ${links.map((l) => `<a class="account-menu__item" href="${esc(l.href)}"${l.href === page ? ' aria-current="page"' : ''}>${esc(l.label)}</a>`).join('')}
+        <button class="account-menu__item account-menu__item--danger" type="button" data-menu-logout>Выйти</button>
+        <p class="account-menu__error" role="alert" hidden></p>
+      </div>
+    </div>`;
+
+  const root = /** @type {HTMLElement} */ (container.querySelector('.account-menu'));
+  const logout = /** @type {HTMLButtonElement} */ (root.querySelector('[data-menu-logout]'));
+  const errorBox = /** @type {HTMLElement} */ (root.querySelector('.account-menu__error'));
+  const listeners = bindDropdown(root);
 
   logout.addEventListener('click', async () => {
     logout.disabled = true;
@@ -134,9 +156,21 @@ class ClientHeader extends HTMLElement {
 
   render(actions, user) {
     if (!user) {
+      // На телефоне «Регистрация» — в меню по кнопке с тремя полосками, «Войти» остается рядом с логотипом
+      const id = `guest-menu-${++menuCounter}`;
       actions.innerHTML = `
         <a class="client-header__login" href="${routes.login}">Войти</a>
-        <a class="btn btn--primary btn--small client-header__register" href="${routes.register}">Регистрация</a>`;
+        <a class="btn btn--primary btn--small client-header__register" href="${routes.register}">Регистрация</a>
+        <div class="account-menu client-header__more">
+          <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="${id}" data-dropdown-toggle>
+            ${BURGER}
+            <span class="visually-hidden">Меню</span>
+          </button>
+          <div class="account-menu__list" id="${id}" data-theme="powder" data-dropdown-list hidden>
+            <a class="account-menu__item" href="${routes.register}">Регистрация</a>
+          </div>
+        </div>`;
+      bindDropdown(/** @type {HTMLElement} */ (actions.querySelector('.client-header__more')));
       return;
     }
     actions.innerHTML = `
@@ -144,6 +178,7 @@ class ClientHeader extends HTMLElement {
       <div data-menu></div>`;
     mountAccountMenu(/** @type {HTMLElement} */ (actions.querySelector('[data-menu]')), user, {
       onLoggedOut: () => window.location.assign(routes.home),
+      bookOnPhone: true,
     });
   }
 }
