@@ -1,0 +1,634 @@
+/*
+ * Шаги записи BOOK-01 «Услуги» и BOOK-02 «Мастер». Образец — «Запись · Услуги», «Запись · Мастер»,
+ * плашка корзины визита и модалки BOOK-M4…M6 в Prototype/Прототип - Ноготочки.dc.html.
+ * Поле страницы — пудровая тема, плашка корзины внизу — темная (:root), как в прототипе.
+ * Только переменные из tokens.css.
+ */
+
+.booking-body {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.booking {
+  flex: 1;
+  /* Снизу — место под плашку корзины, чтобы она не закрывала последние карточки */
+  padding-block: var(--space-4) calc(var(--space-24) + var(--space-16));
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.booking__inner {
+  /* Колонка до 960px — ширина из прототипа, собранная из шкалы отступов */
+  max-width: calc(var(--space-24) * 10);
+}
+
+/* ---------- «← Назад» и шаги ---------- */
+
+.booking-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  letter-spacing: var(--text-button-letter-spacing);
+  text-transform: uppercase;
+}
+
+.steps__item--current {
+  color: var(--color-text-accent);
+}
+
+.steps__item--done {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: var(--space-1);
+}
+
+.steps__item--done:hover {
+  color: var(--color-button-bg-active);
+}
+
+.steps__item--todo,
+.steps__arrow {
+  color: var(--color-text-muted);
+}
+
+.booking__title {
+  margin-bottom: var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--text-h3-size);
+  font-weight: var(--text-h1-weight);
+  line-height: var(--text-h1-line);
+  text-transform: uppercase;
+}
+
+.booking__note {
+  margin-bottom: var(--space-3);
+  color: var(--color-text-accent);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+}
+
+@media (min-width: 768px) {
+  .booking {
+    padding-top: var(--space-8);
+  }
+
+  .booking__title {
+    font-size: var(--text-h2-size);
+  }
+}
+
+/* ---------- Поиск и категории ---------- */
+
+.catalog-search {
+  margin-bottom: var(--space-4);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.chip {
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-divider);
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--color-button-bg);
+  color: var(--color-button-text);
+}
+
+/* ---------- Предупреждение «ни один мастер не выполняет…» ---------- */
+
+.warning {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  margin-bottom: var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+.warning .icon {
+  width: var(--text-body-m-size);
+  height: var(--text-body-m-size);
+  flex-shrink: 0;
+  margin-top: var(--space-1);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Карточки услуг ---------- */
+
+.service-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .service-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .service-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.service-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.service-card.is-selected {
+  border-color: var(--color-button-bg);
+}
+
+/* Услуга, из-за которой ни один мастер не подходит, — как в прототипе, рамкой предупреждения */
+.service-card.is-problem {
+  border-color: var(--color-warning);
+}
+
+.service-card__open {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--text-button-weight);
+  text-align: left;
+  cursor: pointer;
+}
+
+.service-card__open:hover {
+  color: var(--color-text-accent);
+}
+
+.service-card__desc {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-body-s-line);
+}
+
+.service-card__foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.service-card__duration {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+}
+
+.service-card__price {
+  font-size: var(--text-body-s-size);
+  font-weight: var(--text-button-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.add-button {
+  flex-shrink: 0;
+  min-width: var(--space-12);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-button-bg);
+  color: var(--color-button-text);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  cursor: pointer;
+}
+
+.add-button:hover {
+  background: var(--color-button-bg-hover);
+}
+
+.add-button[aria-pressed='true'] {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+/* ---------- Заглушки, пустые состояния, ошибки ---------- */
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.state-box {
+  grid-column: 1 / -1;
+  padding: var(--space-12) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+
+.state-box__title {
+  margin-bottom: var(--space-2);
+  font-weight: var(--text-button-weight);
+}
+
+.state-box__text {
+  margin-bottom: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-body-s-size);
+}
+
+.state-box__text:empty {
+  display: none;
+}
+
+/* ---------- Плашка корзины визита внизу экрана (темная тема) ---------- */
+
+.cart {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 150;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-top: 1px solid var(--color-border);
+}
+
+.cart__inner {
+  max-width: calc(var(--space-24) * 10);
+}
+
+.cart__lines {
+  padding-top: var(--space-3);
+}
+
+.cart__line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+  font-size: var(--text-body-s-size);
+}
+
+.cart__line.is-problem .cart__line-name {
+  color: var(--color-warning-bg);
+}
+
+.cart__line-side {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.cart__remove,
+.qty__button {
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption-size);
+  cursor: pointer;
+}
+
+.cart__remove:hover,
+.qty__button:hover:not(:disabled) {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.qty {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.qty__button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.cart__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+}
+
+.cart__summary {
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cart__summary:disabled {
+  cursor: default;
+}
+
+.cart__total {
+  display: block;
+  font-size: var(--text-body-s-size);
+  font-weight: var(--text-label-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.cart__hint {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-body-s-line);
+}
+
+.cart__hint--warning {
+  color: var(--color-warning-bg);
+}
+
+.cart__next {
+  flex-shrink: 0;
+}
+
+/* ---------- Шаг «Мастер» ---------- */
+
+.visit-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  font-size: var(--text-body-s-size);
+}
+
+.visit-summary__text {
+  font-weight: var(--text-button-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.master-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  /* Колонка до 640px, как колонка кабинета */
+  max-width: calc(var(--space-24) * 6 + var(--space-16));
+}
+
+/* Группа переключателей «кто будет мастером»: рамки и отступы fieldset не нужны */
+.master-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.master-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+}
+
+.master-option:hover {
+  border-color: var(--color-button-bg-hover);
+}
+
+.master-option:has(input:checked) {
+  border-color: var(--color-button-bg);
+  background: color-mix(in srgb, var(--color-button-bg) 8%, var(--color-surface));
+}
+
+.master-option:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus-border);
+  outline-offset: 2px;
+}
+
+.master-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.master-option__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-12);
+  height: var(--space-12);
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-avatar-bg);
+  color: var(--color-text-accent);
+  font-weight: var(--text-button-weight);
+}
+
+.master-option__avatar--any {
+  background: var(--color-button-bg);
+  color: var(--color-button-text);
+}
+
+.master-option__body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Строки карточки мастера — каждая с новой строки */
+.master-option__body > * {
+  display: block;
+}
+
+.master-option__body > .master-option__more {
+  display: inline-block;
+}
+
+.master-option__body > .master-option__head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-weight: var(--text-button-weight);
+}
+
+.master-option__price {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.master-option__specialty {
+  margin-block: var(--space-1);
+  color: var(--color-text-accent);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-label-weight);
+}
+
+.master-option__meta {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-body-s-line);
+}
+
+.master-option__nearest {
+  margin-bottom: var(--space-1);
+  color: var(--color-success-text);
+  font-size: var(--text-caption-size);
+}
+
+.master-option__nearest:empty {
+  display: none;
+}
+
+.master-option__more {
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+}
+
+.master-list__subtitle {
+  margin-top: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  letter-spacing: var(--text-button-letter-spacing);
+  text-transform: uppercase;
+}
+
+/* Мастер не выполняет какую-то из выбранных услуг — неактивная карточка, как в прототипе */
+.master-option--unavailable {
+  background: var(--color-divider);
+  cursor: default;
+  opacity: 0.7;
+}
+
+.master-option--unavailable:hover {
+  border-color: var(--color-border);
+}
+
+.master-option__missing {
+  color: var(--color-error-text);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-body-s-line);
+}
+
+.btn--neutral {
+  background: transparent;
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.btn--neutral:hover {
+  border-color: var(--color-text-muted);
+}
+
+.btn--danger {
+  background: transparent;
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.btn--danger:hover {
+  background: color-mix(in srgb, var(--color-error) 8%, transparent);
+}
+
+.btn--block {
+  width: 100%;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.btn--primary:disabled:hover {
+  background: var(--color-button-bg);
+}
+
+/* ---------- Таймер брони: подтверждение записи и перенос ---------- */
+
+.hold-timer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-accent);
+  color: var(--color-text);
+  font-size: var(--text-body-s-size);
+  font-weight: var(--text-button-weight);
+}
+
+.hold-timer__value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Меньше минуты — как в прототипе: цвет предупреждения и строка «Бронь скоро истечет» */
+.hold-timer.is-soon {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.hold-timer.is-soon .hold-timer__value {
+  font-size: var(--text-body-l-size);
+}
+
+.hold-timer__soon {
+  font-weight: var(--text-label-weight);
+}

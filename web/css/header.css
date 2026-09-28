@@ -50,8 +50,10 @@ client-header {
   color: var(--color-button-bg-hover);
 }
 
-/* На телефоне в шапке нет места для «Записаться» рядом с аватаром: кнопка «Новая запись» есть в кабинете */
-.client-header__book {
+/* На телефоне в шапке нет места для второй кнопки рядом с логотипом: «Записаться» есть в кабинете
+   («Новая запись»), «Регистрация» — на странице входа («Нет аккаунта? Зарегистрироваться») */
+.client-header__book,
+.client-header__register {
   display: none;
 }
 
@@ -60,7 +62,8 @@ client-header {
     gap: var(--space-6);
   }
 
-  .client-header__book {
+  .client-header__book,
+  .client-header__register {
     display: inline-flex;
   }
 }

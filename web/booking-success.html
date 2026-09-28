@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вы записаны — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/booking.css">
+  <link rel="stylesheet" href="css/booking-success.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/booking-success.js"></script>
+</head>
+<body class="booking-body">
+  <a class="skip-link" href="#main">К содержимому</a>
+
+  <!-- Общая шапка клиента — js/header.js -->
+  <client-header></client-header>
+
+  <!-- BOOK-05 Вы записаны. Данные — GET /api/bookings/:id (запись, которую только что создали) и GET /api/studio -->
+  <main id="main">
+    <!-- Темная плашка «Вы записаны!», как в прототипе -->
+    <section class="success-hero" aria-labelledby="success-title">
+      <div class="container success-hero__inner" data-hero aria-busy="true">
+        <svg class="success-hero__emblem" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <g stroke="currentColor" stroke-width="1.3">
+            <ellipse cx="20" cy="14" rx="5" ry="11"/>
+            <ellipse cx="20" cy="14" rx="5" ry="11" transform="rotate(72 20 20)"/>
+            <ellipse cx="20" cy="14" rx="5" ry="11" transform="rotate(144 20 20)"/>
+            <ellipse cx="20" cy="14" rx="5" ry="11" transform="rotate(216 20 20)"/>
+            <ellipse cx="20" cy="14" rx="5" ry="11" transform="rotate(288 20 20)"/>
+          </g>
+        </svg>
+        <h1 class="success-hero__title" id="success-title" tabindex="-1" data-title>Вы записаны!</h1>
+        <p class="success-hero__when" data-when><span class="skeleton skeleton--line" aria-hidden="true"></span></p>
+        <p class="success-hero__what" data-what><span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span></p>
+      </div>
+    </section>
+
+    <section class="booking success" data-theme="powder">
+      <div class="container success__inner">
+        <div class="state-box" role="alert" data-error hidden>
+          <p class="state-box__title" data-error-title>Запись не найдена</p>
+          <p class="state-box__text" data-error-text></p>
+          <a class="btn btn--primary btn--small" href="account.html">Мои записи</a>
+        </div>
+
+        <div data-details hidden>
+          <dl class="success-facts">
+            <div><dt>Адрес</dt><dd data-address></dd></div>
+            <div><dt>Стоимость</dt><dd data-price></dd></div>
+            <div><dt>Длительность</dt><dd data-duration></dd></div>
+          </dl>
+          <p class="success__note" data-note></p>
+
+          <div class="success-actions">
+            <button class="btn btn--outline" type="button" data-calendar>Добавить в календарь</button>
+            <a class="btn btn--outline" href="#" target="_blank" rel="noopener" data-map>Как добраться</a>
+            <a class="btn btn--primary" href="account.html">Мои записи</a>
+            <a class="btn btn--neutral" href="booking-services.html">Записаться еще</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

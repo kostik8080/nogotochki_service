@@ -16,6 +16,11 @@ const alert = /** @type {HTMLElement} */ (form.querySelector('[data-alert]'));
 const loginInput = /** @type {HTMLInputElement} */ (form.elements.namedItem('login'));
 const passwordInput = /** @type {HTMLInputElement} */ (form.elements.namedItem('password'));
 
+// Пришли с шага «Время»: бронь бывает только после входа (docs/ui-map.md, список 1, пункт 7)
+if (safeNext('') === routes.bookingTimeStep) {
+  showAlert(alert, 'warning', 'Войдите, чтобы закрепить время и завершить запись. Выбранное время мы запомнили.');
+}
+
 bindPasswordToggle(passwordInput, form.querySelector('[data-password-toggle]'));
 clearOnInput(form);
 

@@ -12,8 +12,12 @@ import {
 } from './form.js';
 import { phone as formatPhone, phoneHref, plural } from './format.js';
 import { routes } from './routes.js';
+import { getDraft } from './store.js';
 
 const PREFILL_KEY = 'nog_login_prefill';
+
+/** После регистрации — в пустой кабинет, а если клиент начал запись и выбрал время — обратно к ней (карта экранов) */
+const afterRegister = () => (getDraft().startsAt ? routes.bookingTimeStep : routes.account);
 const RESEND_SECONDS = 60;
 
 const steps = {
@@ -112,7 +116,7 @@ form.addEventListener('submit', async (event) => {
   try {
     const result = await api.register(body);
     if (result.status === 201) {
-      window.location.assign(routes.account);
+      window.location.assign(afterRegister());
       return;
     }
     done();
@@ -184,7 +188,7 @@ codeForm.addEventListener('submit', async (event) => {
     const result = await api.register({ ...pending, code });
     if (result.status === 201) {
       // Карточка привязана, прежние записи уже в кабинете
-      window.location.assign(routes.account);
+      window.location.assign(afterRegister());
       return;
     }
     done();
@@ -210,7 +214,7 @@ resendButton.addEventListener('click', async () => {
     const result = await api.register(pending);
     done();
     if (result.status === 201) {
-      window.location.assign(routes.account);
+      window.location.assign(afterRegister());
       return;
     }
     await openCodeStep(result);

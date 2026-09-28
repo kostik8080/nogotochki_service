@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Запись — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/cabinet.css">
+  <link rel="stylesheet" href="css/account.css">
+  <link rel="stylesheet" href="css/booking-card.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/cabinet-nav.js"></script>
+  <script type="module" src="js/booking-card.js"></script>
+</head>
+<body class="cabinet-body">
+  <a class="skip-link" href="#main">К содержимому</a>
+
+  <!-- Общая шапка клиента — js/header.js -->
+  <client-header></client-header>
+
+  <div class="cabinet" data-theme="powder">
+    <div class="container cabinet__inner">
+      <!-- Меню кабинета — js/cabinet-nav.js -->
+      <cabinet-nav></cabinet-nav>
+
+      <!-- CAB-03 Карточка записи -->
+      <main class="cabinet__main" id="main">
+        <a class="text-link card-back" href="account.html">← Мои записи</a>
+
+        <div data-view="loading" aria-busy="true">
+          <span class="skeleton skeleton--nearest" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем запись…</span>
+        </div>
+
+        <div class="state-card" role="alert" data-view="error" hidden>
+          <p class="state-card__title" data-error-title>Запись не найдена</p>
+          <p class="state-card__text" data-error-text></p>
+          <a class="btn btn--primary btn--small" href="account.html">Мои записи</a>
+        </div>
+
+        <article class="booking-detail" data-view="content" hidden>
+          <div class="booking-detail__head">
+            <h1 class="booking-detail__title" data-services></h1>
+            <span data-badge></span>
+          </div>
+
+          <!-- Сообщение «Студия отменила / перенесла запись», пока клиент его не закрыл -->
+          <div class="notice" data-studio-change hidden>
+            <span data-studio-change-text></span>
+            <button class="notice__close" type="button" aria-label="Закрыть сообщение" data-acknowledge>✕</button>
+          </div>
+
+          <dl class="detail-list">
+            <div><dt>Дата и время</dt><dd data-when></dd></div>
+            <div><dt>Мастер</dt><dd><a class="text-link" href="#" data-master></a></dd></div>
+            <div><dt>Услуги</dt><dd><ul class="detail-lines" data-lines></ul></dd></div>
+            <div><dt>Стоимость</dt><dd class="detail-list__price" data-price></dd></div>
+          </dl>
+
+          <p class="detail-comment" data-comment hidden></p>
+          <p class="alert alert--warning" data-cancel-reason hidden></p>
+
+          <div class="detail-address">
+            <span data-address></span>
+            <span class="detail-address__actions">
+              <a class="btn btn--outline btn--small" href="#" target="_blank" rel="noopener" data-map>Как добраться</a>
+              <button class="btn btn--outline btn--small" type="button" data-calendar>В календарь</button>
+            </span>
+          </div>
+
+          <!-- Действия зависят от статуса и правила 24 часов (canChange из API) -->
+          <p class="alert alert--warning" data-deadline-warning hidden></p>
+          <div class="detail-actions" data-detail-actions></div>
+        </article>
+      </main>
+    </div>
+  </div>
+
+  <!-- CAB-05 Отмена записи -->
+  <dialog class="modal cancel-modal" data-theme="powder" aria-labelledby="cancel-title" data-cancel>
+    <!-- Выбор причины и подтверждение -->
+    <form class="form" data-cancel-form novalidate>
+      <p class="modal__title" id="cancel-title">Отменить запись?</p>
+      <p class="cancel-modal__summary" data-cancel-summary></p>
+      <p class="cancel-modal__rules" data-cancel-rules></p>
+      <p class="alert alert--warning" data-cancel-soon hidden></p>
+      <div class="alert" role="alert" data-cancel-alert hidden></div>
+
+      <fieldset class="cancel-modal__reasons">
+        <legend class="field__label">Причина (необязательно)</legend>
+        <label class="check__label"><input type="radio" name="reason" value="Изменились планы"> Изменились планы</label>
+        <label class="check__label"><input type="radio" name="reason" value="Заболел(а)"> Заболел(а)</label>
+        <label class="check__label"><input type="radio" name="reason" value="Нашел(а) другое время"> Нашел(а) другое время</label>
+        <label class="check__label"><input type="radio" name="reason" value="other"> Другое</label>
+      </fieldset>
+      <div class="field" data-other-field hidden>
+        <label class="field__label" for="cancel-other">Расскажите, что случилось</label>
+        <input class="input" id="cancel-other" type="text" maxlength="500" data-other>
+      </div>
+
+      <p class="cancel-modal__instead"><a class="text-link" href="#" data-reschedule-instead>Может, перенести?</a></p>
+      <div class="modal__actions">
+        <button class="btn btn--neutral btn--small" type="button" data-cancel-close>Не отменять</button>
+        <button class="btn btn--danger btn--small" type="submit" data-cancel-submit>Отменить запись</button>
+      </div>
+    </form>
+
+    <!-- Онлайн-отмена недоступна (меньше суток до визита) -->
+    <div data-cancel-restricted hidden>
+      <p class="modal__title">Онлайн-отмена недоступна</p>
+      <p class="modal__text" data-restricted-text></p>
+      <div class="modal__actions">
+        <button class="btn btn--neutral btn--small" type="button" data-cancel-close>Закрыть</button>
+        <a class="btn btn--primary btn--small" href="tel:" data-restricted-phone>Позвонить в салон</a>
+      </div>
+    </div>
+
+    <!-- Запись отменена -->
+    <div data-cancel-done hidden>
+      <p class="modal__title">Запись отменена</p>
+      <p class="modal__text" data-done-text></p>
+      <div class="modal__actions">
+        <button class="btn btn--neutral btn--small" type="button" data-cancel-close>Закрыть</button>
+        <a class="btn btn--primary btn--small" href="#" data-rebook>Записаться на другое время</a>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>

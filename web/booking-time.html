@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Запись: дата и время — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/booking.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/booking-time.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/booking-steps.js"></script>
+  <script type="module" src="js/booking-time.js"></script>
+</head>
+<body class="booking-body">
+  <a class="skip-link" href="#main">К содержимому</a>
+
+  <!-- Общая шапка клиента — js/header.js -->
+  <client-header></client-header>
+
+  <!-- BOOK-03 Шаг 3. Время -->
+  <main class="booking" id="main" data-theme="powder">
+    <div class="container booking__inner">
+      <div class="booking-bar">
+        <a class="btn btn--neutral btn--small" href="booking-master.html" data-back>← Назад</a>
+        <booking-steps current="time"></booking-steps>
+      </div>
+
+      <h1 class="visually-hidden" data-page-title>Запись: выберите дату и время</h1>
+
+      <!-- Сводка: услуги, мастер, длительность — у каждого «Изменить», как в прототипе -->
+      <dl class="time-summary" data-summary>
+        <div><dt>Услуги:</dt> <dd><span data-summary-services><span class="skeleton skeleton--line" aria-hidden="true"></span></span> <a class="text-link" href="booking-services.html">Изменить</a></dd></div>
+        <div><dt>Мастер:</dt> <dd><span data-summary-master><span class="skeleton skeleton--line" aria-hidden="true"></span></span> <a class="text-link" href="booking-master.html" data-change-master>Изменить</a></dd></div>
+        <div><dt>Длительность:</dt> <dd data-summary-duration><span class="skeleton skeleton--line" aria-hidden="true"></span></dd></div>
+      </dl>
+
+      <!-- Перенос записи (?reschedule=ID): текущее время записи — отдельным состоянием, услуги и мастер зафиксированы -->
+      <div class="reschedule-current" data-current hidden>
+        <p class="reschedule-current__label">Сейчас вы записаны</p>
+        <p class="reschedule-current__when" data-current-when></p>
+        <p class="reschedule-current__note">Выберите новое время. Услуги и мастер останутся прежними — чтобы их изменить, отмените запись и создайте новую.</p>
+      </div>
+
+      <!-- Перенос недоступен: текст — из ответа сервера (правило 24 часов, запись уже отменена) -->
+      <section class="state-box reschedule-blocked" role="alert" data-blocked hidden>
+        <p class="state-box__title" data-blocked-title>Перенос недоступен</p>
+        <p class="state-box__text" data-blocked-text></p>
+        <div class="reschedule-actions">
+          <a class="btn btn--primary btn--small" href="tel:" data-blocked-phone hidden></a>
+          <a class="btn btn--neutral btn--small" href="account.html" data-back-to-booking>Назад к записи</a>
+        </div>
+      </section>
+
+      <!-- Перенос: «Было → Стало» после брони нового времени -->
+      <section class="compare" aria-labelledby="compare-title" data-compare hidden>
+        <h2 class="visually-hidden" id="compare-title">Проверьте перенос</h2>
+        <div class="hold-timer" role="status" data-compare-timer>
+          <span>Новое время закреплено за вами еще <span class="hold-timer__value" data-compare-left>10:00</span></span>
+          <span class="hold-timer__soon" data-compare-soon hidden>Бронь скоро истечет</span>
+        </div>
+        <div class="compare__grid">
+          <div class="compare__card">
+            <p class="compare__label">Было</p>
+            <p class="compare__when" data-was-when></p>
+            <p data-was-master></p>
+            <p class="compare__price" data-was-price></p>
+          </div>
+          <span class="compare__arrow" aria-hidden="true">→</span>
+          <div class="compare__card compare__card--new">
+            <p class="compare__label">Стало</p>
+            <p class="compare__when" data-new-when></p>
+            <p data-new-master></p>
+            <p class="compare__price" data-new-price></p>
+          </div>
+        </div>
+        <div class="field compare__reason">
+          <label class="field__label" for="reschedule-reason">Причина переноса (необязательно)</label>
+          <input class="input" id="reschedule-reason" type="text" maxlength="500" data-reason>
+        </div>
+        <div class="alert" role="alert" data-compare-alert hidden></div>
+        <div class="reschedule-actions">
+          <button class="btn btn--neutral" type="button" data-compare-back>Назад</button>
+          <button class="btn btn--primary" type="button" data-compare-confirm>Подтвердить перенос</button>
+        </div>
+      </section>
+
+      <!-- Запись перенесена -->
+      <section class="rescheduled" role="status" aria-labelledby="rescheduled-title" data-rescheduled hidden>
+        <p class="rescheduled__title" id="rescheduled-title" tabindex="-1">Запись перенесена</p>
+        <p class="rescheduled__when" data-done-when></p>
+        <p class="rescheduled__what" data-done-what></p>
+        <div class="reschedule-actions">
+          <a class="btn btn--primary" href="account.html" data-done-booking>К записи</a>
+          <a class="btn btn--neutral" href="account.html">Мои записи</a>
+        </div>
+      </section>
+
+      <div class="time-layout" data-picker>
+        <!-- Календарь месяца: у каждого дня — есть ли свободное время (по ответам API) -->
+        <section class="calendar" aria-labelledby="calendar-title">
+          <button class="btn btn--outline btn--small calendar__nearest" type="button" data-nearest disabled>Ближайшее свободное время</button>
+          <div class="calendar__head">
+            <button class="calendar__nav" type="button" aria-label="Предыдущий месяц" data-prev-month disabled>←</button>
+            <h2 class="calendar__title" id="calendar-title" data-month-title aria-live="polite"></h2>
+            <button class="calendar__nav" type="button" aria-label="Следующий месяц" data-next-month disabled>→</button>
+          </div>
+          <p class="calendar__horizon" data-horizon hidden></p>
+          <div class="calendar__weekdays" aria-hidden="true">
+            <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+          </div>
+          <div class="calendar__grid" data-days></div>
+          <ul class="calendar__legend">
+            <li><span class="legend-mark legend-mark--free" aria-hidden="true"></span>есть свободное время</li>
+            <li data-legend-original hidden><span class="legend-mark legend-mark--original" aria-hidden="true"></span>день вашей записи</li>
+            <li><span class="legend-mark legend-mark--full" aria-hidden="true"></span>мест нет</li>
+            <li><span class="legend-mark legend-mark--off" aria-hidden="true"></span>выходной, закрыто или прошло</li>
+          </ul>
+          <p class="calendar__month-note" role="status" data-month-note hidden></p>
+        </section>
+
+        <!-- Время выбранного дня: загрузка, сетка или «мест нет» — разные состояния одной области -->
+        <section class="day-slots" aria-labelledby="day-title" aria-live="polite" data-day>
+          <h2 class="day-slots__title" id="day-title" data-day-title>Выберите день</h2>
+          <div data-day-body>
+            <p class="day-slots__hint">Дни с точкой — со свободным временем.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- Плашка внизу: что выбрано и «Продолжить» -->
+  <section class="cart" aria-label="Ваш визит" data-cart>
+    <div class="container cart__inner">
+      <div class="cart__bar">
+        <span class="cart__summary">
+          <span class="cart__total" data-total aria-live="polite">Время не выбрано</span>
+          <span class="cart__hint" id="cart-hint" data-hint>Выберите день и время</span>
+        </span>
+        <button class="btn btn--primary cart__next" type="button" aria-describedby="cart-hint" data-continue disabled>Продолжить</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOOK-M1 Время уже заняли -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="taken-title" data-taken>
+    <p class="modal__title" id="taken-title">Это время только что заняли</p>
+    <p class="modal__text" data-taken-text></p>
+    <div class="taken__options" data-taken-options></div>
+    <div class="modal__actions">
+      <button class="btn btn--neutral btn--small" type="button" data-taken-close>Выбрать другое время</button>
+    </div>
+  </dialog>
+</body>
+</html>

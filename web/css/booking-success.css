@@ -1,0 +1,100 @@
+/*
+ * BOOK-05 Вы записаны. Образец — «Запись · Успех» в Prototype/Прототип - Ноготочки.dc.html: темная плашка
+ * «Вы записаны!» с датой, временем, услугами и мастером; «Добавить в календарь», «Как добраться», «Мои записи»,
+ * «Записаться еще». Плашка — темная тема (:root) полосой во всю ширину, кнопки — в пудровой секции ниже.
+ */
+
+.success-hero {
+  padding-block: var(--space-12);
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: center;
+}
+
+.success-hero__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.success-hero__emblem {
+  width: var(--space-8);
+  height: var(--space-8);
+  margin-bottom: var(--space-2);
+  color: var(--color-brand-gold);
+}
+
+.success-hero__title {
+  font-family: var(--font-display);
+  font-size: var(--text-h2-size);
+  font-weight: var(--text-h1-weight);
+  text-transform: uppercase;
+}
+
+.success-hero__when {
+  font-size: var(--text-body-l-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.success-hero__what {
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-s-size);
+}
+
+.success-hero .skeleton {
+  width: calc(var(--space-24) * 2);
+}
+
+.success {
+  padding-block: var(--space-8) var(--space-16);
+}
+
+.success__inner {
+  /* Колонка около 440px, как в прототипе, — из шкалы отступов (432px) */
+  max-width: calc(var(--space-24) * 4 + var(--space-12));
+}
+
+.success-facts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  font-size: var(--text-body-s-size);
+}
+
+.success-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.success-facts dt {
+  color: var(--color-text-muted);
+}
+
+.success-facts dd {
+  margin: 0;
+  font-weight: var(--text-label-weight);
+  text-align: right;
+}
+
+.success__note {
+  margin-bottom: var(--space-6);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-body-s-line);
+}
+
+.success-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.success-actions .btn {
+  padding-inline: var(--space-2);
+}

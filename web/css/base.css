@@ -386,3 +386,60 @@ button {
   color: var(--color-text-muted);
   cursor: default;
 }
+
+/* ---------- Модальное окно (<dialog class="modal" data-theme="powder">): записи, отмена, сессия ---------- */
+
+.modal {
+  width: min(100% - 2 * var(--page-gutter-mobile), calc(var(--space-24) * 4));
+  padding: var(--space-6);
+  border: 0;
+  border-radius: var(--radius-modal);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+/* Затемнение под окном: у окна светлая тема, --color-text в ней темный */
+.modal::backdrop {
+  background: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+
+.modal__title {
+  margin-bottom: var(--space-2);
+  font-weight: var(--text-button-weight);
+}
+
+.modal__title--display {
+  font-family: var(--font-display);
+  font-size: var(--text-body-l-size);
+  font-weight: var(--text-h1-weight);
+  text-transform: uppercase;
+}
+
+.modal__text {
+  margin-bottom: var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+.modal__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  color: var(--color-text-muted);
+  font-size: var(--text-body-s-size);
+}
+
+.modal__price {
+  color: var(--color-text);
+  font-weight: var(--text-button-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

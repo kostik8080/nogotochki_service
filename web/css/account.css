@@ -320,3 +320,74 @@
 .btn--block {
   width: 100%;
 }
+
+.badge--cancelled {
+  --badge-dot: var(--color-status-cancelled);
+  background: var(--color-status-cancelled-bg);
+  color: var(--color-status-cancelled-text);
+}
+
+.badge--no-show {
+  --badge-dot: var(--color-status-no-show);
+  background: var(--color-status-no-show-bg);
+  color: var(--color-status-no-show-text);
+}
+
+/* ---------- CAB-02 История ---------- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.filter {
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-divider);
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  cursor: pointer;
+}
+
+.filter[aria-pressed='true'] {
+  background: var(--color-button-bg);
+  color: var(--color-button-text);
+}
+
+.history-skeleton {
+  margin-bottom: var(--space-2);
+}
+
+.history-item {
+  margin-bottom: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.history-item__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.history-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-body-s-size);
+  font-weight: var(--text-button-weight);
+}
+
+.history-empty {
+  color: var(--color-text-muted);
+  font-size: var(--text-body-s-size);
+}

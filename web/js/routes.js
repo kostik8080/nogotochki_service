@@ -37,6 +37,13 @@ export const routes = {
     return 'booking-services.html' + (qs ? '?' + qs : '');
   },
 
+  /** BOOK-03 Шаг 3. Время (выбор уже в черновике записи, js/store.js) */
+  bookingTimeStep: 'booking-time.html',
+  /** BOOK-04 Шаг 4. Подтверждение */
+  bookingConfirm: 'booking-confirm.html',
+  /** BOOK-05 Вы записаны — по номеру созданной записи */
+  bookingSuccess: (id) => 'booking-success.html?id=' + encodeURIComponent(String(id)),
+
   /**
    * BOOK-02 Шаг 2. Мастер — с уже выбранными услугами.
    * @param {string} services услуги в формате API: «8,3:2» — номера через запятую, количество через двоеточие
@@ -63,6 +70,6 @@ export const routes = {
    */
   bookingCard: (id, options = {}) => 'booking.html?id=' + encodeURIComponent(String(id)) + (options.cancel ? '&cancel=1' : ''),
 
-  /** CAB-04 Перенос записи */
-  reschedule: (id) => 'reschedule.html?id=' + encodeURIComponent(String(id)),
+  /** CAB-04 Перенос записи — экран выбора времени в режиме переноса: услуги и мастер из записи */
+  reschedule: (id) => 'booking-time.html?reschedule=' + encodeURIComponent(String(id)),
 };

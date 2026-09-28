@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Запись: подтверждение — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/booking.css">
+  <link rel="stylesheet" href="css/booking-confirm.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/booking-steps.js"></script>
+  <script type="module" src="js/booking-confirm.js"></script>
+</head>
+<body class="booking-body confirm-body">
+  <a class="skip-link" href="#main">К содержимому</a>
+
+  <!-- Общая шапка клиента — js/header.js -->
+  <client-header></client-header>
+
+  <!-- BOOK-04 Шаг 4. Подтверждение -->
+  <main class="booking" id="main" data-theme="powder">
+    <div class="container booking__inner">
+      <div class="booking-bar">
+        <a class="btn btn--neutral btn--small" href="booking-time.html">← Назад</a>
+        <booking-steps current="confirm"></booking-steps>
+      </div>
+
+      <h1 class="booking__title">Подтверждение</h1>
+
+      <!-- Бронь: сколько времени осталось. Меньше минуты — другой вид и «Бронь скоро истечет», как в прототипе -->
+      <div class="hold-timer" role="status" data-timer hidden>
+        <span>Время закреплено за вами еще <span class="hold-timer__value" data-timer-value>10:00</span></span>
+        <span class="hold-timer__soon" data-timer-soon hidden>Бронь скоро истечет</span>
+      </div>
+
+      <!-- Время уже заняли (409 SLOT_TAKEN): текст и варианты — из ответа сервера. Состояние этого же экрана -->
+      <section class="taken" role="alert" aria-labelledby="taken-title" data-taken hidden>
+        <h2 class="taken__title" id="taken-title" tabindex="-1" data-taken-text></h2>
+        <div class="taken__options" data-taken-options></div>
+        <a class="text-link taken__other" href="booking-time.html">Выбрать другое время</a>
+      </section>
+
+      <!-- Не удалось записаться: сеть, сервер, техработы. Текст — из ответа API -->
+      <section class="state-box confirm-fail" role="alert" data-fail hidden>
+        <p class="state-box__title">Не удалось записаться</p>
+        <p class="state-box__text" data-fail-text></p>
+        <p class="state-box__text">Запись не создана. Ваш выбор сохранен.</p>
+        <div class="confirm-fail__actions">
+          <button class="btn btn--primary btn--small" type="button" data-fail-retry>Повторить</button>
+          <a class="btn btn--neutral btn--small" href="tel:" data-studio-phone hidden></a>
+        </div>
+      </section>
+
+      <!-- Пока бронь и данные грузятся -->
+      <div class="confirm-layout" data-loading aria-busy="true">
+        <div class="confirm-card"><span class="skeleton skeleton--title"></span><span class="skeleton skeleton--line"></span><span class="skeleton skeleton--line skeleton--short"></span></div>
+        <div class="confirm-card"><span class="skeleton skeleton--title"></span><span class="skeleton skeleton--line"></span><span class="skeleton skeleton--line"></span><span class="skeleton skeleton--line skeleton--short"></span></div>
+        <span class="visually-hidden">Закрепляем время и загружаем данные…</span>
+      </div>
+
+      <div class="confirm-layout" data-content hidden>
+        <!-- Слева: данные клиента, комментарий, «Подтвердить запись» -->
+        <form class="confirm-card confirm-form" data-form novalidate>
+          <h2 class="confirm-card__title">Ваши данные</h2>
+          <dl class="client-data">
+            <div><dt>Имя</dt><dd data-client-name></dd></div>
+            <div><dt>Телефон</dt><dd data-client-phone></dd></div>
+            <div><dt>E-mail</dt><dd data-client-email></dd></div>
+          </dl>
+          <a class="text-link client-data__edit" href="profile.html">Изменить в профиле</a>
+
+          <!-- У клиента уже есть запись на это время (docs/ui-map.md, список 1, пункт 5) -->
+          <p class="alert alert--warning" data-overlap hidden></p>
+
+          <div class="field">
+            <label class="field__label" for="comment">Комментарий для мастера (необязательно)</label>
+            <textarea class="input confirm-form__comment" id="comment" name="comment" rows="3" maxlength="500"
+                      aria-describedby="comment-hint comment-error" data-comment></textarea>
+            <p class="field__hint" id="comment-hint"><span data-comment-count>0</span> из 500 символов</p>
+            <p class="field__error" id="comment-error" data-error-for="comment" hidden></p>
+          </div>
+
+          <div class="alert" role="alert" data-alert hidden></div>
+
+          <p class="confirm-form__rule" data-rule>Бесплатная отмена или перенос — не позднее чем за 24 часа до визита. Оплата в студии.</p>
+          <button class="btn btn--primary btn--block" type="submit" data-submit>Подтвердить запись</button>
+        </form>
+
+        <!-- Справа: сводка визита. «Изменить» — на шаги записи по карте экранов -->
+        <aside class="confirm-card confirm-summary" aria-labelledby="summary-title">
+          <h2 class="confirm-card__title" id="summary-title">Ваш визит</h2>
+          <div class="summary-row">
+            <div><p class="summary-row__label">Мастер</p><p class="summary-row__value" data-master></p></div>
+            <a class="text-link" href="booking-master.html" data-edit-master>Изменить</a>
+          </div>
+          <div class="summary-row">
+            <div><p class="summary-row__label">Дата и время</p><p class="summary-row__value" data-when></p></div>
+            <a class="text-link" href="booking-time.html">Изменить</a>
+          </div>
+          <div class="summary-row summary-row--services">
+            <div class="summary-row__main">
+              <p class="summary-row__label">Услуги</p>
+              <ul class="summary-lines" data-lines></ul>
+            </div>
+            <a class="text-link" href="booking-services.html">Изменить</a>
+          </div>
+          <div class="summary-row">
+            <div><p class="summary-row__label">Адрес</p><p class="summary-row__value" data-address></p></div>
+          </div>
+          <div class="summary-total">
+            <div><p class="summary-row__label" data-duration></p><p class="summary-total__price" data-total></p></div>
+            <p class="summary-row__label">Оплата в студии</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <!-- BOOK-M2 Время брони истекло -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="expired-title" data-expired>
+    <p class="modal__title" id="expired-title">Время брони истекло</p>
+    <p class="modal__text" data-expired-text>Проверим, свободно ли еще выбранное время.</p>
+    <div class="modal__actions">
+      <button class="btn btn--primary btn--small btn--block" type="button" data-recheck>Проверить снова</button>
+    </div>
+  </dialog>
+
+  <!-- BOOK-M3 Сессия истекла: выбор не потерялся, бронь живет до своего срока -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="session-title" data-session>
+    <form class="form" method="dialog" data-session-form novalidate>
+      <p class="modal__title" id="session-title">Сессия истекла</p>
+      <p class="modal__text">Войдите снова — ваш выбор не потерялся.</p>
+      <div class="alert" role="alert" data-session-alert hidden></div>
+      <div class="field">
+        <label class="field__label" for="session-login">Телефон или e-mail</label>
+        <input class="input" id="session-login" name="login" type="text" autocomplete="username" autocapitalize="off" spellcheck="false">
+        <p class="field__error" data-error-for="login" hidden></p>
+      </div>
+      <div class="field">
+        <label class="field__label" for="session-password">Пароль</label>
+        <input class="input" id="session-password" name="password" type="password" autocomplete="current-password">
+        <p class="field__error" data-error-for="password" hidden></p>
+      </div>
+      <button class="btn btn--primary btn--block" type="submit">Войти</button>
+    </form>
+  </dialog>
+</body>
+</html>

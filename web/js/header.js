@@ -136,7 +136,7 @@ class ClientHeader extends HTMLElement {
     if (!user) {
       actions.innerHTML = `
         <a class="client-header__login" href="${routes.login}">Войти</a>
-        <a class="btn btn--primary btn--small" href="${routes.register}">Регистрация</a>`;
+        <a class="btn btn--primary btn--small client-header__register" href="${routes.register}">Регистрация</a>`;
       return;
     }
     actions.innerHTML = `

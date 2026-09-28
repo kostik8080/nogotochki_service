@@ -62,8 +62,30 @@ export const getStudio = () => request('GET', '/api/studio');
 /** Каталог: категории с услугами, правила опции, несовместимые пары. */
 export const getServices = () => request('GET', '/api/services');
 
-/** Активные мастера. */
-export const getMasters = () => request('GET', '/api/masters');
+/**
+ * Активные мастера. С `services` — только те, кто выполняет все услуги визита, и у каждого `visit`:
+ * `{ durationMin, priceKop }` — длительность и стоимость визита у этого мастера (цена зависит от уровня).
+ * Неверный набор — 400: SERVICES_INCOMPATIBLE, MAIN_SERVICE_REQUIRED, ADDON_NOT_ALLOWED, QUANTITY_TOO_LARGE.
+ * @param {string} [services] услуги визита: «8,3:2» — номера через запятую, количество через двоеточие
+ */
+export async function getMasters(services) {
+  const qs = services ? '?services=' + encodeURIComponent(services) : '';
+  return request('GET', '/api/masters' + qs);
+}
+
+/**
+ * Свободное время мастера на дату студии. Ответ: `{ day: { status, reason }, durationMin, priceKop, slots: [{ startsAt, endsAt }] }`.
+ * Для переноса вместо услуг передается `bookingId`: длительность — из записи, сама запись не считается занятым временем;
+ * тогда 403 CHANGE_DEADLINE_PASSED / 409 BOOKING_NOT_ACTIVE — перенести уже нельзя.
+ * @param {number} masterId
+ * @param {{ date: string, services?: string, bookingId?: number }} query дата — YYYY-MM-DD по календарю студии
+ */
+export function getMasterSlots(masterId, query) {
+  const qs = new URLSearchParams({ date: query.date });
+  if (query.bookingId !== undefined) qs.set('bookingId', String(query.bookingId));
+  else qs.set('services', query.services);
+  return request('GET', `/api/masters/${encodeURIComponent(String(masterId))}/slots?${qs}`);
+}
 
 /**
  * Опубликованные фото работ.
@@ -75,6 +97,46 @@ export function getGallery(options = {}) {
   if (options.limit !== undefined) query.set('limit', String(options.limit));
   const qs = query.toString();
   return request('GET', '/api/gallery' + (qs ? '?' + qs : ''));
+}
+
+/**
+ * «Любой свободный мастер»: свободное время всех подходящих мастеров на дату.
+ * Ответ: `{ durationMin, masters: [{ id, name, level, priceKop }], slots: [{ startsAt, endsAt, masterIds }] }`.
+ * @param {{ date: string, services: string }} query
+ */
+export function getSlots(query) {
+  const qs = new URLSearchParams({ date: query.date, services: query.services });
+  return request('GET', `/api/slots?${qs}`);
+}
+
+/**
+ * Особые дни студии: закрытые и сокращенные. `{ days: [{ date, isOpen, open, close, reason }] }`.
+ * @param {{ from?: string, to?: string }} [range] по умолчанию — от сегодня на горизонт записи
+ */
+export function getStudioDays(range = {}) {
+  const query = new URLSearchParams();
+  if (range.from) query.set('from', range.from);
+  if (range.to) query.set('to', range.to);
+  const qs = query.toString();
+  return request('GET', '/api/studio/days' + (qs ? '?' + qs : ''));
+}
+
+// ---------- Бронь времени ----------
+
+/**
+ * Закрепить время на 10 минут перед подтверждением (только после входа). `masterId: null` — «Любой мастер»:
+ * мастера назначит сервер. Для переноса — `{ bookingId, startsAt, masterId? }` без услуг.
+ * 201 — `{ hold: { id, master, startsAt, endsAt, expiresAt, secondsLeft, priceKop, durationMin } }`;
+ * 401 — нужен вход; 409 SLOT_TAKEN — `details.alternatives`; 403 CHANGE_DEADLINE_PASSED; 503 MAINTENANCE.
+ * @param {{ masterId?: number | null, startsAt: string, services?: { serviceId: number, quantity: number }[], bookingId?: number }} body
+ */
+export async function createHold(body) {
+  return (await request('POST', '/api/holds', body)).hold;
+}
+
+/** Действующая бронь пользователя или null (нет или истекла). `{ id, masterId, startsAt, endsAt, bookingId, expiresAt, secondsLeft }` */
+export async function getCurrentHold() {
+  return (await request('GET', '/api/holds/current')).hold;
 }
 
 // ---------- Вход ----------
@@ -153,3 +215,37 @@ export async function getBookings(filter = {}) {
 
 /** Клиент закрыл сообщение «Студия отменила / перенесла запись». */
 export const acknowledgeBooking = (id) => request('POST', `/api/bookings/${encodeURIComponent(String(id))}/acknowledge`);
+
+/**
+ * Создать запись по действующей брони. 201 — запись целиком; 409 HOLD_EXPIRED / HOLD_NOT_FOUND — бронь истекла или ее нет;
+ * 409 HOLD_MISMATCH — бронь на другое время или состав; 409 SLOT_TAKEN — `details.alternatives`; 401 SESSION_EXPIRED; 503 MAINTENANCE.
+ * @param {{ masterId: number, startsAt: string, services: { serviceId: number, quantity: number }[], comment: string | null, isAnyMaster: boolean }} body
+ */
+export async function createBooking(body) {
+  return (await request('POST', '/api/bookings', body)).booking;
+}
+
+/** Запись клиента целиком. 404 — нет такой, 403 — чужая. */
+export async function getBooking(id) {
+  return (await request('GET', `/api/bookings/${encodeURIComponent(String(id))}`)).booking;
+}
+
+/**
+ * Отменить свою запись. 200 — запись; 403 CHANGE_DEADLINE_PASSED — меньше суток до визита (в тексте — телефон студии);
+ * 409 BOOKING_NOT_ACTIVE — уже отменена; 409 VERSION_CONFLICT — запись успели изменить.
+ * @param {number} id
+ * @param {{ reason: string | null, version: number }} body
+ */
+export async function cancelBooking(id, body) {
+  return (await request('POST', `/api/bookings/${encodeURIComponent(String(id))}/cancel`, body)).booking;
+}
+
+/**
+ * Перенести ту же запись на время, закрепленное бронью с bookingId. 200 — запись; 409 HOLD_EXPIRED / HOLD_NOT_FOUND /
+ * HOLD_MISMATCH / SLOT_TAKEN / VERSION_CONFLICT; 403 CHANGE_DEADLINE_PASSED.
+ * @param {number} id
+ * @param {{ startsAt: string, masterId?: number, reason: string | null, version: number }} body
+ */
+export async function rescheduleBooking(id, body) {
+  return (await request('POST', `/api/bookings/${encodeURIComponent(String(id))}/reschedule`, body)).booking;
+}

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Запись: услуги — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/booking.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/booking-steps.js"></script>
+  <script type="module" src="js/booking-services.js"></script>
+</head>
+<body class="booking-body">
+  <a class="skip-link" href="#main">К содержимому</a>
+
+  <!-- Общая шапка клиента — js/header.js -->
+  <client-header></client-header>
+
+  <!-- BOOK-01 Шаг 1. Услуги -->
+  <main class="booking" id="main" data-theme="powder">
+    <div class="container booking__inner">
+      <div class="booking-bar">
+        <button class="btn btn--neutral btn--small" type="button" data-back>← Назад</button>
+        <booking-steps current="services"></booking-steps>
+      </div>
+
+      <h1 class="visually-hidden">Запись: выберите услуги</h1>
+      <p class="booking__note" data-locked-note hidden></p>
+
+      <input class="input catalog-search" type="search" placeholder="Поиск по услугам" aria-label="Поиск по услугам" data-search>
+      <div class="chips" role="group" aria-label="Категории услуг" data-chips></div>
+
+      <!-- Ни один мастер не выполняет все выбранные услуги -->
+      <div class="warning" role="status" data-coverage hidden>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg>
+        <span>Ни один мастер не выполняет все выбранные услуги. Разделите их на два визита.</span>
+      </div>
+
+      <!-- Карточки — из GET /api/services. Пока каталог грузится — заглушки, как в прототипе -->
+      <div class="service-grid" data-services aria-busy="true">
+        <div class="skeleton-card" aria-hidden="true"><span class="skeleton skeleton--title"></span><span class="skeleton skeleton--line"></span><span class="skeleton skeleton--line skeleton--short"></span></div>
+        <div class="skeleton-card" aria-hidden="true"><span class="skeleton skeleton--title"></span><span class="skeleton skeleton--line"></span><span class="skeleton skeleton--line skeleton--short"></span></div>
+        <div class="skeleton-card" aria-hidden="true"><span class="skeleton skeleton--title"></span><span class="skeleton skeleton--line"></span><span class="skeleton skeleton--line skeleton--short"></span></div>
+        <div class="skeleton-card" aria-hidden="true"><span class="skeleton skeleton--title"></span><span class="skeleton skeleton--line"></span><span class="skeleton skeleton--line skeleton--short"></span></div>
+        <div class="skeleton-card" aria-hidden="true"><span class="skeleton skeleton--title"></span><span class="skeleton skeleton--line"></span><span class="skeleton skeleton--line skeleton--short"></span></div>
+        <div class="skeleton-card" aria-hidden="true"><span class="skeleton skeleton--title"></span><span class="skeleton skeleton--line"></span><span class="skeleton skeleton--line skeleton--short"></span></div>
+        <span class="visually-hidden">Загружаем услуги…</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Плашка корзины визита: состав, сумма и длительность от сервера, «Далее». Темная, как в прототипе -->
+  <section class="cart" aria-label="Ваш визит">
+    <div class="container cart__inner">
+      <div class="cart__lines" id="cart-lines" data-cart-lines hidden></div>
+      <div class="cart__bar">
+        <button class="cart__summary" type="button" aria-expanded="false" aria-controls="cart-lines" data-cart-toggle disabled>
+          <span class="cart__total" data-total aria-live="polite">Услуги не выбраны</span>
+          <span class="cart__hint" id="cart-hint" data-hint>Выберите хотя бы одну услугу</span>
+        </button>
+        <button class="btn btn--primary cart__next" type="button" aria-describedby="cart-hint" data-next disabled>Далее</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOOK-M4 Детали услуги -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="detail-title" data-detail>
+    <p class="modal__title modal__title--display" id="detail-title" data-detail-name></p>
+    <p class="modal__text" data-detail-desc></p>
+    <p class="modal__meta"><span data-detail-duration></span><span class="modal__price" data-detail-price></span></p>
+    <div class="modal__actions">
+      <button class="btn btn--neutral btn--small" type="button" data-detail-close>Закрыть</button>
+      <button class="btn btn--primary btn--small" type="button" data-detail-toggle></button>
+    </div>
+  </dialog>
+
+  <!-- BOOK-M5 Мастер не выполняет услугу -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="conflict-title" data-conflict>
+    <p class="modal__title" id="conflict-title" data-conflict-text></p>
+    <p class="modal__text">Выбрать другого мастера или убрать услугу?</p>
+    <div class="modal__actions">
+      <button class="btn btn--neutral btn--small" type="button" data-conflict-remove>Убрать услугу</button>
+      <button class="btn btn--outline btn--small" type="button" data-conflict-switch>Выбрать другого мастера</button>
+    </div>
+  </dialog>
+
+  <!-- BOOK-M6 Выйти из записи? -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="exit-title" data-exit>
+    <p class="modal__title" id="exit-title">Выйти из записи?</p>
+    <p class="modal__text">Выбор не сохранится.</p>
+    <div class="modal__actions">
+      <button class="btn btn--neutral btn--small" type="button" data-exit-stay>Остаться</button>
+      <button class="btn btn--danger btn--small" type="button" data-exit-leave>Выйти</button>
+    </div>
+  </dialog>
+</body>
+</html>
