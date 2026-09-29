@@ -113,6 +113,205 @@ client-header {
   }
 }
 
+/* ---------- Колокольчик уведомлений клиента (js/notifications.js) ---------- */
+
+.notify {
+  position: relative;
+}
+
+/* Кнопка 40px занимает по высоте столько же, сколько аватар: шапка не становится выше */
+.notify__toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space-8) + var(--space-2));
+  height: calc(var(--space-8) + var(--space-2));
+  margin-block: calc(-1 * var(--space-1));
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  vertical-align: top;
+  cursor: pointer;
+  transition: border-color 150ms ease-out;
+}
+
+.notify__toggle:hover {
+  border-color: var(--color-text-muted);
+}
+
+.notify__toggle svg {
+  width: var(--space-6);
+  height: var(--space-6);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Счетчик новых — розовый кружок в углу, текст темный, как на розовой кнопке */
+.notify__count {
+  position: absolute;
+  top: calc(-1 * var(--space-2));
+  right: calc(-1 * var(--space-2));
+  min-width: var(--space-4);
+  height: var(--space-4);
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-button-bg);
+  color: var(--color-button-text);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  line-height: var(--space-4);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.notify__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-3));
+  width: calc(var(--space-24) * 3 + var(--space-8));
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+/* Телефон: список — во всю ширину под шапкой, иначе он вылезет за левый край экрана */
+@media (max-width: 767.98px) {
+  .notify {
+    position: static;
+  }
+
+  .notify__panel {
+    left: var(--page-gutter-mobile);
+    right: var(--page-gutter-mobile);
+    top: calc(100% + var(--space-1));
+    width: auto;
+  }
+}
+
+.notify__title {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-button-weight);
+}
+
+/* Подпись вида сверху, текст под ней, крестик справа на обе строки */
+.notify__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'kind close'
+    'link close'
+    'error error';
+  align-items: start;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+.notify__kind {
+  grid-area: kind;
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  letter-spacing: var(--text-button-letter-spacing);
+  text-transform: uppercase;
+}
+
+/* Напоминание о визите — акцентом: оно про ближайшее время */
+.notify__item--reminder .notify__kind {
+  color: var(--color-text-accent);
+}
+
+.notify__link {
+  grid-area: link;
+}
+
+.notify__link:hover {
+  color: var(--color-text-accent);
+}
+
+.notify__close {
+  grid-area: close;
+  min-width: var(--space-8);
+  min-height: var(--space-8);
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--color-text-muted);
+  font-size: var(--text-body-m-size);
+  cursor: pointer;
+}
+
+.notify__close:hover {
+  color: var(--color-text);
+}
+
+.notify__close:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.notify__error {
+  grid-area: error;
+  color: var(--color-error-text);
+  font-size: var(--text-caption-size);
+}
+
+.notify__empty {
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+.notify__empty--error {
+  padding-bottom: var(--space-2);
+  color: var(--color-error-text);
+}
+
+.notify__retry {
+  margin: 0 var(--space-4) var(--space-4);
+  font-size: var(--text-body-s-size);
+  font-weight: var(--text-button-weight);
+}
+
+.notify__settings {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-accent);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-button-weight);
+}
+
+.notify__settings:hover {
+  background: var(--color-surface-accent);
+}
+
+/* Телефон: крестик и ссылка настроек — не меньше 44px, чтобы попасть пальцем */
+@media (max-width: 767.98px) {
+  .notify__close {
+    min-width: calc(var(--space-8) + var(--space-3));
+    min-height: calc(var(--space-8) + var(--space-3));
+  }
+
+  .notify__settings {
+    padding-block: var(--space-4);
+  }
+}
+
 /* ---------- Аватар с инициалами ---------- */
 
 .avatar {

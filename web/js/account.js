@@ -6,6 +6,7 @@ import * as api from './api.js';
 import {
   countdown, dateLabel, dateLong, escapeHtml as esc, money, phone as formatPhone, phoneHref, plural, timeLabel,
 } from './format.js';
+import { announceAcknowledged, onAcknowledged, studioChangeText } from './notifications.js';
 import { routes } from './routes.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -42,17 +43,11 @@ const isUpcoming = (b, now) => b.status === 'active' && Date.parse(b.startsAt) >
 function renderStudioChanges(bookings, tz) {
   const container = $('[data-studio-changes]');
   const changed = bookings.filter((b) => b.studioChange);
-  container.innerHTML = changed.map((b) => {
-    const when = `${dateLabel(b.startsAt, tz)}, ${timeLabel(b.startsAt, tz)}`;
-    const text = b.studioChange.type === 'cancelled'
-      ? `Студия отменила запись «${servicesText(b)}» на ${when}.`
-      : `Студия перенесла запись «${servicesText(b)}» — теперь она ${when}.`;
-    return `
+  container.innerHTML = changed.map((b) => `
       <div class="notice" data-notice="${b.id}">
-        <span><a href="${esc(routes.bookingCard(b.id))}">${esc(text)}</a><span class="notice__error" role="alert" hidden></span></span>
+        <span><a href="${esc(routes.bookingCard(b.id))}">${esc(studioChangeText(b, tz))}</a><span class="notice__error" role="alert" hidden></span></span>
         <button class="notice__close" type="button" aria-label="Закрыть сообщение" data-acknowledge="${b.id}">✕</button>
-      </div>`;
-  }).join('');
+      </div>`).join('');
 
   container.querySelectorAll('[data-acknowledge]').forEach((button) => {
     button.addEventListener('click', async () => {
@@ -63,6 +58,7 @@ function renderStudioChanges(bookings, tz) {
       try {
         await api.acknowledgeBooking(Number(button.dataset.acknowledge));
         notice.remove();
+        announceAcknowledged(Number(button.dataset.acknowledge));
       } catch (e) {
         if (isAuthError(e)) return goLogin();
         error.textContent = `Не удалось закрыть сообщение. ${e.message}`;
@@ -72,6 +68,9 @@ function renderStudioChanges(bookings, tz) {
     });
   });
 }
+
+// Сообщение закрыли в колокольчике шапки — убираем его и здесь
+onAcknowledged((bookingId) => document.querySelector(`[data-notice="${bookingId}"]`)?.remove());
 
 function badge(b) {
   return b.canChange

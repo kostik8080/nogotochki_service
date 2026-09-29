@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Профиль — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/cabinet.css">
+  <link rel="stylesheet" href="css/account.css">
+  <link rel="stylesheet" href="css/profile.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/cabinet-nav.js"></script>
+  <script type="module" src="js/profile.js"></script>
+</head>
+<body class="cabinet-body profile-body">
+  <a class="skip-link" href="#main">К содержимому</a>
+
+  <!-- Общая шапка клиента — js/header.js -->
+  <client-header></client-header>
+
+  <div class="cabinet" data-theme="powder">
+    <div class="container cabinet__inner">
+      <!-- Меню кабинета — js/cabinet-nav.js -->
+      <cabinet-nav></cabinet-nav>
+
+      <!-- CAB-07 Профиль -->
+      <main class="cabinet__main" id="main">
+        <h1 class="cabinet__title">Профиль</h1>
+
+        <div data-view="loading" aria-busy="true">
+          <span class="skeleton skeleton--nearest" aria-hidden="true"></span>
+          <span class="skeleton skeleton--nearest" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем профиль…</span>
+        </div>
+
+        <div class="state-card" role="alert" data-view="error" hidden>
+          <p class="state-card__title">Не удалось загрузить профиль</p>
+          <p class="state-card__text" data-error-text></p>
+          <button class="btn btn--primary btn--small" type="button" data-retry>Обновить</button>
+        </div>
+
+        <div class="profile" data-view="content" hidden>
+          <!-- Вкладки профиля: слева на компьютере, строкой сверху на планшете и телефоне.
+               Открытая вкладка — в адресе: profile.html#security, #notifications (туда ведет колокольчик в шапке) -->
+          <div class="profile-tabs" role="tablist" aria-label="Разделы профиля" data-tabs>
+            <button class="profile-tab" type="button" role="tab" id="tab-personal" aria-controls="panel-personal"
+                    aria-selected="true" data-tab="personal">Личные данные</button>
+            <button class="profile-tab" type="button" role="tab" id="tab-security" aria-controls="panel-security"
+                    aria-selected="false" tabindex="-1" data-tab="security">Безопасность</button>
+            <button class="profile-tab" type="button" role="tab" id="tab-notifications" aria-controls="panel-notifications"
+                    aria-selected="false" tabindex="-1" data-tab="notifications">Уведомления</button>
+          </div>
+
+          <!-- Личные данные: у имени и e-mail разные пути сохранения (docs/ui-map.md, пункт 11.3) -->
+          <section class="profile-panel" role="tabpanel" id="panel-personal" aria-labelledby="tab-personal" tabindex="0">
+            <div class="profile-card">
+              <h2 class="profile-card__title">Личные данные</h2>
+
+              <!-- Имя → PATCH /api/profile { name } -->
+              <form class="form profile-row" data-name-form novalidate>
+                <div class="alert" role="alert" data-alert hidden></div>
+                <div class="field">
+                  <label class="field__label" for="name">Имя</label>
+                  <div class="profile-inline">
+                    <input class="input" id="name" name="name" type="text" autocomplete="name" maxlength="100"
+                           aria-describedby="name-error">
+                    <button class="btn btn--primary btn--small" type="submit" data-name-save disabled>Сохранить</button>
+                  </div>
+                  <p class="field__error" id="name-error" data-error-for="name" hidden></p>
+                </div>
+              </form>
+
+              <!-- Телефон только для чтения: номер меняет администратор (docs/ui-map.md, пункт 11.2) -->
+              <div class="profile-row">
+                <p class="field__label" id="phone-label">Телефон</p>
+                <p class="profile-value" aria-labelledby="phone-label" data-phone></p>
+                <p class="field__hint" data-phone-hint>Сменить номер можно через студию</p>
+              </div>
+
+              <!-- E-mail: новый адрес попадет в профиль только после кода из письма -->
+              <div class="profile-row">
+                <p class="field__label" id="email-label">E-mail</p>
+                <div class="profile-inline profile-inline--value" data-email-view>
+                  <p class="profile-value" aria-labelledby="email-label">
+                    <span data-email></span>
+                    <span class="profile-badge" data-email-unverified hidden>не подтвержден</span>
+                  </p>
+                  <span class="profile-actions">
+                    <button class="btn btn--outline btn--small" type="button" data-email-verify hidden>Подтвердить</button>
+                    <button class="btn btn--neutral btn--small" type="button" data-email-edit>Изменить</button>
+                  </span>
+                </div>
+                <div class="alert" role="alert" data-email-alert hidden></div>
+
+                <!-- Новый e-mail → POST /api/profile/email { email } → код на этот адрес -->
+                <form class="form profile-email-form" data-email-form novalidate hidden>
+                  <div class="field">
+                    <label class="field__label" for="email">Новый e-mail</label>
+                    <input class="input" id="email" name="email" type="email" autocomplete="email" inputmode="email"
+                           autocapitalize="off" spellcheck="false" placeholder="you@mail.ru" maxlength="254"
+                           aria-describedby="email-hint email-error">
+                    <p class="field__hint" id="email-hint">Потребуется код из письма. До ввода кода остается прежний адрес.</p>
+                    <p class="field__error" id="email-error" data-error-for="email" hidden></p>
+                  </div>
+                  <div class="profile-actions">
+                    <button class="btn btn--primary btn--small" type="submit">Получить код</button>
+                    <button class="btn btn--neutral btn--small" type="button" data-email-cancel>Отмена</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </section>
+
+          <!-- Безопасность: смена пароля, выход, удаление аккаунта -->
+          <section class="profile-panel" role="tabpanel" id="panel-security" aria-labelledby="tab-security" tabindex="0" hidden>
+            <!-- Смена пароля → POST /api/profile/password { currentPassword, newPassword } -->
+            <div class="profile-card">
+              <h2 class="profile-card__title">Смена пароля</h2>
+              <form class="form" data-password-form novalidate>
+                <div class="alert" role="alert" data-alert hidden></div>
+
+                <div class="field">
+                  <label class="field__label" for="current-password">Текущий пароль</label>
+                  <input class="input" id="current-password" name="currentPassword" type="password"
+                         autocomplete="current-password" maxlength="128" aria-describedby="currentPassword-error">
+                  <p class="field__error" id="currentPassword-error" data-error-for="currentPassword" hidden></p>
+                </div>
+
+                <div class="field">
+                  <label class="field__label" for="new-password">Новый пароль</label>
+                  <input class="input" id="new-password" name="newPassword" type="password" autocomplete="new-password"
+                         maxlength="128" aria-describedby="password-rules newPassword-error">
+                  <ul class="password-rules" id="password-rules" data-password-rules>
+                    <li data-rule="length"><span data-mark aria-hidden="true">○</span>минимум 8 символов</li>
+                    <li data-rule="letter"><span data-mark aria-hidden="true">○</span>есть буква</li>
+                    <li data-rule="digit"><span data-mark aria-hidden="true">○</span>есть цифра</li>
+                  </ul>
+                  <p class="field__error" id="newPassword-error" data-error-for="newPassword" hidden></p>
+                </div>
+
+                <div class="field">
+                  <label class="field__label" for="repeat-password">Повторите новый пароль</label>
+                  <input class="input" id="repeat-password" name="repeatPassword" type="password" autocomplete="new-password"
+                         maxlength="128" aria-describedby="repeatPassword-error">
+                  <p class="field__error" id="repeatPassword-error" data-error-for="repeatPassword" hidden></p>
+                </div>
+
+                <p class="field__hint">После смены пароля на других устройствах нужно будет войти заново.</p>
+                <div>
+                  <button class="btn btn--primary" type="submit">Изменить пароль</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Выйти и удалить аккаунт -->
+            <div class="profile-card profile-card--row">
+              <button class="text-link profile-logout" type="button" data-logout>Выйти</button>
+              <button class="text-link profile-delete" type="button" data-delete-open>Удалить аккаунт</button>
+              <p class="profile-card__error" role="alert" data-logout-error hidden></p>
+            </div>
+          </section>
+
+          <!-- Уведомления: что сервис сообщает клиенту и согласие на рассылку -->
+          <section class="profile-panel" role="tabpanel" id="panel-notifications" aria-labelledby="tab-notifications" tabindex="0" hidden>
+            <div class="profile-card">
+              <h2 class="profile-card__title">Уведомления</h2>
+
+              <!-- Напоминания считает браузер по времени визита (js/notifications.js), сообщения студии — из записей.
+                   SMS и письма о записях сервис не отправляет (docs/ui-map.md, «Уведомления») -->
+              <div class="profile-row">
+                <p class="field__label">Напоминания о визите</p>
+                <p class="profile-text">За сутки, за 2 часа и за 15 минут до визита под колокольчиком в шапке появится напоминание: дата, время, услуги и мастер, а за 15 минут — еще и адрес студии.</p>
+              </div>
+
+              <div class="profile-row">
+                <p class="field__label">Изменения записей</p>
+                <p class="profile-text">Если студия отменит или перенесет вашу запись, сообщение появится в личном кабинете и под колокольчиком в шапке.</p>
+              </div>
+
+              <div class="profile-row">
+                <p class="profile-text profile-text--note">Уведомления видны, когда вы открываете сайт: SMS, письма и сообщения на телефон о записях сервис не отправляет.</p>
+              </div>
+
+              <!-- Согласие на новости → PATCH /api/profile { marketingConsent } (docs/ui-map.md, список 2, пункт 1) -->
+              <div class="profile-row">
+                <p class="field__label">Новости и акции</p>
+                <div class="check">
+                  <label class="check__label">
+                    <input type="checkbox" data-marketing aria-describedby="marketing-hint">
+                    <span>Получать новости и акции студии на e-mail</span>
+                  </label>
+                </div>
+                <p class="field__hint" id="marketing-hint" data-marketing-hint>Согласие можно отозвать в любой момент — снимите флажок.</p>
+                <p class="profile-status" role="status" data-marketing-status></p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    <div class="container page-footer__inner">
+      <span>© Ноготочки, бьюти-студия</span>
+      <span class="page-footer__links">
+        <a href="privacy.html">Политика обработки персональных данных</a>
+      </span>
+    </div>
+  </footer>
+
+  <!-- AUTH-02 Подтверждение e-mail кодом из письма → POST /api/profile/email/confirm { code }.
+       Окно этой же страницы: адрес, на который ушел код, живет только до перезагрузки (docs/ui-map.md, пункт 11.1) -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="code-title" data-code-dialog>
+    <form class="form" data-code-form novalidate>
+      <p class="modal__title" id="code-title">Подтверждение e-mail</p>
+      <p class="modal__text" data-code-hint></p>
+      <div class="alert" role="alert" data-alert hidden></div>
+
+      <div class="field">
+        <label class="field__label" for="code">Код из письма</label>
+        <input class="input input--code" id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+               maxlength="6" pattern="\d{6}" aria-describedby="code-error">
+        <p class="field__error" id="code-error" data-error-for="code" hidden></p>
+      </div>
+
+      <div class="profile-code-links">
+        <button class="text-link" type="button" data-resend disabled>Отправить код повторно</button>
+        <button class="text-link" type="button" data-code-change>Изменить e-mail</button>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn btn--neutral btn--small" type="button" data-code-close>Отмена</button>
+        <button class="btn btn--primary btn--small" type="submit">Подтвердить</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- CAB-10 Удаление аккаунта → DELETE /api/profile { password }. API требует пароль, поэтому вместо слова
+       «УДАЛИТЬ» из прототипа — поле пароля (docs/ui-map.md, пункт 12) -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="delete-title" data-delete-dialog>
+    <form class="form" data-delete-form novalidate>
+      <p class="modal__title profile-delete__title" id="delete-title">Удалить аккаунт?</p>
+      <p class="modal__text">Все предстоящие записи будут отменены, имя, телефон и e-mail — удалены. Прошедшие визиты останутся в истории студии без ваших данных. Это действие нельзя отменить.</p>
+      <div class="alert" role="alert" data-alert hidden></div>
+
+      <div class="field">
+        <label class="field__label" for="delete-password">Введите пароль, чтобы удалить аккаунт</label>
+        <input class="input" id="delete-password" name="password" type="password" autocomplete="current-password"
+               maxlength="128" aria-describedby="password-error">
+        <p class="field__error" id="password-error" data-error-for="password" hidden></p>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn btn--neutral btn--small" type="button" data-delete-close>Отмена</button>
+        <button class="btn btn--danger btn--small" type="submit">Удалить аккаунт</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

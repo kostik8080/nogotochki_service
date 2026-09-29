@@ -8,6 +8,7 @@ import * as api from './api.js';
 import { bookingServices, downloadIcs } from './calendar.js';
 import { setBusy, showAlert } from './form.js';
 import { dateLabel, escapeHtml as esc, money, phone as formatPhone, phoneHref, plural, timeLabel } from './format.js';
+import { announceAcknowledged, onAcknowledged } from './notifications.js';
 import { routes } from './routes.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -132,10 +133,18 @@ $('[data-acknowledge]').addEventListener('click', async () => {
   try {
     booking = { ...booking, studioChange: null, ...(await api.acknowledgeBooking(id)).booking };
     renderStudioChange();
+    announceAcknowledged(id);
   } catch (error) {
     $('[data-studio-change-text]').textContent += ` Не удалось закрыть сообщение: ${error.message}`;
     button.disabled = false;
   }
+});
+
+// Сообщение об этой записи закрыли в колокольчике шапки — прячем его и здесь
+onAcknowledged((bookingId) => {
+  if (bookingId !== id || !booking) return;
+  booking = { ...booking, studioChange: null };
+  renderStudioChange();
 });
 
 $('[data-calendar]').addEventListener('click', () => downloadIcs(booking, studio));

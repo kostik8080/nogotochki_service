@@ -197,6 +197,52 @@ export const requestPasswordReset = (body) => request('POST', '/api/auth/passwor
  */
 export const confirmPasswordReset = (body) => request('POST', '/api/auth/password-reset/confirm', body);
 
+// ---------- Профиль ----------
+
+/**
+ * Имя и согласие на новости. 200 — пользователь целиком, как в GET /api/auth/me.
+ * @param {{ name?: string, marketingConsent?: boolean }} body
+ */
+export async function updateProfile(body) {
+  const { user } = await request('PATCH', '/api/profile', body);
+  mePromise = Promise.resolve(user);
+  return user;
+}
+
+/**
+ * Смена пароля. 204 — пароль изменен, остальные сессии закрыты; 403 WRONG_PASSWORD — неверный текущий пароль.
+ * @param {{ currentPassword: string, newPassword: string }} body
+ */
+export const changePassword = (body) => request('POST', '/api/profile/password', body);
+
+/**
+ * Код на новый или неподтвержденный e-mail. 202 — `{ sentTo, expiresInMin }`; 409 EMAIL_TAKEN;
+ * 429 CODE_RECENTLY_SENT — не чаще раза в минуту; 503 EMAIL_UNAVAILABLE / DELIVERY_FAILED — почта не работает.
+ * @param {{ email: string }} body
+ */
+export const requestEmailCode = (body) => request('POST', '/api/profile/email', body);
+
+/**
+ * Код из письма: адрес записывается в профиль подтвержденным. 200 — пользователь целиком;
+ * 400 INVALID_CODE — `details.attemptsLeft`, после трех ошибок и через 15 минут код не действует; 409 EMAIL_TAKEN.
+ * @param {{ code: string }} body
+ */
+export async function confirmEmailCode(body) {
+  const { user } = await request('POST', '/api/profile/email/confirm', body);
+  mePromise = Promise.resolve(user);
+  return user;
+}
+
+/**
+ * Удалить аккаунт клиента. 204 — предстоящие записи отменены, данные обезличены, сессия закрыта;
+ * 403 WRONG_PASSWORD — неверный пароль.
+ * @param {{ password: string }} body
+ */
+export async function deleteAccount(body) {
+  await request('DELETE', '/api/profile', body);
+  mePromise = Promise.resolve(null);
+}
+
 // ---------- Записи клиента ----------
 
 /**

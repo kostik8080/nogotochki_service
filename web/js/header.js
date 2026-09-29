@@ -3,14 +3,16 @@
 //
 // Состав — лист «Навигация» карты связей (docs/karta-svyazey-prototipa.xlsx) и шапка лендинга в прототипе:
 //   логотип → главная (N-25);
-//   вошел клиент: «Записаться» → BOOK-01 (N-26), аватар с инициалами и имя, меню «Мои записи» (N-09),
-//                 «Профиль» (N-10), «Выйти» → главная (N-11, N-27);
+//   вошел клиент: «Записаться» → BOOK-01 (N-26), колокольчик уведомлений со счетчиком (js/notifications.js),
+//                 аватар с инициалами и имя, меню «Мои записи» (N-09), «Профиль» (N-10), «Выйти» → главная (N-11, N-27);
 //   не вошел: «Войти» (N-08) и «Регистрация» (N-54) вместо аватара.
 // На телефоне рядом с логотипом остаются только вход или аватар, остальное сворачивается в меню:
 // клиенту «Записаться» и имя — в меню аккаунта, гостю «Регистрация» — в меню по кнопке с тремя полосками.
 // Имя — из GET /api/auth/me (один запрос на страницу, см. api.getMe). Меню аккаунта использует и шапка лендинга.
 import * as api from './api.js';
+import { bindDropdown } from './dropdown.js';
 import { escapeHtml as esc, initials } from './format.js';
+import { mountNotifications } from './notifications.js';
 import { routes } from './routes.js';
 
 const EMBLEM = `
@@ -30,36 +32,6 @@ const currentPage = () => window.location.pathname.split('/').pop() || routes.ho
 let menuCounter = 0;
 
 const BURGER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
-
-/**
- * Выпадающий список по кнопке [data-dropdown-toggle]: открывается и закрывается ею, закрывается кликом мимо
- * и клавишей Escape.
- * @param {HTMLElement} root блок, внутри которого кнопка и список [data-dropdown-list]
- * @returns {AbortController} снимает слушатели документа
- */
-function bindDropdown(root) {
-  const toggle = /** @type {HTMLButtonElement} */ (root.querySelector('[data-dropdown-toggle]'));
-  const list = /** @type {HTMLElement} */ (root.querySelector('[data-dropdown-list]'));
-
-  // Слушатели документа снимаются, когда меню перерисовывают (например, после выхода)
-  const listeners = new AbortController();
-  const setOpen = (open) => {
-    list.hidden = !open;
-    toggle.setAttribute('aria-expanded', String(open));
-  };
-  toggle.addEventListener('click', () => setOpen(list.hidden));
-  document.addEventListener('click', (event) => {
-    if (!root.isConnected) return listeners.abort();
-    if (!list.hidden && !root.contains(/** @type {Node} */ (event.target))) setOpen(false);
-  }, { signal: listeners.signal });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !list.hidden) {
-      setOpen(false);
-      toggle.focus();
-    }
-  }, { signal: listeners.signal });
-  return listeners;
-}
 
 /**
  * Меню аккаунта: аватар, имя и выпадающий список. Клиенту — «Мои записи» и «Профиль»; у сотрудника
@@ -113,6 +85,21 @@ export function mountAccountMenu(container, user, { onLoggedOut, bookOnPhone = f
       errorBox.hidden = false;
       logout.disabled = false;
     }
+  });
+}
+
+/**
+ * Новое имя во всех меню аккаунта на странице: инициалы, имя рядом с аватаром и в начале списка.
+ * Нужно профилю: имя сохранено, а шапку перерисовывать незачем.
+ * @param {string} name
+ */
+export function updateAccountName(name) {
+  document.querySelectorAll('.account-menu').forEach((menu) => {
+    const toggle = menu.querySelector('.account-menu__toggle');
+    if (!toggle) return;
+    toggle.setAttribute('aria-label', `Меню аккаунта: ${name}`);
+    menu.querySelector('.avatar').textContent = initials(name);
+    menu.querySelectorAll('.account-menu__name, .account-menu__user').forEach((el) => { el.textContent = name; });
   });
 }
 
@@ -173,9 +160,12 @@ class ClientHeader extends HTMLElement {
       bindDropdown(/** @type {HTMLElement} */ (actions.querySelector('.client-header__more')));
       return;
     }
+    const client = user.role === 'client';
     actions.innerHTML = `
-      ${user.role === 'client' ? `<a class="btn btn--primary btn--small client-header__book" href="${esc(routes.booking())}">Записаться</a>` : ''}
+      ${client ? `<a class="btn btn--primary btn--small client-header__book" href="${esc(routes.booking())}">Записаться</a>` : ''}
+      ${client ? '<div data-notify></div>' : ''}
       <div data-menu></div>`;
+    if (client) mountNotifications(/** @type {HTMLElement} */ (actions.querySelector('[data-notify]')));
     mountAccountMenu(/** @type {HTMLElement} */ (actions.querySelector('[data-menu]')), user, {
       onLoggedOut: () => window.location.assign(routes.home),
       bookOnPhone: true,

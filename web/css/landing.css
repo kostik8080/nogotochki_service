@@ -150,24 +150,144 @@
 
 /* ---------- Первый экран ---------- */
 
+/*
+ * Фон первого экрана — как на референсе «Luxury Nail Salon» (картинка в корне проекта): темный фон,
+ * фото рук с маникюром справа уходит в темноту к тексту, между ними теплые размытые огоньки (боке).
+ * Слои снизу вверх: темный атлас (.hero) → фото (.hero__photo) → ::before (боке и затемнение под текстом).
+ *
+ * Фото — web/img/hero.jpg, задается в .hero__photo переменной --hero-photo. Без нее остается атлас:
+ * складки ткани и розовое свечение, нарисованные градиентами.
+ * Фото лучше горизонтальное, рука — справа на темном фоне, слева пусто: там встанет текст.
+ */
 .hero {
   position: relative;
   display: flex;
   align-items: center;
+  overflow: hidden;
   padding-block: calc(var(--space-24) + var(--space-8)) var(--space-16);
-  /* Место под фото студии: пока фото нет, как в прототипе — полосатая заглушка */
-  background-image: repeating-linear-gradient(135deg, var(--color-text-accent) 0 var(--space-3), var(--color-button-bg-active) var(--space-3) var(--space-6));
+  background:
+    /* Мягкий блик на складке ткани */
+    radial-gradient(ellipse 30% 45% at 75% 38%, color-mix(in srgb, var(--color-button-bg) 28%, transparent), transparent 70%),
+    /* Складки атласа: светлые полосы по диагонали, в правой части */
+    linear-gradient(118deg,
+      transparent 48%,
+      color-mix(in srgb, var(--color-avatar-bg) 14%, transparent) 58%,
+      transparent 65%,
+      color-mix(in srgb, var(--color-avatar-bg) 10%, transparent) 74%,
+      transparent 81%,
+      color-mix(in srgb, var(--color-avatar-bg) 12%, transparent) 90%,
+      transparent 97%),
+    linear-gradient(160deg, var(--color-surface), var(--color-bg));
 }
 
+.hero__photo {
+  --hero-photo: url('../img/hero.jpg');
+  position: absolute;
+  z-index: 0;
+  inset: 0 0 0 auto;
+  width: 100%;
+  background-image: var(--hero-photo, none);
+  background-repeat: no-repeat;
+  background-size: cover;
+  /* Кадр прижат вправо: при обрезке теряется пустой фон слева, а не рука */
+  background-position: right center;
+  /* Левый край растворяется в темном фоне — как фото на референсе */
+  -webkit-mask-image: linear-gradient(90deg, transparent, var(--color-bg) 45%);
+  mask-image: linear-gradient(90deg, transparent, var(--color-bg) 45%);
+}
+
+/* Боке — теплые огоньки не в фокусе; затемнение слева держит контраст текста, снизу — переход к полосе цифр */
 .hero::before {
   content: '';
   position: absolute;
+  z-index: 1;
   inset: 0;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--color-bg) 88%, transparent), color-mix(in srgb, var(--color-bg) 55%, transparent));
+  background:
+    radial-gradient(circle var(--space-12) at 40% 26%, color-mix(in srgb, var(--color-brand-gold) 34%, transparent) 0, color-mix(in srgb, var(--color-brand-gold) 22%, transparent) 55%, transparent 72%),
+    radial-gradient(circle var(--space-8) at 48% 40%, color-mix(in srgb, var(--color-brand-gold) 30%, transparent) 0, color-mix(in srgb, var(--color-brand-gold) 18%, transparent) 55%, transparent 72%),
+    radial-gradient(circle var(--space-16) at 55% 22%, color-mix(in srgb, var(--color-button-bg) 16%, transparent) 0, color-mix(in srgb, var(--color-button-bg) 10%, transparent) 55%, transparent 72%),
+    radial-gradient(circle var(--space-6) at 34% 44%, color-mix(in srgb, var(--color-brand-gold) 26%, transparent) 0, transparent 72%),
+    radial-gradient(circle var(--space-8) at 60% 48%, color-mix(in srgb, var(--color-avatar-bg) 14%, transparent) 0, transparent 72%),
+    linear-gradient(0deg, var(--color-bg), transparent 22%),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-bg) 92%, transparent) 0, color-mix(in srgb, var(--color-bg) 70%, transparent) 38%, transparent 70%);
+}
+
+/* Телефон и планшет: текст на всю ширину. Фото не растягивается на всю высоту экрана, а стоит целиком
+   в правом нижнем углу; огоньки — над заголовком. Высота фото и затемнение под текстом — переменными:
+   на планшете справа от текста есть место, и рука там крупнее и ярче */
+@media (max-width: 1023.98px) {
+  .hero {
+    /* Какую часть высоты первого экрана занимает фото */
+    --hero-photo-height: 45%;
+    /* Затемнение слева направо: на телефоне рука стоит прямо за текстом — притушена сильнее */
+    --hero-shade: linear-gradient(90deg, color-mix(in srgb, var(--color-bg) 85%, transparent), color-mix(in srgb, var(--color-bg) 45%, transparent));
+  }
+
+  .hero__photo {
+    opacity: 0.7;
+    background-size: auto var(--hero-photo-height);
+    background-position: right bottom;
+    /* Левый и верхний края фото растворяются — иначе они видны ровными линиями на свечении атласа */
+    -webkit-mask-image:
+      linear-gradient(90deg, transparent, var(--color-bg) 45%),
+      linear-gradient(180deg, transparent calc(100% - var(--hero-photo-height)), var(--color-bg) calc(100% - var(--hero-photo-height) + 20%));
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(90deg, transparent, var(--color-bg) 45%),
+      linear-gradient(180deg, transparent calc(100% - var(--hero-photo-height)), var(--color-bg) calc(100% - var(--hero-photo-height) + 20%));
+    mask-composite: intersect;
+  }
+
+  .hero::before {
+    background:
+      radial-gradient(circle var(--space-8) at 78% 18%, color-mix(in srgb, var(--color-brand-gold) 30%, transparent) 0, color-mix(in srgb, var(--color-brand-gold) 18%, transparent) 55%, transparent 72%),
+      radial-gradient(circle var(--space-12) at 90% 30%, color-mix(in srgb, var(--color-button-bg) 16%, transparent) 0, transparent 72%),
+      radial-gradient(circle var(--space-6) at 68% 30%, color-mix(in srgb, var(--color-brand-gold) 24%, transparent) 0, transparent 72%),
+      /* Узкое затемнение снизу: рука в нижнем углу должна остаться видна */
+      linear-gradient(0deg, var(--color-bg), transparent 8%),
+      var(--hero-shade);
+  }
+}
+
+/* Планшет и широкий телефон (от 524px): рука почти на всю высоту первого экрана, справа от текста;
+   затемнение держит только текст слева. Уже 524px руке рядом с текстом не хватает места — там раскладка телефона.
+   524px — не точка перелома сетки tokens.css, а ширина, с которой рука помещается рядом с колонкой текста */
+@media (min-width: 524px) and (max-width: 1023.98px) {
+  .hero {
+    --hero-photo-height: 76%;
+    --hero-shade: linear-gradient(90deg, color-mix(in srgb, var(--color-bg) 85%, transparent) 0, color-mix(in srgb, var(--color-bg) 55%, transparent) 45%, transparent 75%);
+  }
+
+  /* Фото заходит за правый край, чтобы ногти не ложились на кнопки и строку преимуществ. Чем уже экран, тем
+     больше текст по ширине — тем дальше сдвиг: 64px от ~860px и шире, на 768px — около 140px */
+  .hero__photo {
+    opacity: 0.9;
+    background-position: right min(calc(100vw - var(--space-24) * 9 - var(--space-12)), calc(-1 * var(--space-16))) bottom;
+  }
+}
+
+/* Широкий телефон: колонка текста сужена до 60% (см. ниже). Высота первого экрана тут зависит от того, сколько
+   строк занял текст, поэтому размер руки задан от ширины экрана: ногти встают правее колонки текста,
+   а рука почти не заходит за правый край */
+@media (min-width: 524px) and (max-width: 767.98px) {
+  .hero {
+    --hero-photo-height: 64vw;
+  }
+
+  .hero__photo {
+    background-position: right calc(-1 * var(--space-6)) bottom;
+  }
+}
+
+@media (min-width: 1024px) {
+  .hero__photo {
+    width: 62%;
+  }
 }
 
 .hero__inner {
   position: relative;
+  z-index: 2;
 }
 
 .hero__inner > * {
@@ -255,6 +375,14 @@
 
   .hero__lead {
     font-size: var(--text-body-l-size);
+  }
+}
+
+/* Широкий телефон (524–767px): текст — в левой колонке на 60% ширины, как на планшете; справа — рука.
+   Кнопки встают друг под другом, преимущества — столбиком */
+@media (min-width: 524px) and (max-width: 767.98px) {
+  .hero__inner > * {
+    max-width: 60%;
   }
 }
 
