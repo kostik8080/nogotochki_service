@@ -14,13 +14,15 @@ import { masterRoutes } from './api/master.js';
 import { passwordResetRoutes } from './api/password-reset.js';
 import { photoRoutes } from './api/photos.js';
 import { profileRoutes } from './api/profile.js';
-import { clearSessionCookie, findSession, SESSION_COOKIE } from './auth/sessions.js';
+import { clearSessionCookie, findSession, SESSION_COOKIE, type SessionUser } from './auth/sessions.js';
+import { config } from './config.js';
 import type { Db } from './db/connection.js';
 import { fromDatabaseError, HttpError } from './http/errors.js';
 import { parseCookies, readJson, readRaw, sendFile, sendJson } from './http/io.js';
 import { RateLimiter } from './http/rate-limit.js';
 import { type Context, type LimitBucket, Router, type Services } from './http/router.js';
 import type { Mailer } from './notify/mailer.js';
+import { adminPage, isAdminPagePath } from './web/admin-pages.js';
 
 export interface AppOptions {
   /** Текущий момент; тесты подставляют свой. */
@@ -39,6 +41,8 @@ export interface AppOptions {
   appUrl?: string;
   /** Папка фото работ. */
   uploadsDir: string;
+  /** Папка интерфейса web/ — страницы раздела администратора /admin. По умолчанию из настроек (WEB_DIR). */
+  webDir?: string;
 }
 
 export interface App {
@@ -51,6 +55,7 @@ export function createApp(db: Db, options: AppOptions): App {
   const now = options.now ?? (() => new Date());
   const secureCookies = options.secureCookies ?? false;
   const logError = options.logError ?? ((error) => console.error(error));
+  const webDir = options.webDir ?? config.webDir;
   const services: Services = {
     mailer: options.mailer ?? null,
     appUrl: options.appUrl ?? 'http://localhost:3000',
@@ -87,26 +92,36 @@ export function createApp(db: Db, options: AppOptions): App {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
       const method = req.method ?? 'GET';
-      const { handler, params, raw } = router.match(method, url.pathname);
-
       const at = now();
+
+      let user: SessionUser | null = null;
+      let sessionStatus: Context['sessionStatus'] = 'none';
+      const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE);
+      if (token) {
+        const session = findSession(db, token, at);
+        sessionStatus = session.status;
+        if (session.status === 'ok') user = session.user;
+        // Недействительную cookie браузер больше не присылает: так клиент сразу видит, что нужно войти.
+        else cookies.push(clearSessionCookie(secureCookies));
+      }
+
+      // Страницы раздела администратора: доступ решает сервер по сессии (web/admin-pages.ts).
+      if (isAdminPagePath(url.pathname)) {
+        const page = await adminPage({ method, pathname: url.pathname, user, webDir });
+        res.writeHead(page.status, { ...page.headers, ...(cookies.length ? { 'Set-Cookie': cookies } : {}) });
+        res.end(method === 'HEAD' ? undefined : page.body);
+        return;
+      }
+
+      const { handler, params, raw } = router.match(method, url.pathname);
       const ctx: Context = {
-        db, req, params, query: url.searchParams, body: undefined, services, now: at, user: null, sessionStatus: 'none',
+        db, req, params, query: url.searchParams, body: undefined, services, now: at, user, sessionStatus,
         ip: clientIp(req, options.trustProxy ?? false),
         limit: (bucket, key) => {
           if (options.rateLimit !== false) limiters[bucket].hit(key, at.getTime());
         },
         setCookie: (value) => cookies.push(value),
       };
-
-      const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE);
-      if (token) {
-        const session = findSession(db, token, at);
-        ctx.sessionStatus = session.status;
-        if (session.status === 'ok') ctx.user = session.user;
-        // Недействительную cookie браузер больше не присылает: так клиент сразу видит, что нужно войти.
-        else cookies.push(clearSessionCookie(secureCookies));
-      }
 
       // Файл (фото) принимается только от вошедшего пользователя: без входа 10 МБ даже не читаются.
       if (raw) {

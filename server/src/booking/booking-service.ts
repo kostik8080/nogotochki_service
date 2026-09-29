@@ -10,7 +10,7 @@
 //   * insertBookingRows, writeReschedule, writeCancellation, writeStatusChange — только запись строк
 //     в правильном порядке (например, событие отмены раньше статуса, триггер 10.7). Правил в них нет:
 //     их вызывают функции первого слоя и тестовые данные, которым нужна история в прошлом.
-import type { Role } from '../auth/sessions.js';
+import { hasRole, type Role } from '../auth/sessions.js';
 import { type Db, transaction } from '../db/connection.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../http/errors.js';
 import { readSettings } from '../studio/settings.js';
@@ -21,7 +21,8 @@ import { type Level, requireMasterForVisit, resolveVisit, unitPrice, type VisitI
 /** Кто действует: пользователь сессии или система (тестовые данные — через функции второго слоя). */
 export interface Actor {
   id: number;
-  role: Role;
+  /** Роли списком: права проверяет hasRole (auth/sessions.ts). */
+  roles: readonly Role[];
 }
 
 type CancelStatus = 'cancelled_by_client' | 'cancelled_by_studio';
@@ -39,7 +40,7 @@ const addMin = (at: string, min: number) => iso(Date.parse(at) + min * 60_000);
  * разделов для мастера в первой версии нет (паспорт, раздел «Ограничения»; решение 38).
  */
 function requireBookingRole(actor: Actor): void {
-  if (actor.role === 'master') {
+  if (hasRole(actor, 'master')) {
     throw forbidden('Учетная запись мастера пока не может создавать и менять записи. Это делает администратор', 'MASTER_NO_BOOKING_RIGHTS');
   }
 }
@@ -57,9 +58,9 @@ export function assertCanChange(
   options: { ignoreDeadline?: boolean } = {},
 ): void {
   requireBookingRole(actor);
-  if (actor.role !== 'admin' && booking.client_id !== actor.id) throw forbidden('Это чужая запись');
+  if (!hasRole(actor, 'admin') && booking.client_id !== actor.id) throw forbidden('Это чужая запись');
   if (booking.status !== 'active') throw conflict('BOOKING_NOT_ACTIVE', 'Изменить можно только действующую запись');
-  if (actor.role === 'admin' || options.ignoreDeadline) return;
+  if (hasRole(actor, 'admin') || options.ignoreDeadline) return;
   const settings = readSettings(db);
   const deadline = Date.parse(booking.starts_at) - settings.client_change_deadline_hours * 3600_000;
   if (now.getTime() >= deadline) {
@@ -73,7 +74,7 @@ export function assertCanChange(
 
 /** Режим технических работ: клиенты не создают бронь и запись, администратор работает (раздел 5.1). */
 export function assertNotMaintenance(db: Db, actor: Actor): void {
-  if (actor.role === 'admin') return;
+  if (hasRole(actor, 'admin')) return;
   const settings = readSettings(db);
   if (settings.is_maintenance) {
     throw new HttpError(503, 'MAINTENANCE', `Запись временно недоступна. Записаться можно по телефону ${settings.phone}`);
@@ -234,16 +235,16 @@ export interface CreateBookingRequest {
  */
 export function createBooking(db: Db, actor: Actor, req: CreateBookingRequest, now: Date): number {
   requireBookingRole(actor);
-  if (actor.role === 'client' && (req.clientId !== undefined || req.newClient !== undefined)) {
+  if (hasRole(actor, 'client') && (req.clientId !== undefined || req.newClient !== undefined)) {
     throw forbidden('Клиент записывает только себя');
   }
-  if (actor.role === 'admin' && req.clientId === undefined && req.newClient === undefined) {
+  if (hasRole(actor, 'admin') && req.clientId === undefined && req.newClient === undefined) {
     throw badRequest('VALIDATION_ERROR', 'Укажите клиента', { fields: [{ field: 'clientId', message: 'Укажите клиента или нового клиента' }] });
   }
   assertNotMaintenance(db, actor);
   // Проверка роли для наложения: признак действует только у администратора, у клиента молча отбрасывается —
   // запись создается обычной и проходит все проверки. Второй барьер — триггер bookings_overbooking_admin_only.
-  const isOverbooking = actor.role === 'admin' && req.isOverbooking === true;
+  const isOverbooking = hasRole(actor, 'admin') && req.isOverbooking === true;
 
   // Длительность и уборка нужны и после отката транзакции — чтобы подобрать альтернативы.
   let timing: { durationMin: number; cleanupMin: number } | undefined;
@@ -254,10 +255,10 @@ export function createBooking(db: Db, actor: Actor, req: CreateBookingRequest, n
       const master = requireMasterForVisit(db, req.masterId, visit.serviceIds);
       const endsAt = addMin(req.startsAt, visit.durationMin);
       const busyUntil = addMin(endsAt, visit.cleanupMin);
-      const clientId = actor.role === 'client' ? actor.id : resolveClient(db, req.clientId, req.newClient, now);
+      const clientId = hasRole(actor, 'client') ? actor.id : resolveClient(db, req.clientId, req.newClient, now);
 
       // У клиента бронь обязательна и должна совпадать с тем, что он подтверждает.
-      if (actor.role === 'client') {
+      if (hasRole(actor, 'client')) {
         const hold = ownHold(db, actor);
         if (!hold) throw conflict('HOLD_NOT_FOUND', 'Время не закреплено за вами. Выберите время заново');
         if (hold.expires_at <= now.toISOString()) throw conflict('HOLD_EXPIRED', 'Время брони истекло. Проверьте, свободно ли еще это время');
@@ -292,7 +293,7 @@ export function createBooking(db: Db, actor: Actor, req: CreateBookingRequest, n
     if (isSlotConflict(error) && timing) {
       throw slotTaken(nearestFreeSlots(db, {
         masterIds: [req.masterId], startsAt: req.startsAt, ...timing, now,
-        audience: actor.role === 'admin' ? 'admin' : 'client', viewerId: actor.id,
+        audience: hasRole(actor, 'admin') ? 'admin' : 'client', viewerId: actor.id,
       }));
     }
     throw error;
@@ -318,7 +319,7 @@ export interface RescheduleRequest {
 export function rescheduleBooking(db: Db, actor: Actor, bookingId: number, req: RescheduleRequest, now: Date): void {
   requireBookingRole(actor);
   // Наложение при переносе — только у администратора; у клиента признак молча отбрасывается.
-  const isOverbooking = actor.role === 'admin' && req.isOverbooking === true;
+  const isOverbooking = hasRole(actor, 'admin') && req.isOverbooking === true;
   let target: { masterId: number; durationMin: number; cleanupMin: number } | undefined;
   try {
     transaction(db, () => {
@@ -334,7 +335,7 @@ export function rescheduleBooking(db: Db, actor: Actor, bookingId: number, req: 
       }
       const master = requireMasterForVisit(db, masterId, booking.serviceIds);
 
-      if (actor.role === 'client') {
+      if (hasRole(actor, 'client')) {
         const hold = ownHold(db, actor);
         if (!hold || hold.booking_id !== bookingId) throw conflict('HOLD_NOT_FOUND', 'Новое время не закреплено за вами. Выберите время заново');
         if (hold.expires_at <= now.toISOString()) throw conflict('HOLD_EXPIRED', 'Время брони истекло. Проверьте, свободно ли еще это время');
@@ -358,7 +359,7 @@ export function rescheduleBooking(db: Db, actor: Actor, bookingId: number, req: 
     if (isSlotConflict(error) && target) {
       throw slotTaken(nearestFreeSlots(db, {
         masterIds: [target.masterId], startsAt: req.startsAt, durationMin: target.durationMin, cleanupMin: target.cleanupMin, now,
-        audience: actor.role === 'admin' ? 'admin' : 'client', viewerId: actor.id, excludeBookingId: bookingId,
+        audience: hasRole(actor, 'admin') ? 'admin' : 'client', viewerId: actor.id, excludeBookingId: bookingId,
       }));
     }
     throw error;
@@ -379,7 +380,7 @@ export interface CancelRequest {
  */
 export function cancelBooking(db: Db, actor: Actor, bookingId: number, req: CancelRequest, now: Date, options: { accountDeletion?: boolean } = {}): void {
   requireBookingRole(actor);
-  if (actor.role === 'client' && req.by === 'studio') {
+  if (hasRole(actor, 'client') && req.by === 'studio') {
     throw badRequest('VALIDATION_ERROR', 'Клиент отменяет запись от своего имени', { fields: [{ field: 'by', message: 'Клиент отменяет запись от своего имени' }] });
   }
   transaction(db, () => {
@@ -390,7 +391,7 @@ export function cancelBooking(db: Db, actor: Actor, bookingId: number, req: Canc
     checkVersion(booking.version, req.version);
     writeCancellation(db, {
       bookingId, version: booking.version,
-      status: actor.role === 'client' || req.by === 'client' ? 'cancelled_by_client' : 'cancelled_by_studio',
+      status: hasRole(actor, 'client') || req.by === 'client' ? 'cancelled_by_client' : 'cancelled_by_studio',
       actorId: actor.id, reason: req.reason, at: now.toISOString(),
     });
   });
@@ -403,7 +404,7 @@ export function cancelBooking(db: Db, actor: Actor, bookingId: number, req: Canc
 export function setVisitResult(
   db: Db, actor: Actor, bookingId: number, req: { status: ResultStatus; reason: string | null; version?: number }, now: Date,
 ): void {
-  if (actor.role !== 'admin') throw forbidden('Итог визита отмечает администратор');
+  if (!hasRole(actor, 'admin')) throw forbidden('Итог визита отмечает администратор');
   transaction(db, () => {
     const booking = db.prepare('SELECT status, starts_at, version FROM bookings WHERE id = ?').get(bookingId) as
       { status: string; starts_at: string; version: number } | undefined;

@@ -7,6 +7,7 @@ import {
   countdown, dateLabel, dateLong, escapeHtml as esc, money, phone as formatPhone, phoneHref, plural, timeLabel,
 } from './format.js';
 import { announceAcknowledged, onAcknowledged, studioChangeText } from './notifications.js';
+import { hasRole } from './roles.js';
 import { routes } from './routes.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -200,8 +201,8 @@ async function load() {
   try {
     const user = await api.getMe();
     if (!user) return goLogin();
-    // Клиентские экраны сотруднику не нужны; его раздела в web/ пока нет
-    if (user.role !== 'client') return window.location.replace(routes.home);
+    // Клиентские экраны сотруднику не нужны: администратору — его раздел, мастеру — главная
+    if (!hasRole(user, 'client')) return window.location.replace(hasRole(user, 'admin') ? routes.admin : routes.home);
     const [bookings, studio] = await Promise.all([api.getBookings(), api.getStudio()]);
     render(user, bookings, studio);
   } catch (error) {

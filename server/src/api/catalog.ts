@@ -1,4 +1,5 @@
 // Публичная часть: студия, каталог услуг, мастера и свободное время. Вход не нужен.
+import { hasRole } from '../auth/sessions.js';
 import { loadBooking, pricesAtLevel } from '../booking/existing.js';
 import { findMastersForServices, getMasterDay, getSlots, getSlotsAnyMaster } from '../booking/slots.js';
 import { readVisitItemsQuery, requireMasterForVisit, resolveVisit, visitPrice, type Level, type Visit } from '../booking/visit.js';
@@ -40,7 +41,7 @@ function activeMaster(db: Db, id: number): MasterRow {
 }
 
 /** Кто смотрит расчет: администратор не связан минимальным временем до визита и горизонтом (раздел 7.3, шаг 6). */
-const audienceOf = (ctx: Context) => (ctx.user?.role === 'admin' ? 'admin' : 'client') as 'admin' | 'client';
+const audienceOf = (ctx: Context) => (ctx.user && hasRole(ctx.user, 'admin') ? 'admin' : 'client') as 'admin' | 'client';
 
 export function catalogRoutes(router: Router): void {
   // Контакты и правила записи: что показать на лендинге, на экранах ошибок и в подсказке о правиле 24 часов.

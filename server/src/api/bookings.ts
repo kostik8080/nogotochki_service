@@ -1,6 +1,7 @@
 // Записи: создание, свои записи, карточка записи, перенос, отмена, итог визита (паспорт, функции 6–8 клиента,
 // функции 5–7 администратора). Обработчики только разбирают запрос и собирают ответ: создают и меняют записи
 // функции booking/booking-service.ts — одни и те же для клиента, мастера и администратора, права ролей — там же.
+import { viewerRole } from '../auth/sessions.js';
 import { cancelBooking, createBooking, rescheduleBooking, setVisitResult } from '../booking/booking-service.js';
 import { readVisitItems } from '../booking/visit.js';
 import { forbidden, notFound } from '../http/errors.js';
@@ -32,7 +33,7 @@ export function bookingRoutes(router: Router): void {
     input.done();
 
     const id = createBooking(ctx.db, user, { masterId, startsAt, items, comment, isAnyMaster, clientId, newClient, isOverbooking }, ctx.now);
-    return { status: 201, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now }) } };
+    return { status: 201, body: { booking: bookingView(ctx.db, id, { viewer: viewerRole(user), now: ctx.now }) } };
   });
 
   // Свои записи клиента (CAB-01, CAB-02): предстоящие — сверху по времени, затем прошедшие и отмененные — от новых к старым.
@@ -53,7 +54,7 @@ export function bookingRoutes(router: Router): void {
                starts_at DESC
     `).all({ client: user.id, status: status ?? null, now }) as { id: number; upcoming: number }[];
     const ids = rows.filter((r) => !period || (period === 'upcoming') === (r.upcoming === 1)).map((r) => r.id);
-    return { status: 200, body: { bookings: bookingViews(ctx.db, ids, { viewer: user.role, now: ctx.now }) } };
+    return { status: 200, body: { bookings: bookingViews(ctx.db, ids, { viewer: viewerRole(user), now: ctx.now }) } };
   });
 
   // Карточка записи (CAB-03, A-03, BOOK-M1). Три проверки по порядку: вход, роль, владение объектом.
@@ -66,7 +67,7 @@ export function bookingRoutes(router: Router): void {
       { client_id: number; master_id: number } | undefined;
     if (!row) throw notFound('Запись не найдена');
     requireBookingAccess(ctx, user, row);
-    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now, withEvents: true }) } };
+    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: viewerRole(user), now: ctx.now, withEvents: true }) } };
   });
 
   // Перенос той же записи (сценарий 5, CAB-04, A-04) — rescheduleBooking. isOverbooking действует только у администратора.
@@ -81,7 +82,7 @@ export function bookingRoutes(router: Router): void {
     const isOverbooking = input.bool('isOverbooking', { optional: true }) ?? false;
     input.done();
     rescheduleBooking(ctx.db, user, id, { startsAt, masterId, reason, version, isOverbooking }, ctx.now);
-    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now, withEvents: true }) } };
+    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: viewerRole(user), now: ctx.now, withEvents: true }) } };
   });
 
   // Отмена (CAB-05, A-05) — cancelBooking.
@@ -94,7 +95,7 @@ export function bookingRoutes(router: Router): void {
     const version = input.int('version', { optional: true, min: 1 });
     input.done();
     cancelBooking(ctx.db, user, id, { reason, by, version }, ctx.now);
-    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now, withEvents: true }) } };
+    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: viewerRole(user), now: ctx.now, withEvents: true }) } };
   });
 
   // «Визит завершен» и «Клиент не пришел» (A-03, A-06) — setVisitResult.
@@ -107,7 +108,7 @@ export function bookingRoutes(router: Router): void {
     const version = input.int('version', { optional: true, min: 1 });
     input.done();
     setVisitResult(ctx.db, user, id, { status, reason, version }, ctx.now);
-    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now, withEvents: true }) } };
+    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: viewerRole(user), now: ctx.now, withEvents: true }) } };
   });
 
   // Клиент закрыл баннер «Запись отменена или перенесена студией» (CAB-01): баннер больше не показывается.
@@ -120,7 +121,7 @@ export function bookingRoutes(router: Router): void {
     if (!row) throw notFound('Запись не найдена');
     if (row.client_id !== user.id) throw forbidden('Это чужая запись');
     ctx.db.prepare('UPDATE bookings SET client_acknowledged_at = ? WHERE id = ?').run(ctx.now.toISOString(), id);
-    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: user.role, now: ctx.now }) } };
+    return { status: 200, body: { booking: bookingView(ctx.db, id, { viewer: viewerRole(user), now: ctx.now }) } };
   });
 
   // Все записи студии для администратора (A-01, функция 5): фильтры по датам студии, мастеру, услуге, статусу и клиенту.
@@ -155,7 +156,7 @@ export function bookingRoutes(router: Router): void {
       .all({ ...params, limit, offset }) as { id: number }[]).map((r) => r.id);
     return {
       status: 200,
-      body: { timezone, total, limit, offset, bookings: bookingViews(ctx.db, ids, { viewer: user.role, now: ctx.now }) },
+      body: { timezone, total, limit, offset, bookings: bookingViews(ctx.db, ids, { viewer: viewerRole(user), now: ctx.now }) },
     };
   });
 }

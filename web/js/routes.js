@@ -13,8 +13,13 @@ export const routes = {
   forgotPassword: 'forgot-password.html',
   /** AUTH-08 Новый пароль. Ссылка из письма ведет на /reset-password?token=… — без .html, это решает веб-сервер */
   resetPassword: 'reset-password.html',
-  /** AUTH-04 Вход сотрудника — вне карты клиентских экранов */
-  staffLogin: 'staff-login.html',
+  /**
+   * Раздел администратора. Страницы отдает сервер API после проверки роли (server/src/web/admin-pages.ts),
+   * адреса — от корня сайта. Отдельной формы входа у сотрудников нет: вход общий (AUTH-01, login.html).
+   */
+  admin: '/admin',
+  adminServices: '/admin/services',
+  adminMasters: '/admin/masters',
   /** CAB-01 Мои записи */
   account: 'account.html',
   /** CAB-02 История */

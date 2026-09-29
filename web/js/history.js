@@ -4,6 +4,7 @@
 import * as api from './api.js';
 import { bookingServices } from './calendar.js';
 import { dateLabel, escapeHtml as esc, timeLabel } from './format.js';
+import { hasRole } from './roles.js';
 import { routes } from './routes.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -86,7 +87,7 @@ async function load() {
   try {
     const user = await api.getMe();
     if (!user) return window.location.replace(`${routes.login}?next=${encodeURIComponent(routes.history)}`);
-    if (user.role !== 'client') return window.location.replace(routes.home);
+    if (!hasRole(user, 'client')) return window.location.replace(hasRole(user, 'admin') ? routes.admin : routes.home);
     [bookings, studio] = await Promise.all([api.getBookings({ period: 'past' }), api.getStudio()]);
     render();
   } catch (error) {

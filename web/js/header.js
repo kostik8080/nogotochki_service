@@ -13,6 +13,7 @@ import * as api from './api.js';
 import { bindDropdown } from './dropdown.js';
 import { escapeHtml as esc, initials } from './format.js';
 import { mountNotifications } from './notifications.js';
+import { hasRole } from './roles.js';
 import { routes } from './routes.js';
 
 const EMBLEM = `
@@ -34,20 +35,22 @@ let menuCounter = 0;
 const BURGER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
 
 /**
- * Меню аккаунта: аватар, имя и выпадающий список. Клиенту — «Мои записи» и «Профиль»; у сотрудника
- * клиентских экранов нет, ему — только «Выйти». Закрывается кликом мимо и клавишей Escape.
+ * Меню аккаунта: аватар, имя и выпадающий список. Клиенту — «Мои записи» и «Профиль»; администратору —
+ * «Раздел администратора» (клиент этого пункта не видит, но и без него раздел закрыт на сервере);
+ * мастеру — только «Выйти». Роли — список `roles`, проверка — hasRole. Закрывается кликом мимо и клавишей Escape.
  * @param {HTMLElement} container куда нарисовать
- * @param {{ name: string, role: string }} user
+ * @param {{ name: string, roles: string[] }} user
  * @param {{ onLoggedOut: () => void, bookOnPhone?: boolean }} options onLoggedOut — что сделать после выхода;
  *   bookOnPhone — на телефоне показать в списке «Записаться»: кнопке рядом с логотипом там нет места
  */
 export function mountAccountMenu(container, user, { onLoggedOut, bookOnPhone = false }) {
   const id = `account-menu-${++menuCounter}`;
-  const links = user.role === 'client'
-    ? [{ href: routes.account, label: 'Мои записи' }, { href: routes.profile, label: 'Профиль' }]
-    : [];
+  const links = [
+    ...(hasRole(user, 'client') ? [{ href: routes.account, label: 'Мои записи' }, { href: routes.profile, label: 'Профиль' }] : []),
+    ...(hasRole(user, 'admin') ? [{ href: routes.admin, label: 'Раздел администратора' }] : []),
+  ];
   const page = currentPage();
-  const book = bookOnPhone && user.role === 'client'
+  const book = bookOnPhone && hasRole(user, 'client')
     ? `<a class="account-menu__item account-menu__item--phone" href="${esc(routes.booking())}">Записаться</a>`
     : '';
 
@@ -160,7 +163,7 @@ class ClientHeader extends HTMLElement {
       bindDropdown(/** @type {HTMLElement} */ (actions.querySelector('.client-header__more')));
       return;
     }
-    const client = user.role === 'client';
+    const client = hasRole(user, 'client');
     actions.innerHTML = `
       ${client ? `<a class="btn btn--primary btn--small client-header__book" href="${esc(routes.booking())}">Записаться</a>` : ''}
       ${client ? '<div data-notify></div>' : ''}

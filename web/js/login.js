@@ -1,11 +1,12 @@
 // AUTH-01 Вход (docs/ui-map.md). POST /api/auth/login { login, password }.
 // Сессию сервер ставит сам — cookie HttpOnly; страница ее не читает и ничего не сохраняет.
-// Успех → CAB-01 «Мои записи» (или страница из ?next=).
+// Успех → по ролям: клиент — CAB-01 «Мои записи», администратор — раздел /admin (или страница из ?next=).
 import * as api from './api.js';
 import {
-  bindPasswordToggle, clearErrors, clearOnInput, isEmail, normalizePhone, retryText, safeNext, setBusy,
+  bindPasswordToggle, clearErrors, clearOnInput, isAdminPath, isEmail, normalizePhone, retryText, safeNext, setBusy,
   showAlert, showErrors, showServerError,
 } from './form.js';
+import { hasRole } from './roles.js';
 import { routes } from './routes.js';
 
 // Логин, подставленный с регистрации («Такой аккаунт уже есть» → «Войти»). Сразу удаляется.
@@ -33,6 +34,19 @@ try {
   }
 } catch {
   // Хранилище недоступно (приватный режим) — логин просто не подставится
+}
+
+/**
+ * Куда вести после входа — по ролям из ответа сервера (список `roles`): администратора — в раздел /admin
+ * (или на его страницу из ?next=), клиента — в кабинет (или на клиентскую страницу из ?next=), мастера —
+ * на главную: его экранов в web/ нет. Форма входа одна для всех.
+ * @param {{ roles: string[] }} user
+ */
+function homeAfterLogin(user) {
+  const next = safeNext(null);
+  if (hasRole(user, 'admin')) return next && isAdminPath(next) ? next : routes.admin;
+  if (hasRole(user, 'client')) return next && !isAdminPath(next) ? next : routes.account;
+  return routes.home;
 }
 
 /** Проверка до отправки — для удобства; сервер проверит все сам. */
@@ -64,8 +78,7 @@ form.addEventListener('submit', async (event) => {
       login: login.includes('@') ? login : normalizePhone(login) ?? login,
       password: passwordInput.value,
     });
-    // Клиента — в кабинет. У сотрудника своего раздела в web/ пока нет — на главную.
-    window.location.assign(user.role === 'client' ? safeNext(routes.account) : routes.home);
+    window.location.assign(homeAfterLogin(user));
   } catch (error) {
     done();
     if (error instanceof api.ApiError && error.code === 'LOGIN_LOCKED') {

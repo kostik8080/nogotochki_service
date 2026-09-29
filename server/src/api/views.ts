@@ -3,7 +3,7 @@
 // (попытки входа, блокировки) не попадают в ответы, а контакты клиента видит только администратор.
 // Время — моменты в UTC, как в базе; в часовой пояс студии их переводит интерфейс при показе.
 // Деньги — целые копейки (поля …Kop).
-import type { Role } from '../auth/sessions.js';
+import { type Role, rolesOf } from '../auth/sessions.js';
 import type { Db } from '../db/connection.js';
 import { readSettings } from '../studio/settings.js';
 
@@ -11,7 +11,11 @@ import { readSettings } from '../studio/settings.js';
 // Пользователь
 // ---------------------------------------------------------------------------
 
-/** Своя учетная запись: имя и контакты, без хеша пароля и служебных полей. */
+/**
+ * Своя учетная запись: имя, роли и контакты, без хеша пароля и служебных полей.
+ * `roles` — список ролей: интерфейс проверяет, есть ли в нем нужная роль. `role` оставлено для чернового
+ * интерфейса web-draft/; настоящий интерфейс web/ его не читает.
+ */
 export function selfView(db: Db, userId: number) {
   const u = db.prepare(`
     SELECT id, role, name, phone, email, phone_verified_at, email_verified_at, marketing_consent_at
@@ -21,7 +25,7 @@ export function selfView(db: Db, userId: number) {
     phone_verified_at: string | null; email_verified_at: string | null; marketing_consent_at: string | null;
   };
   return {
-    id: u.id, role: u.role, name: u.name, phone: u.phone, email: u.email,
+    id: u.id, roles: rolesOf(u.role), role: u.role, name: u.name, phone: u.phone, email: u.email,
     phoneVerified: u.phone_verified_at !== null, emailVerified: u.email_verified_at !== null,
     marketingConsent: u.marketing_consent_at !== null,
   };

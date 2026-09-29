@@ -19,9 +19,31 @@ export const SESSION_TTL_DAYS: Record<Role, number> = { client: 30, admin: 7, ma
 
 export interface SessionUser {
   id: number;
-  role: Role;
+  /** Роли учетной записи — список. Права проверяются наличием роли в списке (hasRole), а не равенством. */
+  roles: readonly Role[];
   name: string;
   sessionId: number;
+}
+
+/**
+ * Роли учетной записи списком. В базе у учетной записи одна роль — users.role, и после создания она не меняется
+ * (docs/db-schema.md, «Роль одна, а не список»). Роль назначается только в базе: ни одно поле API ее не принимает.
+ * Код проверяет права по списку, поэтому переход на несколько ролей не потребует переписывать проверки.
+ */
+export function rolesOf(role: Role): Role[] {
+  return [role];
+}
+
+/** Есть ли у пользователя роль. Единственный способ проверить права по роли — и на сервере, и в интерфейсе так же. */
+export function hasRole(user: { roles: readonly Role[] }, role: Role): boolean {
+  return user.roles.includes(role);
+}
+
+/** Какой набор полей показать в ответе: администратору — полный, мастеру — для визита, остальным — клиентский. */
+export function viewerRole(user: { roles: readonly Role[] }): Role {
+  if (hasRole(user, 'admin')) return 'admin';
+  if (hasRole(user, 'master')) return 'master';
+  return 'client';
 }
 
 export type SessionLookup =
@@ -61,7 +83,7 @@ export function findSession(db: Db, token: string, now: Date): SessionLookup {
   if (now.getTime() - Date.parse(row.last_seen_at) > TOUCH_INTERVAL_MS) {
     db.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?').run(now.toISOString(), row.session_id);
   }
-  return { status: 'ok', user: { id: row.id, role: row.role, name: row.name, sessionId: row.session_id } };
+  return { status: 'ok', user: { id: row.id, roles: rolesOf(row.role), name: row.name, sessionId: row.session_id } };
 }
 
 export function revokeSession(db: Db, sessionId: number, now: Date): void {

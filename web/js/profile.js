@@ -14,6 +14,7 @@ import {
 } from './form.js';
 import { phone as formatPhone, phoneHref, plural } from './format.js';
 import { updateAccountName } from './header.js';
+import { hasRole } from './roles.js';
 import { routes } from './routes.js';
 
 const RESEND_SECONDS = 60;
@@ -430,7 +431,7 @@ async function load() {
   try {
     user = await api.getMe();
     if (!user) return goLogin();
-    if (user.role !== 'client') return window.location.replace(routes.home);
+    if (!hasRole(user, 'client')) return window.location.replace(hasRole(user, 'admin') ? routes.admin : routes.home);
     renderUser();
     show('content');
     loadStudioPhone();

@@ -5,6 +5,7 @@ import * as api from './api.js';
 import { duration, escapeHtml as esc, initials, money, phone, phoneHref, plural } from './format.js';
 import { mountAccountMenu } from './header.js';
 import { mountNotifications } from './notifications.js';
+import { hasRole } from './roles.js';
 import { routes } from './routes.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -278,8 +279,8 @@ function renderAuth(user) {
   // Меню аккаунта в шапке — общее с шапкой остальных страниц (header.js), на телефоне тоже.
   // После выхода лендинг остается открытым (N-11)
   // Клиенту рядом с аватаром — колокольчик уведомлений, как на остальных страницах
-  header.innerHTML = `${user.role === 'client' ? '<div data-notify></div>' : ''}<div data-menu></div>`;
-  if (user.role === 'client') mountNotifications(/** @type {HTMLElement} */ (header.querySelector('[data-notify]')));
+  header.innerHTML = `${hasRole(user, 'client') ? '<div data-notify></div>' : ''}<div data-menu></div>`;
+  if (hasRole(user, 'client')) mountNotifications(/** @type {HTMLElement} */ (header.querySelector('[data-notify]')));
   mountAccountMenu(/** @type {HTMLElement} */ (header.querySelector('[data-menu]')), user, { onLoggedOut: () => renderAuth(null) });
   nav.innerHTML = '';
 }

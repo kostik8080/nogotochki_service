@@ -5,6 +5,7 @@
 // Загрузка — само изображение в теле запроса (Content-Type: image/jpeg, image/png или image/webp),
 // параметры — в строке запроса. Так не нужен разбор multipart и сторонние пакеты:
 //   fetch('/api/admin/photos?bookingItemId=12&title=…', { method: 'POST', body: file, headers: { 'Content-Type': file.type } })
+import { hasRole } from '../auth/sessions.js';
 import type { Db } from '../db/connection.js';
 import { transaction } from '../db/connection.js';
 import { badRequest, conflict, HttpError, notFound } from '../http/errors.js';
@@ -87,7 +88,7 @@ export function photoRoutes(router: Router): void {
   // связан с конкретным клиентом. Для остальных такого фото «нет» (404), чтобы не выдавать номера.
   router.get('/api/photos/:id/file', (ctx): Result => {
     const photo = getPhoto(ctx.db, pathId(ctx));
-    const isAdmin = ctx.user?.role === 'admin';
+    const isAdmin = ctx.user !== null && hasRole(ctx.user, 'admin');
     if (!photo || (!photo.is_published && !isAdmin)) throw notFound('Фото не найдено');
     const file = readPhoto(ctx.services.uploadsDir, photo.file_path);
     if (!file) throw notFound('Файл фото не найден');

@@ -2,7 +2,7 @@
 // и запрошенный объект принадлежит пользователю (403). Третью проверку нельзя пропускать даже там,
 // где роль уже совпала: клиент видит только свои записи, мастер — записи своего расписания,
 // администратор — все записи студии.
-import type { Role, SessionUser } from '../auth/sessions.js';
+import { hasRole, type Role, type SessionUser } from '../auth/sessions.js';
 import { assertCanChange, assertNotMaintenance } from '../booking/booking-service.js';
 import { forbidden, unauthorized } from '../http/errors.js';
 import type { Context } from '../http/router.js';
@@ -13,9 +13,13 @@ export function requireUser(ctx: Context): SessionUser {
   throw unauthorized();
 }
 
+/**
+ * Вторая проверка: у пользователя есть хотя бы одна из ролей. Роли — список (SessionUser.roles):
+ * проверяется наличие роли в нем, а не равенство одной роли. Все /api/admin/* начинаются с requireRole(ctx, 'admin').
+ */
 export function requireRole(ctx: Context, ...roles: Role[]): SessionUser {
   const user = requireUser(ctx);
-  if (!roles.includes(user.role)) {
+  if (!roles.some((role) => hasRole(user, role))) {
     throw forbidden(roles.includes('admin') && roles.length === 1 ? 'Раздел только для администратора' : 'Действие недоступно для этой учетной записи');
   }
   return user;
@@ -42,8 +46,8 @@ export function requireBookingAccess(
   user: SessionUser,
   booking: { client_id: number; master_id: number },
 ): void {
-  if (user.role === 'admin') return;
-  if (user.role === 'master') {
+  if (hasRole(user, 'admin')) return;
+  if (hasRole(user, 'master')) {
     if (booking.master_id !== requireMasterProfile(ctx, user).id) throw forbidden('Эта запись не из вашего расписания');
     return;
   }

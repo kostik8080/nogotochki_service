@@ -21,6 +21,7 @@ import {
   dateLabel, duration, escapeHtml as esc, money, phone as formatPhone, phoneHref, plural, timeLabel,
 } from './format.js';
 import { setBusy, showAlert } from './form.js';
+import { hasRole } from './roles.js';
 import { routes } from './routes.js';
 import { getDraft, parseServicesParam, servicesParam, startDraft, updateDraft } from './store.js';
 
@@ -293,7 +294,7 @@ const bookingWhen = (b) => `${dateLabel(b.startsAt, studio.timezone)}, ${timeLab
 async function loadMyBookings() {
   try {
     const user = await api.getMe();
-    if (user?.role !== 'client') return;
+    if (!hasRole(user, 'client')) return;
     myBookings = (await api.getBookings({ period: 'upcoming' })).filter((b) => b.status === 'active' && b.id !== rescheduleId);
     if (selectedDate) renderDay();
   } catch {

@@ -2,6 +2,7 @@
 // «Продолжить» — время закрепляется за ним на settings.slot_hold_min минут (10) и не предлагается другим.
 // Бронь истекает сама: во всех проверках учитываются только строки с expires_at > сейчас, а истекшие
 // строки удаляет уборка (cleanupExpired раз в минуту и при каждой новой брони).
+import { hasRole } from '../auth/sessions.js';
 import { checkSlot, isSlotConflict, nearestFreeSlots, SlotUnavailable, slotTaken } from '../booking/availability.js';
 import { loadBooking, pricesAtLevel } from '../booking/existing.js';
 import { cleanupExpiredHolds } from '../booking/cleanup.js';
@@ -36,7 +37,7 @@ export function holdRoutes(router: Router): void {
     requireNotMaintenance(ctx, user);
 
     const settings = readSettings(ctx.db);
-    const audience = user.role === 'admin' ? 'admin' : 'client';
+    const audience = hasRole(user, 'admin') ? 'admin' : 'client';
     const now = ctx.now;
     // Что искали — для подбора альтернатив после отката транзакции.
     let wanted: { masterIds: number[]; durationMin: number; cleanupMin: number; excludeBookingId: number | null } | undefined;

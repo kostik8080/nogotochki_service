@@ -72,6 +72,11 @@ export const config = {
   pdPolicyVersion,
   /** Публичный адрес сервиса без «/» на конце: из него строятся ссылки в письмах. */
   appUrl,
+  /**
+   * Папка интерфейса web/. Из нее сервер берет страницы раздела администратора /admin и страницу «Этот раздел
+   * только для администраторов»: их отдает сервер, потому что доступ к ним решает сессия (src/web/admin-pages.ts).
+   */
+  webDir: path.resolve(SERVER_ROOT, env('WEB_DIR') ?? '../web'),
   /** Папка фото работ. В базе хранится путь относительно нее (work_photos.file_path). */
   uploadsDir: path.resolve(SERVER_ROOT, env('UPLOADS_DIR') ?? 'uploads'),
   /** Почта для одноразовых кодов и ссылок. Без SMTP_HOST письма печатаются в консоль (только не в production). */

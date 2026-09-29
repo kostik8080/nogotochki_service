@@ -77,6 +77,8 @@ export class Client {
     const isBinary = body instanceof Uint8Array;
     const res = await fetch(this.base() + path, {
       method,
+      // Перенаправление проверяют сами тесты (гостя со страниц /admin ведут на вход)
+      redirect: 'manual',
       headers: {
         ...(body !== undefined && !isBinary ? { 'Content-Type': 'application/json' } : {}),
         ...(this.cookie ? { Cookie: this.cookie } : {}),

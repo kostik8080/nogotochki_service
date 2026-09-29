@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Эту страницу отдает сервер API с кодом 403, когда в раздел /admin заходит клиент или мастер
+       (server/src/web/admin-pages.ts). Адрес в браузере — /admin…, поэтому ссылки считаются от корня сайта. -->
+  <base href="/">
+  <meta name="robots" content="noindex">
+  <title>Этот раздел только для администраторов — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script type="module" src="js/header.js"></script>
+</head>
+<body class="access-body">
+  <!-- Общая шапка сервиса: логотип и меню аккаунта — js/header.js -->
+  <client-header></client-header>
+
+  <main class="access-page" id="main" data-theme="powder">
+    <div class="admin-state" role="alert">
+      <div class="admin-state__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <h1 class="admin-state__title">Этот раздел только для администраторов</h1>
+      <p class="admin-state__text">У вашей учетной записи нет доступа к разделу администратора.
+        Записи, профиль и историю визитов клиент смотрит в личном кабинете.</p>
+      <div class="admin-state__actions">
+        <a class="btn btn--primary btn--small" href="account.html">В личный кабинет</a>
+        <a class="link" href="index.html">На главную</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="page-footer">
+    <div class="container page-footer__inner">
+      <span>© Ноготочки, бьюти-студия</span>
+      <span class="page-footer__links">
+        <a href="privacy.html">Политика обработки персональных данных</a>
+      </span>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,6 +1,7 @@
 // Управление мастерами (паспорт, функция 3 администратора; экраны A-19, A-22, A-22p).
 // Мастера не удаляются: на них ссылаются записи. Вместо удаления — isActive: false, отключенного мастера
 // не предлагают клиентам, но он остается в истории записей.
+import { viewerRole } from '../auth/sessions.js';
 import { applyOrPreview, bookingsOutsideWorkingHours } from '../booking/affected.js';
 import type { Db } from '../db/connection.js';
 import { transaction } from '../db/connection.js';
@@ -199,7 +200,7 @@ export function adminMasterRoutes(router: Router): void {
       status: 200,
       body: {
         master: masterView(ctx.db, master, today),
-        ...(master.is_active ? {} : { upcomingBookings: bookingViews(ctx.db, upcoming, { viewer: user.role, now: ctx.now }) }),
+        ...(master.is_active ? {} : { upcomingBookings: bookingViews(ctx.db, upcoming, { viewer: viewerRole(user), now: ctx.now }) }),
       },
     };
   });
@@ -260,7 +261,7 @@ export function adminMasterRoutes(router: Router): void {
       status: 200,
       body: {
         master: masterView(ctx.db, getMaster(ctx.db, id)!, today),
-        affectedBookings: bookingViews(ctx.db, affected, { viewer: user.role, now: ctx.now }),
+        affectedBookings: bookingViews(ctx.db, affected, { viewer: viewerRole(user), now: ctx.now }),
       },
     };
   });

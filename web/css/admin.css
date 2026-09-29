@@ -1,0 +1,269 @@
+/*
+ * Каркас раздела администратора (/admin): общая темная шапка сервиса (css/header.css), темное меню раздела
+ * <admin-nav> (js/admin.js) и светлая область страницы в теме admin — как в прототипе: темная полоса меню
+ * слева, светлое поле справа (Prototype/Прототип - Ноготочки.dc.html, экраны A-01, A-19, A-23).
+ * Меню стоит вне области с data-theme="admin" и поэтому получает темные токены :root.
+ * Здесь же — блок «Этот раздел только для администраторов» (web/forbidden.html и js/admin.js).
+ * Только переменные из tokens.css; прозрачность — через color-mix от цвета из токенов.
+ */
+
+.admin-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+  /* Место под панель меню внизу экрана на телефоне */
+  padding-bottom: var(--space-16);
+}
+
+.admin {
+  flex: 1;
+  display: flex;
+}
+
+/* ---------- Меню раздела: слева на планшете и компьютере, внизу экрана на телефоне ---------- */
+
+admin-nav {
+  display: block;
+}
+
+.admin-nav {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 100;
+  display: flex;
+  padding-block: var(--space-1);
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+}
+
+.admin-nav__title {
+  display: none;
+}
+
+.admin-nav__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-1);
+  border-radius: var(--radius-card);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  text-align: center;
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+
+.admin-nav__item svg {
+  width: calc(var(--space-4) + var(--space-1));
+  height: calc(var(--space-4) + var(--space-1));
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-nav__item:hover {
+  color: var(--color-text);
+}
+
+/* Текущий раздел — как в прототипе: розовая подложка и светлая иконка */
+.admin-nav__item[aria-current='page'] {
+  background: color-mix(in srgb, var(--color-button-bg) 20%, transparent);
+  color: var(--color-avatar-bg);
+  font-weight: var(--text-button-weight);
+}
+
+@media (min-width: 768px) {
+  .admin-body {
+    padding-bottom: 0;
+  }
+
+  admin-nav {
+    flex-shrink: 0;
+    width: var(--space-24);
+    background: var(--color-bg);
+    border-right: 1px solid var(--color-border);
+  }
+
+  .admin-nav {
+    position: sticky;
+    /* Под прилипшей шапкой: ее высоту измеряет js/header.js */
+    top: var(--site-header-height, 0px);
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-4) var(--space-2);
+    background: none;
+    border-top: 0;
+  }
+
+  .admin-nav__item {
+    flex: none;
+    padding: var(--space-3) var(--space-1);
+  }
+}
+
+@media (min-width: 1024px) {
+  admin-nav {
+    width: calc(var(--space-24) * 2);
+  }
+
+  .admin-nav {
+    padding: var(--space-6) var(--space-3);
+  }
+
+  .admin-nav__title {
+    display: block;
+    margin-bottom: var(--space-3);
+    padding-inline: var(--space-3);
+    color: var(--color-text-muted);
+    font-size: var(--text-caption-size);
+    font-weight: var(--text-button-weight);
+    letter-spacing: var(--text-button-letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .admin-nav__item {
+    flex-direction: row;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    font-size: var(--text-label-size);
+    text-align: left;
+  }
+}
+
+/* ---------- Область страницы: светлая тема admin ---------- */
+
+.admin__main {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-6) var(--page-gutter-mobile) var(--space-16);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+@media (min-width: 768px) {
+  .admin__main {
+    padding: var(--space-8) var(--page-gutter-tablet) var(--space-16);
+  }
+}
+
+@media (min-width: 1024px) {
+  .admin__main {
+    padding-inline: var(--page-gutter-desktop);
+  }
+}
+
+.admin__eyebrow {
+  margin-bottom: var(--space-1);
+  color: var(--color-text-accent);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  letter-spacing: var(--text-button-letter-spacing);
+  text-transform: uppercase;
+}
+
+.admin__title {
+  margin-bottom: var(--space-6);
+  font-family: var(--font-display);
+  font-size: var(--text-h3-size);
+  font-weight: var(--text-h1-weight);
+  line-height: var(--text-h1-line);
+  text-transform: uppercase;
+}
+
+@media (min-width: 768px) {
+  .admin__title {
+    font-size: var(--text-h2-size);
+  }
+}
+
+.admin__loading .skeleton--heading {
+  width: calc(var(--space-24) * 2);
+}
+
+/* ---------- Пустая страница раздела и «Этот раздел только для администраторов» ---------- */
+
+.admin-state {
+  max-width: calc(var(--space-24) * 6);
+  padding: var(--space-8) var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+
+.admin-state__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space-12) + var(--space-2));
+  height: calc(var(--space-12) + var(--space-2));
+  margin: 0 auto var(--space-4);
+  border-radius: 50%;
+  background: var(--color-surface-accent);
+  color: var(--color-text-accent);
+}
+
+.admin-state__icon svg {
+  width: var(--space-6);
+  height: var(--space-6);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-state__title {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-body-l-size);
+  font-weight: var(--text-button-weight);
+  line-height: var(--text-body-l-line);
+}
+
+.admin-state__text {
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+.admin-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3) var(--space-6);
+  align-items: center;
+  margin-top: var(--space-6);
+}
+
+/* Страница отказа (web/forbidden.html): карточка по центру светлого поля, как экраны кабинета */
+.access-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+.access-page {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-12) var(--page-gutter-mobile) var(--space-24);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.access-page .admin-state {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .access-page {
+    padding-top: var(--space-24);
+  }
+}
