@@ -2,11 +2,44 @@
 // услуги (/api/admin/services, категории, несовместимые пары) и мастера (/api/admin/masters, график, учетная запись).
 import { useState, type FormEvent } from 'react';
 import {
-  api, LEVEL_LABELS, minutes, rub, STATUS_LABELS, studioToday,
+  api, fmtDateTime, LEVEL_LABELS, minutes, rub, STATUS_LABELS, studioToday,
   type Booking, type BookingStatus, type Level,
 } from '../api';
 import { ErrorBox, go, Json, Loading, useAction, useApp, useLoad } from '../ui';
-import { BookingsTable } from './Cabinet';
+
+/** Таблица записей: все записи, затронутые записи при смене графика. */
+function BookingsTable({ bookings }: { bookings: Booking[] }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>№</th><th>Когда</th><th>Мастер</th><th>Услуги</th><th>Сумма</th><th>Статус</th><th>Клиент</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {bookings.map((b) => (
+            <tr key={b.id}>
+              <td>{b.id}</td>
+              <td>{fmtDateTime(b.startsAt)}</td>
+              <td>{b.master.name}{b.isAnyMaster && <span className="muted small"> (любой)</span>}</td>
+              <td>{b.items.map((i) => `${i.name}${i.quantity > 1 ? ` × ${i.quantity}` : ''}`).join(', ')}</td>
+              <td>{rub(b.totalPriceKop)}</td>
+              <td>
+                {STATUS_LABELS[b.status]}
+                {b.isOverbooking && <div className="small"><b>наложение</b></div>}
+                {b.cancellation?.reason && <div className="muted small">Причина: {b.cancellation.reason}</div>}
+              </td>
+              <td>{b.client?.name}<div className="muted small">{b.client?.phone ?? b.client?.email ?? ''}</div></td>
+              <td><a href={`#/bookings/${b.id}`}>Подробнее</a></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 interface AdminService {
   id: number;
@@ -120,7 +153,7 @@ function BookingsTab() {
         {list.data && (
           <>
             <p>Найдено: {list.data.total}{list.data.total > limit && `, показаны ${offset + 1}–${Math.min(offset + limit, list.data.total)}`}</p>
-            {list.data.bookings.length > 0 && <BookingsTable bookings={list.data.bookings} admin />}
+            {list.data.bookings.length > 0 && <BookingsTable bookings={list.data.bookings} />}
             <div className="row">
               <button type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))}>← Назад</button>
               <button type="button" disabled={offset + limit >= list.data.total} onClick={() => setOffset(offset + limit)}>Дальше →</button>
@@ -463,7 +496,7 @@ function MastersTab() {
       {affected && (
         <div className="warn">
           {affected.title}
-          <BookingsTable bookings={affected.bookings} admin />
+          <BookingsTable bookings={affected.bookings} />
         </div>
       )}
       <Loading loading={data.loading && !data.data}>
@@ -597,7 +630,7 @@ function ScheduleForm({ master, onClose, onSaved }: { master: AdminMaster; onClo
       <ErrorBox error={action.error} />
       {preview && (preview.length === 0
         ? <div className="ok">Все действующие записи попадают в новый график.</div>
-        : <div className="warn">Не попадут в новый график: <BookingsTable bookings={preview} admin /></div>)}
+        : <div className="warn">Не попадут в новый график: <BookingsTable bookings={preview} /></div>)}
     </section>
   );
 }

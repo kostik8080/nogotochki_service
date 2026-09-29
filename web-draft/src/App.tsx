@@ -2,11 +2,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, ROLE_LABELS, setStudioTimezone, type Studio, type User } from './api';
 import { AdminPage } from './pages/Admin';
-import { AuthPage } from './pages/Auth';
+import { LoginPage } from './pages/Auth';
 import { BookPage } from './pages/Book';
 import { BookingPage } from './pages/Booking';
-import { CabinetPage } from './pages/Cabinet';
-import { CatalogPage } from './pages/Catalog';
 import { MasterSchedulePage } from './pages/MasterSchedule';
 import { SlotsPage } from './pages/Slots';
 import { AppContext, ErrorBox, go, useRoute } from './ui';
@@ -55,17 +53,17 @@ export function App() {
 
   const page = (() => {
     const p = route.path;
-    if (p === '/login' || p === '/register') return <AuthPage mode={p === '/register' ? 'register' : 'login'} />;
-    if (p === '/' || p === '/catalog') return <CatalogPage />;
+    // Каталог, регистрация и кабинет клиента заменены клиентским интерфейсом web/: здесь остались вход,
+    // запись (ею пользуется администратор), карточка записи, раздел администратора и расписание мастера.
+    if (p === '/' || p === '/login') return <LoginPage />;
     // key: при новых параметрах в адресе страница начинает с чистого состояния.
     if (p === '/slots') return <SlotsPage key={route.params.toString()} params={route.params} />;
     if (p === '/book') return <BookPage key={route.params.toString()} params={route.params} />;
-    if (p === '/cabinet') return <CabinetPage />;
     const m = /^\/bookings\/(\d+)$/.exec(p);
     if (m) return <BookingPage key={m[1]} id={Number(m[1])} />;
     if (p === '/admin') return <AdminPage tab={route.params.get('tab') ?? 'bookings'} />;
     if (p === '/master') return <MasterSchedulePage />;
-    return <p>Страница не найдена. <a href="#/">На главную</a></p>;
+    return <p>Страница не найдена. <a href="#/login">Ко входу</a></p>;
   })();
 
   return (
@@ -73,9 +71,7 @@ export function App() {
       <header>
         <b>Ноготочки · тест API</b>
         <nav>
-          <a href="#/catalog">Услуги и мастера</a>
           <a href="#/slots">Свободное время</a>
-          {user?.role === 'client' && <a href="#/cabinet">Мои записи</a>}
           {user?.role === 'admin' && <a href="#/admin">Администратор</a>}
           {user?.role === 'master' && <a href="#/master">Мое расписание</a>}
         </nav>
@@ -86,7 +82,7 @@ export function App() {
             </>
           ) : (
             <>
-              <a href="#/login">Вход</a> · <a href="#/register">Регистрация</a>
+              <a href="#/login">Вход</a>
             </>
           )}
         </span>

@@ -7,7 +7,58 @@ import {
   type Catalog, type Hold, type Master, type Slot, type SlotsResponse,
 } from '../api';
 import { ErrorBox, go, Json, Loading, useAction, useApp, useLoad } from '../ui';
-import { ServicePicker, type VisitItems } from './Catalog';
+
+type VisitItems = { serviceId: number; quantity: number }[];
+
+/** Выбор услуг визита по каталогу: основные — галочкой, опция — с количеством. */
+function ServicePicker({ catalog, value, onChange }: {
+  catalog: Catalog;
+  value: VisitItems;
+  onChange: (items: VisitItems) => void;
+}) {
+  const quantityOf = (id: number) => value.find((i) => i.serviceId === id)?.quantity ?? 0;
+  const setQuantity = (id: number, quantity: number) => {
+    const rest = value.filter((i) => i.serviceId !== id);
+    onChange(quantity > 0 ? [...rest, { serviceId: id, quantity }] : rest);
+  };
+  return (
+    <div>
+      {catalog.categories.map((c) => (
+        <div key={c.id}>
+          <h3>{c.name}</h3>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th></th><th>№</th><th>Услуга</th><th>Длительность</th><th>Цена мастера</th><th>Цена топ-мастера</th></tr></thead>
+              <tbody>
+                {c.services.map((s) => (
+                  <tr key={s.id}>
+                    <td>
+                      {s.maxQuantity > 1 ? (
+                        <input type="number" min={0} max={s.maxQuantity} style={{ width: 56 }} value={quantityOf(s.id)}
+                          onChange={(e) => setQuantity(s.id, Math.max(0, Number(e.target.value) || 0))} />
+                      ) : (
+                        <input type="checkbox" checked={quantityOf(s.id) > 0} onChange={(e) => setQuantity(s.id, e.target.checked ? 1 : 0)} />
+                      )}
+                    </td>
+                    <td>{s.id}</td>
+                    <td>
+                      {s.name}
+                      {s.kind === 'addon' && <span className="muted small"> (опция{s.priceUnit ? `, цена ${s.priceUnit}` : ''}, до {s.maxQuantity})</span>}
+                      {s.description && <div className="muted small">{s.description}</div>}
+                    </td>
+                    <td>{minutes(s.durationMin)}</td>
+                    <td>от {rub(s.priceMasterKop)}</td>
+                    <td>{rub(s.priceTopKop)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const DAY_STATUS: Record<string, string> = {
   open: 'Рабочий день',

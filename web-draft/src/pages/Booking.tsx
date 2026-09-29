@@ -27,7 +27,7 @@ export function BookingPage({ id }: { id: number }) {
   return (
     <>
       <h1>Запись №{id}</h1>
-      <p>{user?.role === 'client' ? <a href="#/cabinet">← Мои записи</a> : user?.role === 'admin' ? <a href="#/admin">← Все записи</a> : <a href="#/master">← Расписание</a>}</p>
+      <p>{user?.role === 'client' ? <a href="#/slots">← Свободное время</a> : user?.role === 'admin' ? <a href="#/admin">← Все записи</a> : <a href="#/master">← Расписание</a>}</p>
       <ErrorBox error={booking.error} />
       <Loading loading={booking.loading && !b}>
         {b && (

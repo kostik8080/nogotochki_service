@@ -35,6 +35,8 @@ node tools/web-dev-server.mjs
 
 Еще не сверстаны, но на них уже ведут ссылки (адреса — в `js/routes.js`): `master.html`, `privacy.html`, `staff-login.html`.
 
+Админ-панель и расписание мастера появятся в следующей итерации. Пока они есть только в черновом интерфейсе [web-draft/](../web-draft/README.md). Какие эндпоинты использует каждый экран и что чинили по ходу верстки — [docs/frontend-log.md](../docs/frontend-log.md).
+
 ## Как устроено
 
 | Где | Что |
