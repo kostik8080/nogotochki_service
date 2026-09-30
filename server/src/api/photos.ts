@@ -12,7 +12,7 @@ import { badRequest, conflict, HttpError, notFound } from '../http/errors.js';
 import { pathId, type Result, type Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
 import { deletePhotoFile, detectImageType, MAX_PHOTO_BYTES, PHOTO_TYPES, readPhoto, savePhoto } from '../storage/photos.js';
-import { requireRole } from './guards.js';
+import { requireUser } from './guards.js';
 
 interface PhotoRow {
   id: number;
@@ -95,8 +95,8 @@ export function photoRoutes(router: Router): void {
     return { status: 200, file: { ...file, cache: photo.is_published ? 'public' : 'private' } };
   });
 
+  // /api/admin/photos*: роль проверил requireAdmin в app.ts — как у всего /api/admin/*.
   router.get('/api/admin/photos', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const input = Input.query(ctx.query);
     const bookingId = input.id('bookingId', { optional: true });
     const clientId = input.id('clientId', { optional: true });
@@ -116,7 +116,7 @@ export function photoRoutes(router: Router): void {
 
   // Загрузка: ?bookingItemId=… — фото услуги завершенного визита; ?masterId=…&serviceId=… — прямо в галерею.
   router.post('/api/admin/photos', (ctx): Result => {
-    const user = requireRole(ctx, 'admin');
+    const user = requireUser(ctx);
     const input = Input.query(ctx.query);
     const bookingItemId = input.id('bookingItemId', { optional: true });
     const masterId = input.id('masterId', { optional: true });
@@ -163,7 +163,6 @@ export function photoRoutes(router: Router): void {
   // Подпись, согласие клиента, публикация и порядок в галерее. Без согласия фото с визита не публикуется;
   // отзыв согласия снимает фото с публикации.
   router.patch('/api/admin/photos/:id', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const id = pathId(ctx);
     const input = Input.body(ctx.body);
     const title = input.string('title', { optional: true, nullable: true, max: 200 });
@@ -194,7 +193,6 @@ export function photoRoutes(router: Router): void {
 
   // Фото можно удалить вместе с файлом: это не история записей (раздел 5.22).
   router.delete('/api/admin/photos/:id', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const id = pathId(ctx);
     const photo = ctx.db.prepare('SELECT file_path FROM work_photos WHERE id = ?').get(id) as { file_path: string } | undefined;
     if (!photo) throw notFound('Фото не найдено');

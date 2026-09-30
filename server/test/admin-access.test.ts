@@ -1,10 +1,15 @@
 // Раздел администратора закрыт на сервере, а не только в интерфейсе:
 //   * страницы /admin отдает только администратору: гостю — 302 на общую форму входа,
 //     клиенту и мастеру — 403 и страница «Этот раздел только для администраторов» (src/web/admin-pages.ts);
-//   * /api/admin/* отвечают клиенту и мастеру 403 (api/guards.ts, requireRole);
+//   * /api/admin/* отвечают клиенту и мастеру 403: одна проверка requireAdmin на весь раздел (api/guards.ts, app.ts),
+//     и тест перебирает все маршруты раздела — новый эндпоинт без защиты его уронит;
 //   * роли пользователя — список `roles`, и ни одно поле API не позволяет назначить себе роль.
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
+import { createRouter } from '../src/app.js';
+import { SERVER_ROOT } from '../src/config.js';
 import { type Client, PASSWORDS, startApi, type TestApi } from './helpers/api.js';
 
 let api: TestApi;
@@ -13,7 +18,7 @@ let client: Client;
 let master: Client;
 let guest: Client;
 
-const PAGES = ['/admin', '/admin/', '/admin/services', '/admin/masters'];
+const PAGES = ['/admin', '/admin/', '/admin/services', '/admin/services/form', '/admin/masters', '/admin/masters/form'];
 const DENIED = 'Этот раздел только для администраторов';
 
 before(async () => {
@@ -53,6 +58,8 @@ describe('страницы /admin', () => {
     assert.equal(res.status, 302);
     assert.equal(res.headers.get('location'), '/login.html?next=%2Fadmin%2Fservices');
     assert.equal((await guest.get('/admin')).headers.get('location'), '/login.html?next=%2Fadmin');
+    assert.equal((await guest.get('/admin/services/form?id=5')).headers.get('location'), '/login.html?next=%2Fadmin%2Fservices%2Fform%3Fid%3D5');
+    assert.equal((await guest.get('/admin/masters/form?id=a(b')).headers.get('location'), '/login.html?next=%2Fadmin%2Fmasters%2Fform');
   });
 
   for (const [who, get] of [['клиенту', () => client], ['мастеру', () => master]] as const) {
@@ -68,11 +75,12 @@ describe('страницы /admin', () => {
   }
 
   it('администратору — страницы раздела; неизвестный адрес — 404', async () => {
-    for (const [page, title] of [['/admin', 'Записи'], ['/admin/', 'Записи'], ['/admin/services', 'Услуги'], ['/admin/masters', 'Мастера']]) {
+    for (const [page, title] of [['/admin', 'Записи'], ['/admin/', 'Записи'], ['/admin/services', 'Услуги'], ['/admin/masters', 'Мастера'],
+      ['/admin/services/form?id=1', 'Услуга'], ['/admin/masters/form', 'Мастер']]) {
       const res = await admin.get(page!);
       assert.equal(res.status, 200, page);
       assert.equal(res.headers.get('cache-control'), 'no-store');
-      assert.ok(html(res.body).includes(`<h1 class="admin__title">${title}</h1>`), page);
+      assert.ok(html(res.body).includes(`>${title}</h1>`), page);
     }
     assert.equal((await admin.get('/admin/unknown')).status, 404);
     assert.equal((await admin.get('/admin/bookings.html')).status, 404);
@@ -83,6 +91,46 @@ describe('страницы /admin', () => {
     assert.equal((await session.get('/admin')).status, 200);
     await session.post('/api/auth/logout');
     assert.equal((await session.get('/admin')).status, 302);
+  });
+});
+
+describe('одна проверка на весь /api/admin', () => {
+  // Все маршруты раздела — из того же маршрутизатора, что у сервера: новый эндпоинт попадет сюда сам.
+  const ADMIN_ROUTES = createRouter({ secureCookies: false }).list().filter((r) => r.path.startsWith('/api/admin/'));
+  const PARAMS: Record<string, string> = { id: '1', noteId: '1', date: '2026-10-01', a: '1', b: '2' };
+  const url = (path: string) => path.replace(/:(\w+)/g, (_, key: string) => PARAMS[key] ?? '1');
+  const call = (who: Client, method: string, path: string) =>
+    who.request(method, url(path), method === 'GET' || method === 'DELETE' ? undefined : {});
+  const counts = () => Object.fromEntries(
+    ['users', 'bookings', 'services', 'service_categories', 'masters', 'time_blocks', 'studio_day_overrides', 'client_notes', 'work_photos', 'settings']
+      .map((t) => [t, (api.db.prepare(`SELECT count(*) AS n FROM ${t}`).get() as { n: number }).n]),
+  );
+
+  it('маршрутов раздела много, и проверки роли администратора в самих обработчиках нет', () => {
+    assert.ok(ADMIN_ROUTES.length >= 40, `нашлось ${ADMIN_ROUTES.length}`);
+    const apiDir = path.join(SERVER_ROOT, 'src', 'api');
+    for (const file of readdirSync(apiDir).filter((f) => f.endsWith('.ts') && f !== 'guards.ts')) {
+      const source = readFileSync(path.join(apiDir, file), 'utf8');
+      assert.ok(!source.includes("requireRole(ctx, 'admin')") && !source.includes('requireAdmin('), `${file}: роль проверяется в обработчике`);
+    }
+  });
+
+  it('каждый маршрут /api/admin/*: клиенту и мастеру — 403, гостю — 401, данные не меняются', async () => {
+    const before = counts();
+    const settings = api.db.prepare('SELECT * FROM settings').get();
+    for (const { method, path } of ADMIN_ROUTES) {
+      assert.equal((await call(client, method, path)).status, 403, `клиент: ${method} ${path}`);
+      assert.equal((await call(master, method, path)).status, 403, `мастер: ${method} ${path}`);
+      assert.equal((await call(guest, method, path)).status, 401, `гость: ${method} ${path}`);
+    }
+    assert.deepEqual(counts(), before);
+    assert.deepEqual(api.db.prepare('SELECT * FROM settings').get(), settings);
+  });
+
+  it('проверка стоит до поиска маршрута: несуществующий адрес раздела клиенту — 403, а не 404', async () => {
+    assert.equal((await client.get('/api/admin/new-endpoint')).status, 403);
+    assert.equal((await client.request('PATCH', '/api/admin/bookings', {})).status, 403);
+    assert.equal((await admin.get('/api/admin/new-endpoint')).status, 404);
   });
 });
 

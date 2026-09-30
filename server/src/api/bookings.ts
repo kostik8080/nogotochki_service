@@ -125,8 +125,9 @@ export function bookingRoutes(router: Router): void {
   });
 
   // Все записи студии для администратора (A-01, функция 5): фильтры по датам студии, мастеру, услуге, статусу и клиенту.
+  // Роль проверил requireAdmin в app.ts — как у всего /api/admin/*.
   router.get('/api/admin/bookings', (ctx): Result => {
-    const user = requireRole(ctx, 'admin');
+    const user = requireUser(ctx);
     const input = Input.query(ctx.query);
     const dateFrom = input.date('dateFrom', { optional: true });
     const dateTo = input.date('dateTo', { optional: true });

@@ -6,6 +6,7 @@ import { adminMasterRoutes } from './api/admin-masters.js';
 import { adminScheduleRoutes } from './api/admin-schedule.js';
 import { adminServiceRoutes } from './api/admin-services.js';
 import { adminSettingsRoutes } from './api/admin-settings.js';
+import { isAdminApiPath, requireAdmin } from './api/guards.js';
 import { authRoutes } from './api/auth.js';
 import { bookingRoutes } from './api/bookings.js';
 import { catalogRoutes } from './api/catalog.js';
@@ -72,20 +73,7 @@ export function createApp(db: Db, options: AppOptions): App {
     code: new RateLimiter(10, 3600_000),
   };
 
-  const router = new Router();
-  authRoutes(router, { secureCookies });
-  passwordResetRoutes(router);
-  profileRoutes(router);
-  catalogRoutes(router);
-  holdRoutes(router);
-  bookingRoutes(router);
-  masterRoutes(router);
-  photoRoutes(router);
-  adminServiceRoutes(router);
-  adminMasterRoutes(router);
-  adminScheduleRoutes(router);
-  adminClientRoutes(router);
-  adminSettingsRoutes(router);
+  const router = createRouter({ secureCookies });
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const cookies: string[] = [];
@@ -105,13 +93,18 @@ export function createApp(db: Db, options: AppOptions): App {
         else cookies.push(clearSessionCookie(secureCookies));
       }
 
-      // Страницы раздела администратора: доступ решает сервер по сессии (web/admin-pages.ts).
+      // Раздел администратора — одна проверка на весь раздел (api/guards.ts, requireAdmin).
+      // Страницы /admin: доступ решает сервер по сессии (web/admin-pages.ts).
       if (isAdminPagePath(url.pathname)) {
-        const page = await adminPage({ method, pathname: url.pathname, user, webDir });
+        const page = await adminPage({ method, pathname: url.pathname, search: url.search, session: { user, sessionStatus }, webDir });
         res.writeHead(page.status, { ...page.headers, ...(cookies.length ? { 'Set-Cookie': cookies } : {}) });
         res.end(method === 'HEAD' ? undefined : page.body);
         return;
       }
+
+      // /api/admin/*: до поиска маршрута. Новый эндпоинт под /api/admin защищен без строчки в обработчике,
+      // а клиент получает 403 и на несуществующий адрес раздела — не узнает, какие адреса там есть.
+      if (isAdminApiPath(url.pathname)) requireAdmin({ user, sessionStatus });
 
       const { handler, params, raw } = router.match(method, url.pathname);
       const ctx: Context = {
@@ -155,6 +148,25 @@ export function createApp(db: Db, options: AppOptions): App {
       for (const limiter of Object.values(limiters)) limiter.prune(at.getTime());
     },
   };
+}
+
+/** Все маршруты API. Отдельной функцией — чтобы тесты могли перебрать маршруты (admin-access.test.ts). */
+export function createRouter(options: { secureCookies: boolean }): Router {
+  const router = new Router();
+  authRoutes(router, { secureCookies: options.secureCookies });
+  passwordResetRoutes(router);
+  profileRoutes(router);
+  catalogRoutes(router);
+  holdRoutes(router);
+  bookingRoutes(router);
+  masterRoutes(router);
+  photoRoutes(router);
+  adminServiceRoutes(router);
+  adminMasterRoutes(router);
+  adminScheduleRoutes(router);
+  adminClientRoutes(router);
+  adminSettingsRoutes(router);
+  return router;
 }
 
 function clientIp(req: IncomingMessage, trustProxy: boolean): string {

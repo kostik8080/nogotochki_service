@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Страницу отдает сервер API по адресу /admin/services/form только администратору (server/src/web/admin-pages.ts).
+       Все относительные адреса — от корня сайта: страница открывается не из корня. -->
+  <base href="/">
+  <title>Услуга — раздел администратора — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/admin-service-form.js"></script>
+</head>
+<body class="admin-body">
+  <a class="skip-link" href="/admin/services/form#main">К содержимому</a>
+
+  <!-- Общая шапка сервиса: логотип и меню аккаунта — js/header.js -->
+  <client-header></client-header>
+
+  <div class="admin">
+    <!-- Меню раздела «Записи», «Услуги», «Мастера»: появляется после проверки роли — js/admin.js -->
+    <admin-nav></admin-nav>
+
+    <!-- A-24 Форма услуги (docs/ui-map.md, «Раздел администратора») -->
+    <main class="admin__main" id="main" data-theme="admin" data-admin-main>
+      <div class="admin__loading" data-view="loading" aria-busy="true">
+        <span class="skeleton skeleton--heading" aria-hidden="true"></span>
+        <span class="visually-hidden">Загружаем раздел…</span>
+      </div>
+
+      <div class="admin-state" role="alert" data-view="error" hidden>
+        <p class="admin-state__title">Не удалось открыть раздел</p>
+        <p class="admin-state__text" data-error-text></p>
+        <div class="admin-state__actions">
+          <button class="btn btn--primary btn--small" type="button" data-retry>Повторить</button>
+        </div>
+      </div>
+
+      <div data-view="content" hidden>
+        <a class="admin-back" href="/admin/services">← Услуги</a>
+
+        <div class="admin-head">
+          <div>
+            <p class="admin__eyebrow">Раздел администратора · услуга</p>
+            <h1 class="admin__title" data-title>Услуга</h1>
+          </div>
+          <span data-status></span>
+        </div>
+
+        <div data-page-loading aria-busy="true">
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем данные…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <form class="admin-form" data-form hidden novalidate>
+          <div class="alert" role="alert" data-alert hidden></div>
+
+          <section class="admin-panel" aria-labelledby="service-main">
+            <h2 class="admin-panel__title" id="service-main">Основное</h2>
+            <p class="admin-panel__hint" data-addon-note hidden>Это опция — дополнение к основным услугам. К каким услугам ее можно добавить,
+              задается отдельно; здесь меняются название, цены, длительность, мастера и статус.</p>
+            <div class="field">
+              <label class="field__label" for="service-name">Название</label>
+              <input class="input" id="service-name" name="name" maxlength="100" required autocomplete="off">
+              <p class="field__error" data-error-for="name" hidden></p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="service-description">Описание для клиента</label>
+              <textarea class="input" id="service-description" name="description" maxlength="1000"></textarea>
+              <p class="field__error" data-error-for="description" hidden></p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="service-category">Категория</label>
+              <select class="input" id="service-category" name="categoryId"></select>
+              <p class="field__error" data-error-for="categoryId" hidden></p>
+            </div>
+          </section>
+
+          <section class="admin-panel" aria-labelledby="service-time">
+            <h2 class="admin-panel__title" id="service-time">Длительность и цена</h2>
+            <div class="admin-fields">
+              <div class="field">
+                <label class="field__label" for="service-duration">Длительность, мин</label>
+                <input class="input" id="service-duration" name="durationMin" type="number" inputmode="numeric" min="1" max="600" step="1" required>
+                <p class="field__error" data-error-for="durationMin" hidden></p>
+              </div>
+              <div class="field">
+                <label class="field__label" for="service-cleanup">Уборка после услуги, мин</label>
+                <input class="input" id="service-cleanup" name="cleanupMin" type="number" inputmode="numeric" min="0" max="60" step="1">
+                <p class="field__hint">Клиент не видит. Следующая запись к мастеру — не раньше конца уборки.</p>
+                <p class="field__error" data-error-for="cleanupMin" hidden></p>
+              </div>
+            </div>
+            <div class="admin-fields">
+              <div class="field">
+                <label class="field__label" for="service-price">Цена у мастера, ₽</label>
+                <input class="input" id="service-price" name="priceMasterKop" type="number" inputmode="decimal" min="1" step="1" required>
+                <p class="field__hint">В каталоге клиент видит ее как «цена от».</p>
+                <p class="field__error" data-error-for="priceMasterKop" hidden></p>
+              </div>
+              <div class="field">
+                <label class="field__label" for="service-price-top">Цена у топ-мастера, ₽</label>
+                <input class="input" id="service-price-top" name="priceTopKop" type="number" inputmode="decimal" min="1" step="1" required>
+                <p class="field__hint">Не ниже цены у мастера.</p>
+                <p class="field__error" data-error-for="priceTopKop" hidden></p>
+              </div>
+            </div>
+            <p class="admin-panel__hint">Новая цена действует для новых записей. Созданные записи сохраняют цену и длительность на момент записи.</p>
+          </section>
+
+          <section class="admin-panel" aria-labelledby="service-masters">
+            <h2 class="admin-panel__title" id="service-masters">Какие мастера оказывают</h2>
+            <div class="admin-checks" data-masters></div>
+            <p class="field__error" data-error-for="masterIds" hidden></p>
+          </section>
+
+          <section class="admin-panel" aria-labelledby="service-status">
+            <h2 class="admin-panel__title" id="service-status">Статус</h2>
+            <div class="check">
+              <label class="check__label">
+                <input type="checkbox" name="isActive">
+                <span>Включена — доступна клиентам для новых записей</span>
+              </label>
+            </div>
+            <p class="admin-panel__hint">Отключенную услугу клиенты не видят при записи, а в созданных записях она остается.</p>
+          </section>
+
+          <div class="admin-form__actions">
+            <button class="btn btn--primary" type="submit">Сохранить</button>
+            <a class="btn btn--outline" href="/admin/services">Отмена</a>
+            <button class="btn btn--danger admin-form__delete" type="button" data-delete hidden>Удалить</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

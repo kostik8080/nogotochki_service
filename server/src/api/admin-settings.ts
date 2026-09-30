@@ -1,12 +1,13 @@
 // Настройки студии и витрины (паспорт, функция 10 администратора): контакты и ссылки, часовой пояс,
 // режим технических работ, правила записи и обычный режим работы по дням недели.
 // Избранные услуги для главной — isFeatured в PATCH /api/admin/services/:id, рассказ о мастере — bio мастера.
+// Доступ: весь /api/admin/* закрывает одна проверка requireAdmin (api/guards.ts), ее вызывает app.ts до поиска
+// маршрута. В обработчиках роль не проверяется; пользователя они берут через requireUser.
 import { applyOrPreview, bookingsOutsideWorkingHours } from '../booking/affected.js';
 import type { Db } from '../db/connection.js';
 import type { Result, Router } from '../http/router.js';
 import { Input, type Parsed } from '../http/validate.js';
 import { readSettings } from '../studio/settings.js';
-import { requireRole } from './guards.js';
 import { bookingViews } from './views.js';
 
 function settingsView(db: Db) {
@@ -43,14 +44,12 @@ const timezone = (raw: unknown): Parsed<string> => {
 
 export function adminSettingsRoutes(router: Router): void {
   router.get('/api/admin/settings', (ctx): Result => {
-    requireRole(ctx, 'admin');
     return { status: 200, body: { settings: settingsView(ctx.db) } };
   });
 
   // Передаются только меняемые поля. Правила записи сразу меняют расчет свободного времени;
   // созданные записи и брони остаются как есть.
   router.patch('/api/admin/settings', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const input = Input.body(ctx.body);
     const fields: Record<string, string | number | null | undefined> = {
       studio_name: input.string('studioName', { optional: true, max: 100 }),
@@ -82,7 +81,6 @@ export function adminSettingsRoutes(router: Router): void {
   // Обычный режим работы студии по дням недели (раздел 5.2). Дня нет в списке — студия в этот день закрыта.
   // В ответе — предстоящие записи, которые в новый режим не помещаются; с dryRun: true режим не сохраняется.
   router.put('/api/admin/studio-hours', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const input = Input.body(ctx.body);
     const days = input.objects('days', (d) => ({
       weekday: d.int('weekday', { min: 1, max: 7 }),

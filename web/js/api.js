@@ -295,3 +295,66 @@ export async function cancelBooking(id, body) {
 export async function rescheduleBooking(id, body) {
   return (await request('POST', `/api/bookings/${encodeURIComponent(String(id))}/reschedule`, body)).booking;
 }
+
+// ---------- Раздел администратора (/api/admin/*: гостю — 401, клиенту и мастеру — 403) ----------
+
+const adminPath = (base, id) => `${base}/${encodeURIComponent(String(id))}`;
+
+/** Все услуги, включая отключенные, категории и несовместимые пары: `{ categories, services, incompatibilities }`. */
+export const getAdminServices = () => request('GET', '/api/admin/services');
+
+/**
+ * Новая услуга. 201 — услуга; 400 VALIDATION_ERROR (пустое название, цена или длительность не больше нуля,
+ * цена у топ-мастера ниже цены у мастера — в details.fields); 409 SERVICE_NAME_TAKEN.
+ * @param {Record<string, unknown>} body
+ */
+export async function createService(body) {
+  return (await request('POST', '/api/admin/services', body)).service;
+}
+
+/** Изменить услугу: только переданные поля, `isActive: false` — отключить. Ошибки — как у createService. */
+export async function updateService(id, body) {
+  return (await request('PATCH', adminPath('/api/admin/services', id), body)).service;
+}
+
+/**
+ * Удалить услугу. Решает сервер: `{ result: 'deleted' }` — удалена; `{ result: 'deactivated', message, service }` —
+ * у услуги есть записи или фото, поэтому она только отключена (в message — объяснение для администратора).
+ */
+export const deleteService = (id) => request('DELETE', adminPath('/api/admin/services', id));
+
+/** Новая категория услуг в конец списка. 409 CATEGORY_NAME_TAKEN. */
+export async function createServiceCategory(body) {
+  return (await request('POST', '/api/admin/service-categories', body)).category;
+}
+
+/** Все мастера, включая отключенных: уровень, услуги (`serviceIds`), недельный график, учетная запись. */
+export async function getAdminMasters() {
+  return (await request('GET', '/api/admin/masters')).masters;
+}
+
+/** Новый мастер. 201 — `{ master }`; 400 VALIDATION_ERROR. */
+export const createMaster = (body) => request('POST', '/api/admin/masters', body);
+
+/**
+ * Изменить мастера: только переданные поля; `serviceIds` заменяет список услуг целиком.
+ * При отключении в ответе еще `upcomingBookings` — предстоящие записи, которые нужно перенести или отменить.
+ */
+export const updateMaster = (id, body) => request('PATCH', adminPath('/api/admin/masters', id), body);
+
+/**
+ * Удалить мастера. Решает сервер: `{ result: 'deleted' }` — удален; `{ result: 'deactivated', message, master,
+ * upcomingBookings }` — у мастера есть записи, фото, заметки или учетная запись, поэтому он только отключен.
+ */
+export const deleteMaster = (id) => request('DELETE', adminPath('/api/admin/masters', id));
+
+/**
+ * Записи студии за период (даты студии включительно). `{ timezone, total, bookings }`.
+ * @param {{ dateFrom?: string, dateTo?: string, masterId?: number, status?: string, limit?: number }} [filter]
+ */
+export function getAdminBookings(filter = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filter)) if (value !== undefined) query.set(key, String(value));
+  const qs = query.toString();
+  return request('GET', '/api/admin/bookings' + (qs ? '?' + qs : ''));
+}

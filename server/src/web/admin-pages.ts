@@ -4,17 +4,20 @@
 //   вошел, но роли администратора нет (клиент, мастер) — 403 и страница «Этот раздел только для администраторов»
 //   (web/forbidden.html);
 //   администратор — страница раздела.
-// Роль проверяется наличием в списке ролей пользователя — той же функцией hasRole, что и в /api/admin/*.
-// Данные страницы берут из /api/admin/*, которые сами проверяют роль (api/guards.ts, requireRole).
+// Доступ проверяет та же функция, что закрывает /api/admin/*, — requireAdmin (api/guards.ts): здесь ее 401
+// становится входом, а 403 — страницей отказа. Своей проверки роли у страниц нет.
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { hasRole, type SessionUser } from '../auth/sessions.js';
+import { requireAdmin, type SessionState } from '../api/guards.js';
+import { HttpError } from '../http/errors.js';
 
 /** Адрес раздела → файл в web/. Других страниц в разделе нет: неизвестный адрес — 404. */
 const PAGES: Record<string, string> = {
   '/admin': 'admin/bookings.html',
   '/admin/services': 'admin/services.html',
+  '/admin/services/form': 'admin/service-form.html',
   '/admin/masters': 'admin/masters.html',
+  '/admin/masters/form': 'admin/master-card.html',
 };
 
 const FORBIDDEN_PAGE = 'forbidden.html';
@@ -50,19 +53,28 @@ const text = (status: number, message: string, headers: Record<string, string> =
 export async function adminPage(req: {
   method: string;
   pathname: string;
-  user: SessionUser | null;
+  /** Строка запроса страницы (?id=5): гость вернется после входа туда же. */
+  search?: string;
+  session: SessionState;
   webDir: string;
 }): Promise<PageResponse> {
   if (req.method !== 'GET' && req.method !== 'HEAD') return text(405, 'Метод не поддерживается', { Allow: 'GET, HEAD' });
 
   // Сначала права, потом адрес: клиент не должен узнавать, какие страницы в разделе есть.
-  if (!req.user) {
-    const next = PAGES[req.pathname.replace(/\/+$/, '')] ? req.pathname.replace(/\/+$/, '') : '/admin';
-    return { status: 302, headers: { ...NO_STORE, Location: `/login.html?next=${encodeURIComponent(next)}` }, body: '' };
+  const page = req.pathname.replace(/\/+$/, '');
+  try {
+    requireAdmin(req.session);
+  } catch (error) {
+    if (!(error instanceof HttpError)) throw error;
+    if (error.status === 401) {
+      const search = /^\?[\w=&%.-]*$/.test(req.search ?? '') ? req.search ?? '' : '';
+      const next = PAGES[page] ? page + search : '/admin';
+      return { status: 302, headers: { ...NO_STORE, Location: `/login.html?next=${encodeURIComponent(next)}` }, body: '' };
+    }
+    return html(403, FORBIDDEN_PAGE, req.webDir);
   }
-  if (!hasRole(req.user, 'admin')) return html(403, FORBIDDEN_PAGE, req.webDir);
 
-  const file = PAGES[req.pathname.replace(/\/+$/, '')];
+  const file = PAGES[page];
   if (!file) return text(404, 'Страница не найдена');
   return html(200, file, req.webDir);
 }

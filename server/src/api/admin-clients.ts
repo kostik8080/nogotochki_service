@@ -2,6 +2,8 @@
 // и метками, карточка клиента со статистикой, историей визитов, фото и заметками, черный список.
 // Метки, статистика и «любимый мастер» не хранятся, а считаются по записям при запросе (решение 19).
 // Здесь же — закрытие доступа учетной записи (функция 1 администратора).
+// Доступ: весь /api/admin/* закрывает одна проверка requireAdmin (api/guards.ts), ее вызывает app.ts до поиска
+// маршрута. В обработчиках роль не проверяется; пользователя они берут через requireUser.
 import { CODE_TTL_MIN, issueCode, pendingTarget } from '../auth/codes.js';
 import { revokeUserSessions } from '../auth/sessions.js';
 import { type Db, transaction } from '../db/connection.js';
@@ -10,7 +12,7 @@ import { pathId, type Context, type Result, type Router } from '../http/router.j
 import { Input } from '../http/validate.js';
 import { zonedDate } from '../lib/studio-time.js';
 import { readSettings } from '../studio/settings.js';
-import { requireRole } from './guards.js';
+import { requireUser } from './guards.js';
 import { bookingViews } from './views.js';
 
 /**
@@ -166,7 +168,6 @@ export function adminClientRoutes(router: Router): void {
   // Список клиентов (A-07): поиск по имени, телефону и e-mail, фильтр по метке и черному списку.
   // Поиск идет на сервере в JavaScript: LIKE в SQLite не учитывает регистр кириллицы, а клиентов у студии — сотни.
   router.get('/api/admin/clients', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const input = Input.query(ctx.query);
     const search = input.string('search', { optional: true, max: 100 });
     const filter = input.oneOf('filter', ['new', 'regular', 'lapsed', 'blacklist'] as const, { optional: true });
@@ -192,13 +193,11 @@ export function adminClientRoutes(router: Router): void {
   });
 
   router.get('/api/admin/clients/:id', (ctx): Result => {
-    requireRole(ctx, 'admin');
     return { status: 200, body: { client: cardView(ctx, pathId(ctx)) } };
   });
 
   // Новый клиент без учетной записи (A-02, сценарий 16): по имени и телефону, e-mail — по желанию.
   router.post('/api/admin/clients', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const input = Input.body(ctx.body);
     const name = input.string('name', { max: 100 });
     const phone = input.phone('phone');
@@ -218,7 +217,6 @@ export function adminClientRoutes(router: Router): void {
   // Изменение клиента: имя, контакты и поля карточки. Новый телефон или e-mail считается неподтвержденным.
   // Администратор меняет телефон, убедившись, что звонит сама клиентка: SMS-шлюз пока не подключен.
   router.patch('/api/admin/clients/:id', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const id = pathId(ctx);
     const input = Input.body(ctx.body);
     const name = input.string('name', { optional: true, max: 100 });
@@ -268,7 +266,6 @@ export function adminClientRoutes(router: Router): void {
   // Номер берется из последнего запроса человека за сутки, а у карточки без пароля — из самой карточки.
   // Код показывается один раз и действует 15 минут; в базе — только его хеш, прежний код гасится.
   router.post('/api/admin/users/:id/phone-code', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const id = pathId(ctx);
     Input.body(ctx.body).done();
     const result = transaction(ctx.db, () => {
@@ -293,7 +290,6 @@ export function adminClientRoutes(router: Router): void {
   // убедившись по звонку, что это сам владелец. Код вводится в POST /api/auth/password-reset/confirm
   // вместе с логином; после сброса все сессии закрываются.
   router.post('/api/admin/users/:id/password-reset-code', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const id = pathId(ctx);
     Input.body(ctx.body).done();
     const result = transaction(ctx.db, () => {
@@ -310,7 +306,7 @@ export function adminClientRoutes(router: Router): void {
 
   // Черный список (A-11): причина обязательна, база хранит, кто и когда внес (раздел 5.5).
   router.put('/api/admin/clients/:id/blacklist', (ctx): Result => {
-    const user = requireRole(ctx, 'admin');
+    const user = requireUser(ctx);
     const id = pathId(ctx);
     const input = Input.body(ctx.body);
     const reason = input.string('reason', { max: 500 });
@@ -324,7 +320,6 @@ export function adminClientRoutes(router: Router): void {
   });
 
   router.delete('/api/admin/clients/:id/blacklist', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const id = pathId(ctx);
     requireClient(ctx.db, id);
     ctx.db.prepare(`
@@ -335,7 +330,7 @@ export function adminClientRoutes(router: Router): void {
 
   // Заметки о клиенте. masterId — «со слов мастера»: у мастеров нет своего раздела, заметку вносит администратор.
   router.post('/api/admin/clients/:id/notes', (ctx): Result => {
-    const user = requireRole(ctx, 'admin');
+    const user = requireUser(ctx);
     const id = pathId(ctx);
     const input = Input.body(ctx.body);
     const text = input.string('text', { max: 2000 });
@@ -354,7 +349,6 @@ export function adminClientRoutes(router: Router): void {
   });
 
   router.delete('/api/admin/clients/:id/notes/:noteId', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const deleted = ctx.db.prepare('DELETE FROM client_notes WHERE id = ? AND client_id = ?').run(pathId(ctx, 'noteId'), pathId(ctx)).changes;
     if (deleted === 0) throw notFound('Заметка не найдена');
     return { status: 204 };
@@ -363,7 +357,7 @@ export function adminClientRoutes(router: Router): void {
   // Закрыть доступ учетной записи (функция 1 администратора, SYS-04): все сессии закрываются сразу,
   // бронь снимается. Записи и история остаются. Свою учетную запись закрыть нельзя.
   router.put('/api/admin/users/:id/block', (ctx): Result => {
-    const user = requireRole(ctx, 'admin');
+    const user = requireUser(ctx);
     const id = pathId(ctx);
     Input.body(ctx.body).done();
     if (id === user.id) throw forbidden('Нельзя закрыть доступ своей учетной записи');
@@ -379,7 +373,6 @@ export function adminClientRoutes(router: Router): void {
   });
 
   router.delete('/api/admin/users/:id/block', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const id = pathId(ctx);
     const changed = ctx.db.prepare('UPDATE users SET blocked_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NULL')
       .run(ctx.now.toISOString(), id).changes;

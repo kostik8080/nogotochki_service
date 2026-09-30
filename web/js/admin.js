@@ -3,13 +3,14 @@
 //
 // Доступ к разделу закрывает сервер: страницы /admin он отдает только администратору, клиенту и мастеру —
 // 403 и страницу «Этот раздел только для администраторов» (server/src/web/admin-pages.ts), а данные раздела —
-// только из /api/admin/*, которые проверяют роль сами (server/src/api/guards.ts, requireRole).
+// только из /api/admin/*: весь раздел закрывает одна проверка requireAdmin (server/src/api/guards.ts).
 // Здесь проверка повторяется, чтобы решить, что показать: меню раздела рисуется только после того, как
 // GET /api/auth/me подтвердил роль администратора (hasRole — наличие роли в списке `roles`).
 // Если сессия кончилась, пока страница открыта, — на вход с возвратом; если роли нет — то же сообщение, что у сервера.
 //
 // Пункты меню — экраны карты (docs/ui-map.md, «Раздел администратора»): «Записи» — шахматка A-01,
-// «Услуги» — A-23, «Мастера» — A-19. Страницы пока пустые: данные подключаются в следующих итерациях.
+// «Услуги» — A-23 и форма услуги A-24, «Мастера» — A-19 и карточка мастера A-22.
+// Страница раздела ждет adminReady: он дает пользователя, когда роль администратора подтверждена, иначе null.
 import * as api from './api.js';
 import { hasRole } from './roles.js';
 import { routes } from './routes.js';
@@ -34,6 +35,9 @@ const ITEMS = [
 /** Адрес текущей страницы раздела без «/» на конце: /admin, /admin/services. */
 const currentPath = () => window.location.pathname.replace(/\/+$/, '') || '/';
 
+/** Пункт меню отмечен и на вложенных страницах раздела: форма услуги — «Услуги», карточка мастера — «Мастера». */
+const isCurrent = (href, path) => path === href || (href !== routes.admin && path.startsWith(href + '/'));
+
 class AdminNav extends HTMLElement {
   /** Меню появляется только у администратора: вызывается после проверки роли. */
   render() {
@@ -42,7 +46,7 @@ class AdminNav extends HTMLElement {
       <nav class="admin-nav" aria-label="Раздел администратора">
         <p class="admin-nav__title">Администратор</p>
         ${ITEMS.map((item) => `
-          <a class="admin-nav__item" href="${item.href}"${item.href === path ? ' aria-current="page"' : ''}>
+          <a class="admin-nav__item" href="${item.href}"${isCurrent(item.href, path) ? ' aria-current="page"' : ''}>
             <svg viewBox="0 0 24 24" aria-hidden="true">${item.icon}</svg>
             <span>${item.label}</span>
           </a>`).join('')}
@@ -94,6 +98,7 @@ export function handleAccessError(error) {
   return false;
 }
 
+/** @returns {Promise<object | null>} */
 async function start() {
   const loading = /** @type {HTMLElement} */ (document.querySelector('[data-view="loading"]'));
   const content = /** @type {HTMLElement} */ (document.querySelector('[data-view="content"]'));
@@ -108,14 +113,87 @@ async function start() {
     /** @type {HTMLElement} */ (error.querySelector('[data-error-text]')).textContent = e instanceof api.ApiError
       ? e.message
       : 'Не удалось проверить вход. Обновите страницу.';
-    return;
+    return null;
   }
-  if (!user) return goLogin();
-  if (!hasRole(user, 'admin')) return showAccessDenied();
+  if (!user) {
+    goLogin();
+    return null;
+  }
+  if (!hasRole(user, 'admin')) {
+    showAccessDenied();
+    return null;
+  }
 
   /** @type {AdminNav} */ (document.querySelector('admin-nav')).render();
   loading.hidden = true;
   content.hidden = false;
+  showFlash();
+  return user;
 }
 
-start();
+/** Пользователь, когда роль администратора подтверждена; null — сессии нет или роли нет (страница уже заменена). */
+export const adminReady = start();
+
+// ---------- Сообщение после перехода: «Услуга сохранена», «Услуга отключена, а не удалена…» ----------
+
+const FLASH_KEY = 'nog_admin_flash';
+
+/**
+ * Показать сообщение на следующей странице раздела — после сохранения или удаления форма уходит к списку.
+ * @param {'success' | 'warning'} kind
+ * @param {string} text
+ */
+export function setFlash(kind, text) {
+  try {
+    sessionStorage.setItem(FLASH_KEY, JSON.stringify({ kind, text }));
+  } catch {
+    // Хранилище недоступно — сообщение просто не покажется
+  }
+}
+
+function showFlash() {
+  let flash = null;
+  try {
+    flash = JSON.parse(sessionStorage.getItem(FLASH_KEY) ?? 'null');
+    sessionStorage.removeItem(FLASH_KEY);
+  } catch {
+    return;
+  }
+  const slot = document.querySelector('[data-flash]');
+  if (!flash || !slot) return;
+  slot.className = `alert alert--${flash.kind === 'warning' ? 'warning' : 'success'} admin-flash`;
+  slot.textContent = flash.text;
+  slot.hidden = false;
+}
+
+// ---------- График мастера: сводка для списка и карточки ----------
+
+const WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+
+/** Сегодняшняя дата студии: «2026-09-29». */
+export const studioToday = (timeZone) => new Intl.DateTimeFormat('en-CA', { timeZone }).format(new Date());
+
+/**
+ * Недельный график из GET /api/admin/masters (`schedule`: weekday 1–7 с понедельника, validFrom, validTo, start, end)
+ * по периодам: действующий сегодня и будущие. Часы: «10:00–18:00» или «часы по дням», если у дней они разные.
+ * @param {{ weekday: number, validFrom: string, validTo: string | null, start: string, end: string }[]} schedule
+ * @param {string} today
+ * @returns {{ from: string, current: boolean, days: string, hours: string }[]}
+ */
+export function schedulePeriods(schedule, today) {
+  const periods = new Map();
+  for (const row of schedule) {
+    if (!periods.has(row.validFrom)) periods.set(row.validFrom, []);
+    periods.get(row.validFrom).push(row);
+  }
+  return [...periods.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([from, rows]) => {
+    rows.sort((a, b) => a.weekday - b.weekday);
+    const hours = new Set(rows.map((r) => `${r.start}–${r.end}`));
+    return {
+      from,
+      current: from <= today,
+      days: rows.map((r) => WEEKDAYS[r.weekday - 1]).join(', '),
+      hours: hours.size === 1 ? [...hours][0] : rows.map((r) => `${WEEKDAYS[r.weekday - 1]} ${r.start}–${r.end}`).join('; '),
+    };
+  });
+}

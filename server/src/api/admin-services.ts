@@ -1,12 +1,14 @@
 // Управление услугами (паспорт, функция 2 администратора; экраны A-23, A-24).
-// Услуги не удаляются: на них ссылаются созданные записи. Вместо удаления — isActive: false,
-// отключенная услуга пропадает из новых записей, но остается в созданных (сценарий 7).
+// Отключенная услуга (isActive: false) пропадает из новых записей, но остается в созданных (сценарий 7).
+// Удаление решает сервер: услугу без записей и фото удаляет из базы, а услугу, на которую ссылается история,
+// только отключает и объясняет почему (DELETE /api/admin/services/:id).
+// Доступ: весь /api/admin/* закрывает одна проверка requireAdmin (api/guards.ts), ее вызывает app.ts до поиска
+// маршрута. В обработчиках роль не проверяется; пользователя они берут через requireUser.
 import type { Db } from '../db/connection.js';
 import { transaction } from '../db/connection.js';
 import { badRequest, conflict, notFound } from '../http/errors.js';
 import { pathId, type Result, type Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
-import { requireRole } from './guards.js';
 
 /** Верхняя граница цены — 1 млн ₽: защита от опечатки с лишними нулями. */
 const MAX_PRICE_KOP = 100_000_000;
@@ -137,13 +139,15 @@ function saveLinks(db: Db, serviceId: number, f: ServiceFields): void {
 
 /** Правила, связывающие поля: цена топ-мастера не ниже цены мастера, количество больше 1 — только у опции. */
 function checkCombination(input: Input, v: { kind: string; priceMasterKop: number; priceTopKop: number; maxQuantity: number }): void {
+  // Цена — строго больше нуля: бесплатной услуги в прайсе нет, а ноль чаще всего — незаполненное поле формы.
+  if (v.priceMasterKop <= 0) input.fail('priceMasterKop', 'Цена должна быть больше нуля');
+  if (v.priceTopKop <= 0) input.fail('priceTopKop', 'Цена должна быть больше нуля');
   if (v.priceTopKop < v.priceMasterKop) input.fail('priceTopKop', 'Цена у топ-мастера не может быть ниже цены у мастера');
   if (v.kind === 'main' && v.maxQuantity !== 1) input.fail('maxQuantity', 'Количество больше 1 бывает только у опции');
 }
 
 export function adminServiceRoutes(router: Router): void {
   router.get('/api/admin/services', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const categories = ctx.db.prepare('SELECT id, name, sort_order, is_active FROM service_categories ORDER BY sort_order, id').all() as
       { id: number; name: string; sort_order: number; is_active: number }[];
     const services = ctx.db.prepare('SELECT * FROM services ORDER BY category_id, sort_order, id').all() as unknown as ServiceRow[];
@@ -160,7 +164,6 @@ export function adminServiceRoutes(router: Router): void {
   });
 
   router.post('/api/admin/services', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const input = Input.body(ctx.body);
     const f = readServiceFields(input, true);
     if (input.valid) {
@@ -187,7 +190,6 @@ export function adminServiceRoutes(router: Router): void {
   // Изменение услуги. Передаются только меняемые поля; masterIds и addonForServiceIds заменяют список целиком.
   // Цены созданных записей не меняются: они скопированы в запись (сценарий 7).
   router.patch('/api/admin/services/:id', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const id = pathId(ctx);
     const input = Input.body(ctx.body);
     const f = readServiceFields(input, false);
@@ -239,7 +241,6 @@ export function adminServiceRoutes(router: Router): void {
   // и без них нельзя завести ни одной услуги. Удаления нет, как в прототипе: на категорию ссылаются услуги;
   // ненужную категорию отключают (isActive: false) — она и ее услуги пропадают из каталога.
   router.post('/api/admin/service-categories', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const input = Input.body(ctx.body);
     const name = input.string('name', { max: 100 });
     const sortOrder = input.int('sortOrder', { optional: true, min: 0, max: 100_000 });
@@ -255,7 +256,6 @@ export function adminServiceRoutes(router: Router): void {
   });
 
   router.patch('/api/admin/service-categories/:id', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const id = pathId(ctx);
     const input = Input.body(ctx.body);
     const name = input.string('name', { optional: true, max: 100 });
@@ -275,7 +275,6 @@ export function adminServiceRoutes(router: Router): void {
 
   // Несовместимые услуги (паспорт, функция 2): пара хранится одной строкой, меньший номер первым (раздел 5.12).
   router.post('/api/admin/service-incompatibilities', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const input = Input.body(ctx.body);
     const serviceIds = input.ids('serviceIds', { max: 2 });
     const reason = input.string('reason', { max: 500 });
@@ -294,8 +293,41 @@ export function adminServiceRoutes(router: Router): void {
     return { status: 201, body: { incompatibility: { serviceIds: [a, b], reason } } };
   });
 
+  // Удаление услуги. Решает сервер, по ссылкам в базе:
+  //   * на услугу ссылаются записи (booking_items) или фото работ — история студии, ее терять нельзя:
+  //     услуга только отключается, в ответе result: 'deactivated' и объяснение для администратора;
+  //   * ссылок нет — услуга удаляется вместе со своими настройками: какие мастера ее выполняют,
+  //     правила опции и пары несовместимых услуг. Ответ result: 'deleted'.
+  router.delete('/api/admin/services/:id', (ctx): Result => {
+    const id = pathId(ctx);
+    const outcome = transaction(ctx.db, () => {
+      if (!getService(ctx.db, id)) throw notFound('Услуга не найдена');
+      const count = (sql: string) => (ctx.db.prepare(sql).get(id) as { n: number }).n;
+      const bookings = count('SELECT count(DISTINCT booking_id) AS n FROM booking_items WHERE service_id = ?');
+      const photos = count('SELECT count(*) AS n FROM work_photos WHERE service_id = ?');
+      if (bookings > 0 || photos > 0) {
+        ctx.db.prepare('UPDATE services SET is_active = 0, updated_at = ? WHERE id = ?').run(ctx.now.toISOString(), id);
+        const reason = bookings > 0
+          ? `У услуги есть записи (${bookings}), поэтому она отключена, а не удалена`
+          : `У услуги есть фото работ (${photos}), поэтому она отключена, а не удалена`;
+        return {
+          result: 'deactivated' as const,
+          message: `${reason}. Клиенты больше не увидят ее при записи, а в созданных записях она останется с прежними названием и ценой.`,
+          bookingsCount: bookings,
+          photosCount: photos,
+        };
+      }
+      ctx.db.prepare('DELETE FROM master_services WHERE service_id = ?').run(id);
+      ctx.db.prepare('DELETE FROM service_addon_rules WHERE addon_service_id = ? OR main_service_id = ?').run(id, id);
+      ctx.db.prepare('DELETE FROM service_incompatibilities WHERE service_a_id = ? OR service_b_id = ?').run(id, id);
+      ctx.db.prepare('DELETE FROM services WHERE id = ?').run(id);
+      return { result: 'deleted' as const, message: 'Услуга удалена' };
+    });
+    const service = outcome.result === 'deactivated' ? serviceView(ctx.db, getService(ctx.db, id)!) : null;
+    return { status: 200, body: { ...outcome, service } };
+  });
+
   router.delete('/api/admin/service-incompatibilities/:a/:b', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const [x, y] = [pathId(ctx, 'a'), pathId(ctx, 'b')];
     const deleted = ctx.db.prepare('DELETE FROM service_incompatibilities WHERE service_a_id = ? AND service_b_id = ?')
       .run(Math.min(x, y), Math.max(x, y)).changes;

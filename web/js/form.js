@@ -217,5 +217,5 @@ export function safeNext(fallback) {
   return next && (/^[a-z0-9-]+\.html(\?[\w=&%.-]*)?$/.test(next) || isAdminPath(next)) ? next : fallback;
 }
 
-/** Адрес раздела администратора: /admin или /admin/страница. */
-export const isAdminPath = (path) => /^\/admin(\/[a-z-]+)?$/.test(path);
+/** Адрес раздела администратора: /admin, /admin/services, /admin/services/form?id=5. */
+export const isAdminPath = (path) => /^\/admin(\/[a-z-]+){0,2}(\?[\w=&%.-]*)?$/.test(path);

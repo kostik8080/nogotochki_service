@@ -2,6 +2,8 @@
 // отпуск, больничный), изменения смены мастера на дату (A-20) и особые дни студии (A-20d).
 // Каждое изменение возвращает действующие записи, которые оно задевает; с dryRun: true изменение
 // не сохраняется — только показывает эти записи.
+// Доступ: весь /api/admin/* закрывает одна проверка requireAdmin (api/guards.ts), ее вызывает app.ts до поиска
+// маршрута. В обработчиках роль не проверяется; пользователя они берут через requireUser.
 import { applyOrPreview, bookingsOutsideWorkingHours, bookingsOverlapping } from '../booking/affected.js';
 import type { Db } from '../db/connection.js';
 import { badRequest, notFound } from '../http/errors.js';
@@ -9,7 +11,7 @@ import { pathId, type Context, type Result, type Router } from '../http/router.j
 import { Input } from '../http/validate.js';
 import { addDays, zonedDate, zonedTimeToUtc } from '../lib/studio-time.js';
 import { readSettings } from '../studio/settings.js';
-import { requireRole } from './guards.js';
+import { requireUser } from './guards.js';
 import { bookingViews } from './views.js';
 
 const BLOCK_TYPES = ['lunch', 'personal', 'day_off', 'vacation', 'sick_leave', 'other'] as const;
@@ -72,7 +74,6 @@ export function adminScheduleRoutes(router: Router): void {
   // --- Блокировки времени ---
 
   router.get('/api/admin/time-blocks', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const input = Input.query(ctx.query);
     const masterId = input.id('masterId', { optional: true });
     const { from, to } = readRange(ctx, input);
@@ -100,7 +101,7 @@ export function adminScheduleRoutes(router: Router): void {
   // Новая блокировка (сценарий 8: отпуск Елены). Слоты мастера на это время пропадают сразу; записи,
   // которые попали под блокировку, база не трогает — они приходят в ответе, администратор разбирает их сам.
   router.post('/api/admin/time-blocks', (ctx): Result => {
-    const user = requireRole(ctx, 'admin');
+    const user = requireUser(ctx);
     const input = Input.body(ctx.body);
     const masterId = input.id('masterId');
     const type = input.oneOf('type', BLOCK_TYPES);
@@ -131,7 +132,6 @@ export function adminScheduleRoutes(router: Router): void {
 
   // Блокировку можно удалить: это рабочий график, а не история посещений (раздел 5.17).
   router.delete('/api/admin/time-blocks/:id', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const deleted = ctx.db.prepare('DELETE FROM time_blocks WHERE id = ?').run(pathId(ctx)).changes;
     if (deleted === 0) throw notFound('Блокировка не найдена');
     return { status: 204 };
@@ -140,7 +140,6 @@ export function adminScheduleRoutes(router: Router): void {
   // --- Смена мастера на дату (A-20): рабочий день вне графика или выходной ---
 
   router.get('/api/admin/masters/:id/days', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const masterId = pathId(ctx);
     const input = Input.query(ctx.query);
     const { from, to } = readRange(ctx, input);
@@ -157,7 +156,7 @@ export function adminScheduleRoutes(router: Router): void {
   });
 
   router.put('/api/admin/masters/:id/days/:date', (ctx): Result => {
-    const user = requireRole(ctx, 'admin');
+    const user = requireUser(ctx);
     const masterId = pathId(ctx);
     const date = pathDate(ctx);
     const input = Input.body(ctx.body);
@@ -186,7 +185,6 @@ export function adminScheduleRoutes(router: Router): void {
 
   // Убрать изменение: день снова считается по недельному графику.
   router.delete('/api/admin/masters/:id/days/:date', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const masterId = pathId(ctx);
     const date = pathDate(ctx);
     const affected = applyOrPreview(ctx.db, false, () => {
@@ -200,7 +198,6 @@ export function adminScheduleRoutes(router: Router): void {
   // --- Особые дни студии (A-20d): праздник, санитарный день, сокращенный или дополнительный рабочий день ---
 
   router.get('/api/admin/studio-days', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const input = Input.query(ctx.query);
     const { from, to } = readRange(ctx, input);
     input.done();
@@ -226,7 +223,7 @@ export function adminScheduleRoutes(router: Router): void {
   // Особый день действует сразу на всех мастеров (сценарий 14: санитарный день). В ответе — записи всех
   // мастеров на эту дату, которые в новый режим не помещаются.
   router.put('/api/admin/studio-days/:date', (ctx): Result => {
-    const user = requireRole(ctx, 'admin');
+    const user = requireUser(ctx);
     const date = pathDate(ctx);
     const input = Input.body(ctx.body);
     const isOpen = input.bool('isOpen');
@@ -254,7 +251,6 @@ export function adminScheduleRoutes(router: Router): void {
   });
 
   router.delete('/api/admin/studio-days/:date', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const date = pathDate(ctx);
     const affected = applyOrPreview(ctx.db, false, () => {
       const deleted = ctx.db.prepare('DELETE FROM studio_day_overrides WHERE work_date = ?').run(date).changes;

@@ -31,7 +31,9 @@ REST API поверх базы из [`docs/db-schema.md`](db-schema.md). Код 
 
 **Роли — список.** Сессия и ответы о пользователе содержат `roles` — список ролей учетной записи, и права везде проверяются наличием роли в нем (`hasRole` в `server/src/auth/sessions.ts`), а не равенством. В базе у учетной записи одна роль (`users.role`, решение заказчика — [db-schema.md](db-schema.md), «Роль одна, а не список»), поэтому сейчас в списке одно значение. Роль назначается только в базе (`npm run admin:create`, тестовые данные): поля `role` и `roles` API не принимает ни при регистрации, ни в профиле — 400.
 
-**Три проверки на каждом эндпоинте.** Роль берется из базы (`sessions` → `users`), а не из запроса: поля, заголовки и параметры с ролью сервер не читает. Обработчик по порядку проверяет вход (401 `UNAUTHORIZED` или `SESSION_EXPIRED`), роль (403) и принадлежность запрошенного объекта (403) — `requireUser`, `requireRole` и `requireBookingAccess` / `requireMasterProfile` в `server/src/api/guards.ts`. Третья проверка обязательна и там, где роль уже совпала: клиент с правильной ролью не должен открыть чужую запись. Публичны намеренно только витрина и расчет слотов: `GET /api/studio`, `/api/services`, `/api/masters`, `/api/masters/:id`, `/api/masters/:id/slots`, `/api/slots`, `/api/studio/days`, `/api/gallery`, `/api/photos/:id/file`.
+**Три проверки на каждом эндпоинте.** Роль берется из базы (`sessions` → `users`), а не из запроса: поля, заголовки и параметры с ролью сервер не читает. Обработчик по порядку проверяет вход (401 `UNAUTHORIZED` или `SESSION_EXPIRED`), роль (403) и принадлежность запрошенного объекта (403) — `requireUser`, `requireRole` и `requireBookingAccess` / `requireMasterProfile` в `server/src/api/guards.ts`. Третья проверка обязательна и там, где роль уже совпала: клиент с правильной ролью не должен открыть чужую запись.
+
+**Раздел администратора — одна проверка на весь раздел.** Роль администратора для всех `/api/admin/*` проверяет одна функция `requireAdmin` (`server/src/api/guards.ts`); ее вызывает `server/src/app.ts` до поиска маршрута. Обработчики раздела роль не проверяют, поэтому новый эндпоинт под `/api/admin` получает ту же защиту сам. Гостю — 401, клиенту и мастеру — 403, в том числе на несуществующий адрес раздела: по ответу нельзя узнать, какие адреса там есть. Тест `server/test/admin-access.test.ts` перебирает все маршруты раздела и падает, если хоть один ответит клиенту не 403. Эндпоинты администратора вне `/api/admin` — только `POST /api/bookings/:id/status`: права проверяет `setVisitResult` в `booking-service.ts`. Публичны намеренно только витрина и расчет слотов: `GET /api/studio`, `/api/services`, `/api/masters`, `/api/masters/:id`, `/api/masters/:id/slots`, `/api/slots`, `/api/studio/days`, `/api/gallery`, `/api/photos/:id/file`.
 
 ## Эндпоинты
 
@@ -110,13 +112,15 @@ REST API поверх базы из [`docs/db-schema.md`](db-schema.md). Код 
 | `GET /api/admin/services` | Все услуги, включая отключенные: цены, длительность, уборка, мастера, правила опции; категории и несовместимые пары |
 | `POST /api/admin/service-categories` | Новая категория (A-23, «+ Категория»): `name`, `sortOrder` (по умолчанию — в конец), `isActive`. Новая база стартует без категорий, а без них нельзя завести услугу |
 | `PATCH /api/admin/service-categories/:id` | Переименовать, поменять порядок, отключить (`isActive: false` — категория и ее услуги пропадают из каталога). Название не повторяется без учета регистра. Удаления нет: на категорию ссылаются услуги |
-| `POST /api/admin/services` | Новая услуга: `categoryId`, `kind` (`main` или `addon`), `name`, `durationMin`, `cleanupMin`, `priceMasterKop`, `priceTopKop`, `priceUnit`, `maxQuantity`, `isFeatured`, `sortOrder`, `isActive`, `masterIds`, `addonForServiceIds` (для опции). Цена топ-мастера не ниже цены мастера; название не повторяется без учета регистра |
-| `PATCH /api/admin/services/:id` | Изменение услуги, включая `isActive: false` — отключение. Удаления нет: на услугу ссылаются записи. Созданные записи сохраняют прежние название и цену |
+| `POST /api/admin/services` | Новая услуга: `categoryId`, `kind` (`main` или `addon`), `name`, `durationMin`, `cleanupMin`, `priceMasterKop`, `priceTopKop`, `priceUnit`, `maxQuantity`, `isFeatured`, `sortOrder`, `isActive`, `masterIds`, `addonForServiceIds` (для опции). Проверки на сервере (400 `VALIDATION_ERROR`, поле — в `details.fields`): название не пустое, длительность от 1 минуты, обе цены больше нуля, цена топ-мастера не ниже цены мастера. Название не повторяется без учета регистра (409). Те же проверки — в `PATCH` |
+| `PATCH /api/admin/services/:id` | Изменение услуги, включая `isActive: false` — отключение. Созданные записи сохраняют прежние название, цену и длительность: они скопированы в запись (`booking_items`) в момент оформления |
+| `DELETE /api/admin/services/:id` | Удаление решает сервер. На услугу не ссылаются ни записи, ни фото работ — строка удаляется вместе с отметками мастеров, правилами опции и парами несовместимых услуг: 200 `{ result: 'deleted' }`. Ссылки есть — услуга только отключается: 200 `{ result: 'deactivated', message, bookingsCount, photosCount, service }`, в `message` — объяснение для администратора («У услуги есть записи (3), поэтому она отключена, а не удалена…»). 404 — услуги нет |
 | `POST /api/admin/service-incompatibilities` | Пара несовместимых услуг `serviceIds: [a, b]` с объяснением для клиента |
 | `DELETE /api/admin/service-incompatibilities/:a/:b` | Убрать пару |
 | `GET /api/admin/masters` | Все мастера, включая отключенных: уровень, услуги, действующий и будущий недельный график |
 | `POST /api/admin/masters` | Новый мастер: профиль, `level`, `serviceIds` и `schedule: { validFrom, days: [{ weekday, start, end }] }` |
-| `PATCH /api/admin/masters/:id` | Изменение мастера, уровня, услуг; `isActive: false` — отключение, в ответе предстоящие записи мастера, которые нужно перенести или отменить |
+| `PATCH /api/admin/masters/:id` | Изменение мастера, уровня, услуг (`serviceIds` заменяет список целиком); `isActive: false` — отключение, в ответе предстоящие записи мастера, которые нужно перенести или отменить. Имя не может быть пустым (400) |
+| `DELETE /api/admin/masters/:id` | Удаление решает сервер. У мастера нет записей, фото работ, заметок о клиентах «со слов мастера» и учетной записи для входа — строка удаляется вместе с его услугами, графиком, сменами на даты и блокировками: 200 `{ result: 'deleted' }`. Иначе мастер только отключается: 200 `{ result: 'deactivated', message, bookingsCount, master, upcomingBookings }`. 404 — мастера нет |
 | `POST /api/admin/masters/:id/account` | Учетная запись мастера для входа: `email` и/или `phone`, `password`. Мастер видит свое расписание и меняет пароль в профиле. Уже есть — 409 `MASTER_HAS_ACCOUNT`. В карточке мастера — `account` |
 | `PUT /api/admin/masters/:id/schedule` | Новый недельный график с даты (сценарий 14): текущие строки закрываются днем накануне. В ответе — действующие записи с этой даты, которые в новый график не попадают. С `dryRun: true` график не сохраняется |
 
@@ -183,7 +187,7 @@ REST API поверх базы из [`docs/db-schema.md`](db-schema.md). Код 
 
 ## Страницы раздела администратора
 
-Страницы `/admin`, `/admin/services`, `/admin/masters` (файлы `web/admin/*.html`) отдает этот же сервер, а не статический: доступ к разделу решает сессия (`server/src/web/admin-pages.ts`). Роль проверяется той же функцией `hasRole`, что и в `/api/admin/*`.
+Страницы `/admin`, `/admin/services`, `/admin/masters` (файлы `web/admin/*.html`) отдает этот же сервер, а не статический: доступ к разделу решает сессия (`server/src/web/admin-pages.ts`). Доступ проверяет та же функция `requireAdmin`, что закрывает `/api/admin/*`.
 
 | Кто | Ответ |
 |---|---|

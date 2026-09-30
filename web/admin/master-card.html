@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Страницу отдает сервер API по адресу /admin/masters/form только администратору (server/src/web/admin-pages.ts).
+       Все относительные адреса — от корня сайта: страница открывается не из корня. -->
+  <base href="/">
+  <title>Мастер — раздел администратора — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/admin-master-card.js"></script>
+</head>
+<body class="admin-body">
+  <a class="skip-link" href="/admin/masters/form#main">К содержимому</a>
+
+  <!-- Общая шапка сервиса: логотип и меню аккаунта — js/header.js -->
+  <client-header></client-header>
+
+  <div class="admin">
+    <!-- Меню раздела «Записи», «Услуги», «Мастера»: появляется после проверки роли — js/admin.js -->
+    <admin-nav></admin-nav>
+
+    <!-- A-22 Карточка мастера (docs/ui-map.md, «Раздел администратора») -->
+    <main class="admin__main" id="main" data-theme="admin" data-admin-main>
+      <div class="admin__loading" data-view="loading" aria-busy="true">
+        <span class="skeleton skeleton--heading" aria-hidden="true"></span>
+        <span class="visually-hidden">Загружаем раздел…</span>
+      </div>
+
+      <div class="admin-state" role="alert" data-view="error" hidden>
+        <p class="admin-state__title">Не удалось открыть раздел</p>
+        <p class="admin-state__text" data-error-text></p>
+        <div class="admin-state__actions">
+          <button class="btn btn--primary btn--small" type="button" data-retry>Повторить</button>
+        </div>
+      </div>
+
+      <div data-view="content" hidden>
+        <a class="admin-back" href="/admin/masters">← Мастера</a>
+
+        <div class="admin-head">
+          <div>
+            <p class="admin__eyebrow">Раздел администратора · мастер</p>
+            <h1 class="admin__title" data-title>Мастер</h1>
+          </div>
+          <span data-status></span>
+        </div>
+
+        <div data-page-loading aria-busy="true">
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем данные…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <form class="admin-form" data-form hidden novalidate>
+          <div class="alert" role="alert" data-alert hidden></div>
+
+          <section class="admin-panel" aria-labelledby="master-main">
+            <h2 class="admin-panel__title" id="master-main">Профиль</h2>
+            <div class="field">
+              <label class="field__label" for="master-name">Имя</label>
+              <input class="input" id="master-name" name="name" maxlength="100" required autocomplete="off">
+              <p class="field__error" data-error-for="name" hidden></p>
+            </div>
+            <div class="admin-fields">
+              <div class="field">
+                <label class="field__label" for="master-specialty">Специализация</label>
+                <input class="input" id="master-specialty" name="specialty" maxlength="200" placeholder="Например: маникюр и педикюр">
+                <p class="field__error" data-error-for="specialty" hidden></p>
+              </div>
+              <div class="field">
+                <label class="field__label" for="master-experience">Опыт, лет</label>
+                <input class="input" id="master-experience" name="experienceYears" type="number" inputmode="numeric" min="0" max="80" step="1">
+                <p class="field__error" data-error-for="experienceYears" hidden></p>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field__label" for="master-bio">Рассказ о мастере</label>
+              <textarea class="input" id="master-bio" name="bio" maxlength="1000"></textarea>
+              <p class="field__hint">Клиенты видят его на главной странице и в профиле мастера.</p>
+              <p class="field__error" data-error-for="bio" hidden></p>
+            </div>
+          </section>
+
+          <section class="admin-panel" aria-labelledby="master-level">
+            <h2 class="admin-panel__title" id="master-level">Уровень</h2>
+            <div class="level-switch" role="radiogroup" aria-labelledby="master-level">
+              <input type="radio" id="level-master" name="level" value="master">
+              <label for="level-master">Мастер</label>
+              <input type="radio" id="level-top" name="level" value="top_master">
+              <label for="level-top">Топ-мастер</label>
+            </div>
+            <p class="admin-panel__hint">От уровня зависит цена услуг в новых записях. Созданные записи сохраняют цену на момент записи.</p>
+          </section>
+
+          <section class="admin-panel" aria-labelledby="master-services">
+            <h2 class="admin-panel__title" id="master-services">Какие услуги выполняет</h2>
+            <p class="admin-panel__hint">Клиент увидит мастера на шаге выбора мастера, только если тот выполняет все услуги визита.
+              Цена — по уровню мастера.</p>
+            <div class="admin-checks" data-services></div>
+            <p class="field__error" data-error-for="serviceIds" hidden></p>
+          </section>
+
+          <section class="admin-panel" aria-labelledby="master-schedule">
+            <h2 class="admin-panel__title" id="master-schedule">График работы</h2>
+            <div data-schedule></div>
+          </section>
+
+          <section class="admin-panel" aria-labelledby="master-status">
+            <h2 class="admin-panel__title" id="master-status">Статус</h2>
+            <div class="check">
+              <label class="check__label">
+                <input type="checkbox" name="isActive">
+                <span>Активен — клиенты видят мастера при записи</span>
+              </label>
+            </div>
+            <p class="admin-panel__hint">Отключенного мастера клиенты не видят, а в истории записей он остается.
+              Его предстоящие записи не отменяются сами: после отключения появится их список.</p>
+          </section>
+
+          <div class="admin-form__actions">
+            <button class="btn btn--primary" type="submit">Сохранить</button>
+            <a class="btn btn--outline" href="/admin/masters">Отмена</a>
+            <button class="btn btn--danger admin-form__delete" type="button" data-delete hidden>Удалить</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

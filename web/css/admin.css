@@ -267,3 +267,504 @@ admin-nav {
     padding-top: var(--space-24);
   }
 }
+
+/* ======================================================================
+ * Страницы раздела с данными: «Услуги» (A-23), форма услуги (A-24),
+ * «Мастера» (A-19), карточка мастера (A-22). Поля форм — css/forms.css.
+ * ====================================================================== */
+
+/* ---------- Шапка страницы: заголовок и кнопки ---------- */
+
+.admin-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.admin-head .admin__title {
+  margin-bottom: 0;
+}
+
+.admin-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.admin-head__summary {
+  width: 100%;
+  color: var(--color-text-muted);
+  font-size: var(--text-body-s-size);
+}
+
+.admin-back {
+  display: inline-block;
+  margin-bottom: var(--space-4);
+  color: var(--color-text-accent);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-button-weight);
+}
+
+.admin-back:hover {
+  color: var(--color-button-bg-active);
+}
+
+.admin-flash {
+  margin-bottom: var(--space-6);
+}
+
+/* Кнопка опасного действия: рамка и текст цвета ошибки, как «Отменить запись» в дизайн-системе */
+.btn--danger {
+  background: transparent;
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.btn--danger:hover {
+  background: color-mix(in srgb, var(--color-error) 8%, transparent);
+}
+
+/* ---------- Бейджи: «Включена», «Отключена», «Опция» ---------- */
+
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  line-height: var(--text-body-s-line);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.admin-badge::before {
+  content: '';
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.admin-badge--on {
+  background: var(--color-status-active-bg);
+  color: var(--color-status-active-text);
+}
+
+.admin-badge--off {
+  background: var(--color-status-disabled-bg);
+  color: var(--color-status-disabled-text);
+}
+
+.admin-badge--addon {
+  background: var(--color-surface-accent);
+  color: var(--color-text-accent);
+}
+
+.admin-badge--addon::before {
+  display: none;
+}
+
+/* ---------- Список услуг по категориям ---------- */
+
+.admin-group + .admin-group {
+  margin-top: var(--space-8);
+}
+
+.admin-group__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-body-l-size);
+  font-weight: var(--text-button-weight);
+  line-height: var(--text-body-l-line);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+.admin-table th {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  letter-spacing: var(--text-button-letter-spacing);
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.admin-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+  vertical-align: top;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-table tbody tr:hover {
+  background: color-mix(in srgb, var(--color-surface-accent) 50%, transparent);
+}
+
+.admin-table__name {
+  font-weight: var(--text-label-weight);
+}
+
+.admin-table__name a:hover {
+  color: var(--color-text-accent);
+}
+
+.admin-table__name .admin-badge {
+  margin-left: var(--space-2);
+}
+
+.admin-table__num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.admin-table__muted {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+}
+
+/* Столбцы одной ширины во всех категориях: таблицы стоят друг под другом */
+@media (min-width: 768px) {
+  .admin-table {
+    table-layout: fixed;
+  }
+
+  .admin-table th:nth-child(1) {
+    width: 30%;
+  }
+
+  .admin-table th:nth-child(2) {
+    width: 14%;
+  }
+
+  .admin-table th:nth-child(3) {
+    width: 20%;
+  }
+
+  .admin-table th:nth-child(5) {
+    width: 14%;
+  }
+}
+
+/* Отключенная строка: видна администратору, но приглушена */
+.admin-table tr.is-off td:not(:last-child) {
+  color: var(--color-text-muted);
+}
+
+/* Телефон: строка таблицы — карточка, подписи столбцов — перед значением */
+@media (max-width: 767.98px) {
+  .admin-table,
+  .admin-table tbody,
+  .admin-table tr,
+  .admin-table td {
+    display: block;
+  }
+
+  .admin-table thead {
+    display: none;
+  }
+
+  .admin-table tr {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-divider);
+  }
+
+  .admin-table tr:last-child {
+    border-bottom: 0;
+  }
+
+  .admin-table td {
+    padding: var(--space-1) 0;
+    border: 0;
+  }
+
+  .admin-table td[data-label]::before {
+    content: attr(data-label) ': ';
+    color: var(--color-text-muted);
+  }
+
+  .admin-table__muted {
+    display: inline;
+    margin-left: var(--space-1);
+  }
+}
+
+/* Форма новой категории над списком */
+.admin-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  max-width: calc(var(--space-24) * 6);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.admin-inline-form .field {
+  flex: 1;
+  min-width: calc(var(--space-24) * 2);
+}
+
+.admin-inline-form .alert {
+  width: 100%;
+}
+
+/* ---------- Формы: услуга и мастер ---------- */
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: calc(var(--space-24) * 8);
+}
+
+.admin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.admin-panel__title {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  letter-spacing: var(--text-button-letter-spacing);
+  text-transform: uppercase;
+}
+
+.admin-panel__hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-body-s-line);
+}
+
+/* Несколько полей в ряд с планшета: длительность и уборка, две цены */
+.admin-fields {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .admin-fields {
+    grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-24) * 2), 1fr));
+  }
+}
+
+.admin-form textarea.input {
+  min-height: calc(var(--space-24) + var(--space-4));
+  resize: vertical;
+}
+
+.admin-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* «Удалить» — в стороне от «Сохранить», чтобы не нажать по ошибке */
+.admin-form__delete {
+  margin-left: auto;
+}
+
+/* Флажки: мастера услуги, услуги мастера */
+.admin-checks {
+  display: grid;
+  gap: var(--space-2) var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .admin-checks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.admin-checks__group {
+  grid-column: 1 / -1;
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  letter-spacing: var(--text-button-letter-spacing);
+  text-transform: uppercase;
+}
+
+.admin-checks__group:first-child {
+  margin-top: 0;
+}
+
+.admin-checks .check__label {
+  align-items: center;
+}
+
+.admin-checks__text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.admin-checks__meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Переключатель уровня мастера «Мастер / Топ-мастер» — как в прототипе A-22 */
+.level-switch {
+  position: relative;
+  display: inline-flex;
+  align-self: flex-start;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.level-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.level-switch label {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-button-weight);
+  cursor: pointer;
+}
+
+.level-switch input:checked + label {
+  background: var(--color-button-bg);
+  color: var(--color-button-text);
+}
+
+.level-switch input:focus-visible + label {
+  outline: 2px solid var(--color-focus-border);
+  outline-offset: -2px;
+}
+
+/* График мастера — только просмотр */
+.admin-schedule {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+  font-size: var(--text-body-s-size);
+}
+
+.admin-schedule dt {
+  color: var(--color-text-muted);
+}
+
+.admin-schedule dd {
+  margin: 0;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  padding-left: var(--space-4);
+  list-style: disc;
+}
+
+/* ---------- Мастера: плитки ---------- */
+
+.master-tiles {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .master-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .master-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.master-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  transition: border-color 150ms ease-out;
+}
+
+.master-tile:hover {
+  border-color: var(--color-button-bg);
+}
+
+.master-tile.is-off {
+  color: var(--color-text-muted);
+}
+
+.master-tile__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.master-tile__head .avatar {
+  width: var(--space-12);
+  height: var(--space-12);
+  font-size: var(--text-body-m-size);
+}
+
+.master-tile__name {
+  font-weight: var(--text-button-weight);
+}
+
+.master-tile__sub,
+.master-tile__meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-body-s-line);
+}
+
+.master-tile__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}

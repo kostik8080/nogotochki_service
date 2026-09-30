@@ -20,6 +20,10 @@ export const routes = {
   admin: '/admin',
   adminServices: '/admin/services',
   adminMasters: '/admin/masters',
+  /** A-24 Форма услуги: без id — новая услуга. */
+  adminServiceForm: (id) => '/admin/services/form' + (id ? '?id=' + encodeURIComponent(String(id)) : ''),
+  /** A-22 Карточка мастера: без id — новый мастер. */
+  adminMasterCard: (id) => '/admin/masters/form' + (id ? '?id=' + encodeURIComponent(String(id)) : ''),
   /** CAB-01 Мои записи */
   account: 'account.html',
   /** CAB-02 История */

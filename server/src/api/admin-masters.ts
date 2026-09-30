@@ -1,6 +1,9 @@
 // Управление мастерами (паспорт, функция 3 администратора; экраны A-19, A-22, A-22p).
-// Мастера не удаляются: на них ссылаются записи. Вместо удаления — isActive: false, отключенного мастера
-// не предлагают клиентам, но он остается в истории записей.
+// Отключенного мастера (isActive: false) не предлагают клиентам, но он остается в истории записей.
+// Удаление решает сервер: мастера без записей, фото, заметок и учетной записи удаляет из базы, остальных
+// только отключает и объясняет почему (DELETE /api/admin/masters/:id).
+// Доступ: весь /api/admin/* закрывает одна проверка requireAdmin (api/guards.ts), ее вызывает app.ts до поиска
+// маршрута. В обработчиках роль не проверяется; пользователя они берут через requireUser.
 import { viewerRole } from '../auth/sessions.js';
 import { applyOrPreview, bookingsOutsideWorkingHours } from '../booking/affected.js';
 import type { Db } from '../db/connection.js';
@@ -11,7 +14,7 @@ import { pathId, type Result, type Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
 import { addDays, zonedDate, zonedTimeToUtc } from '../lib/studio-time.js';
 import { readSettings } from '../studio/settings.js';
-import { requireRole } from './guards.js';
+import { requireUser } from './guards.js';
 import { bookingViews } from './views.js';
 
 interface MasterRow {
@@ -128,7 +131,6 @@ function saveSchedule(db: Db, masterId: number, validFrom: string, days: Schedul
 
 export function adminMasterRoutes(router: Router): void {
   router.get('/api/admin/masters', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const today = zonedDate(ctx.now.getTime(), readSettings(ctx.db).timezone);
     const rows = ctx.db.prepare('SELECT id FROM masters ORDER BY sort_order, id').all() as { id: number }[];
     return { status: 200, body: { masters: rows.map((r) => masterView(ctx.db, getMaster(ctx.db, r.id)!, today)) } };
@@ -136,7 +138,6 @@ export function adminMasterRoutes(router: Router): void {
 
   // Новый мастер: профиль, услуги и, если передан, недельный график с даты начала работы.
   router.post('/api/admin/masters', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const input = Input.body(ctx.body);
     const f = readMasterFields(input, true);
     const schedule = input.object('schedule', readSchedule, { optional: true });
@@ -161,7 +162,7 @@ export function adminMasterRoutes(router: Router): void {
   // Изменение мастера. Смена уровня меняет цены только новых записей (сценарий 11).
   // При отключении в ответе — предстоящие записи мастера, которые нужно перенести или отменить.
   router.patch('/api/admin/masters/:id', (ctx): Result => {
-    const user = requireRole(ctx, 'admin');
+    const user = requireUser(ctx);
     const id = pathId(ctx);
     const input = Input.body(ctx.body);
     const f = readMasterFields(input, false);
@@ -205,11 +206,60 @@ export function adminMasterRoutes(router: Router): void {
     };
   });
 
+  // Удаление мастера. Решает сервер, по ссылкам в базе:
+  //   * на мастера ссылается история — записи, фото работ, заметки о клиентах «со слов мастера» — или у него
+  //     есть учетная запись для входа: мастер только отключается, в ответе result: 'deactivated', объяснение
+  //     и предстоящие записи, которые нужно перенести или отменить;
+  //   * ссылок нет — мастер удаляется вместе со своими настройками: услуги, недельный график, смены на даты,
+  //     блокировки времени и чужие брони на его время. Ответ result: 'deleted'.
+  router.delete('/api/admin/masters/:id', (ctx): Result => {
+    const user = requireUser(ctx);
+    const id = pathId(ctx);
+    const today = zonedDate(ctx.now.getTime(), readSettings(ctx.db).timezone);
+    const outcome = transaction(ctx.db, () => {
+      const master = getMaster(ctx.db, id);
+      if (!master) throw notFound('Мастер не найден');
+      const count = (sql: string) => (ctx.db.prepare(sql).get(id) as { n: number }).n;
+      const bookings = count('SELECT count(*) AS n FROM bookings WHERE master_id = ?');
+      const photos = count('SELECT count(*) AS n FROM work_photos WHERE master_id = ?');
+      const notes = count('SELECT count(*) AS n FROM client_notes WHERE master_id = ?');
+      const hasAccount = accountOf(ctx.db, id) !== null;
+      if (bookings > 0 || photos > 0 || notes > 0 || hasAccount) {
+        ctx.db.prepare('UPDATE masters SET is_active = 0, updated_at = ? WHERE id = ?').run(ctx.now.toISOString(), id);
+        const reason = bookings > 0 ? `У мастера есть записи (${bookings})`
+          : photos > 0 ? `У мастера есть фото работ (${photos})`
+            : notes > 0 ? `О клиентах есть заметки со слов этого мастера (${notes})`
+              : 'У мастера есть учетная запись для входа';
+        return {
+          result: 'deactivated' as const,
+          message: `${reason}, поэтому он отключен, а не удален. Клиенты больше не увидят его при записи, а в истории записей он останется.`,
+          bookingsCount: bookings,
+        };
+      }
+      for (const table of ['master_services', 'master_weekly_hours', 'master_day_overrides', 'time_blocks', 'slot_holds']) {
+        ctx.db.prepare(`DELETE FROM ${table} WHERE master_id = ?`).run(id);
+      }
+      ctx.db.prepare('DELETE FROM masters WHERE id = ?').run(id);
+      return { result: 'deleted' as const, message: 'Мастер удален' };
+    });
+    if (outcome.result === 'deleted') return { status: 200, body: { ...outcome, master: null } };
+    const upcoming = (ctx.db.prepare(`
+      SELECT id FROM bookings WHERE master_id = ? AND status = 'active' AND starts_at >= ? ORDER BY starts_at
+    `).all(id, ctx.now.toISOString()) as { id: number }[]).map((r) => r.id);
+    return {
+      status: 200,
+      body: {
+        ...outcome,
+        master: masterView(ctx.db, getMaster(ctx.db, id)!, today),
+        upcomingBookings: bookingViews(ctx.db, upcoming, { viewer: viewerRole(user), now: ctx.now }),
+      },
+    };
+  });
+
   // Учетная запись мастера (паспорт: заводит администратор). Мастер входит с ней и видит свое расписание
   // (GET /api/master/schedule); записи менять не может. Пароль задает администратор, мастер меняет его
   // в профиле (POST /api/profile/password). Закрыть доступ — PUT /api/admin/users/:id/block.
   router.post('/api/admin/masters/:id/account', (ctx): Result => {
-    requireRole(ctx, 'admin');
     const id = pathId(ctx);
     const input = Input.body(ctx.body);
     const email = input.email('email', { optional: true });
@@ -239,7 +289,7 @@ export function adminMasterRoutes(router: Router): void {
   // В ответе — действующие записи с этой даты, которые в новый график не попадают.
   // С dryRun: true график не сохраняется — только показывает эти записи.
   router.put('/api/admin/masters/:id/schedule', (ctx): Result => {
-    const user = requireRole(ctx, 'admin');
+    const user = requireUser(ctx);
     const id = pathId(ctx);
     const input = Input.body(ctx.body);
     const { validFrom, days } = readSchedule(input);

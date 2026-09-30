@@ -13,9 +13,11 @@
   <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
   <link rel="stylesheet" href="css/admin.css">
   <script type="module" src="js/header.js"></script>
   <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/admin-services.js"></script>
 </head>
 <body class="admin-body">
   <a class="skip-link" href="/admin/services#main">К содержимому</a>
@@ -43,17 +45,41 @@
       </div>
 
       <div data-view="content" hidden>
-        <p class="admin__eyebrow">Раздел администратора</p>
-        <h1 class="admin__title">Услуги</h1>
+        <p class="alert admin-flash" role="status" data-flash hidden></p>
 
-        <!-- Пока пусто: данные экрана подключаются в следующей итерации -->
-        <div class="admin-state">
-          <div class="admin-state__icon">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 3v4M17 5h4M5 17v4M3 19h4"/></svg>
+        <div class="admin-head">
+          <div>
+            <p class="admin__eyebrow">Раздел администратора</p>
+            <h1 class="admin__title">Услуги</h1>
           </div>
-          <p class="admin-state__title">Раздел в работе</p>
-          <p class="admin-state__text">Здесь появится прайс по категориям: длительность, цены у мастера и топ-мастера, мастера и статус услуги.</p>
+          <div class="admin-head__actions">
+            <button class="btn btn--outline btn--small" type="button" data-add-category>+ Категория</button>
+            <a class="btn btn--primary btn--small" href="/admin/services/form">+ Добавить услугу</a>
+          </div>
+          <p class="admin-head__summary" data-summary></p>
         </div>
+
+        <!-- Новая категория: без нее не завести ни одной услуги -->
+        <form class="admin-inline-form" data-category-form hidden novalidate>
+          <div class="field">
+            <label class="field__label" for="category-name">Название категории</label>
+            <input class="input" id="category-name" name="name" maxlength="100" autocomplete="off">
+            <p class="field__error" data-error-for="name" hidden></p>
+          </div>
+          <button class="btn btn--primary btn--small" type="submit">Добавить</button>
+          <button class="btn btn--outline btn--small" type="button" data-category-cancel>Отмена</button>
+          <div class="alert" role="alert" data-category-alert hidden></div>
+        </form>
+
+        <div data-page-loading aria-busy="true">
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем данные…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <!-- Категории и услуги, включая отключенные — js/admin-services.js -->
+        <div data-list></div>
       </div>
     </main>
   </div>

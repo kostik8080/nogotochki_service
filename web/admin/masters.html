@@ -13,9 +13,11 @@
   <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
   <link rel="stylesheet" href="css/admin.css">
   <script type="module" src="js/header.js"></script>
   <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/admin-masters.js"></script>
 </head>
 <body class="admin-body">
   <a class="skip-link" href="/admin/masters#main">К содержимому</a>
@@ -43,17 +45,28 @@
       </div>
 
       <div data-view="content" hidden>
-        <p class="admin__eyebrow">Раздел администратора</p>
-        <h1 class="admin__title">Мастера</h1>
+        <p class="alert admin-flash" role="status" data-flash hidden></p>
 
-        <!-- Пока пусто: данные экрана подключаются в следующей итерации -->
-        <div class="admin-state">
-          <div class="admin-state__icon">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+        <div class="admin-head">
+          <div>
+            <p class="admin__eyebrow">Раздел администратора</p>
+            <h1 class="admin__title">Мастера</h1>
           </div>
-          <p class="admin-state__title">Раздел в работе</p>
-          <p class="admin-state__text">Здесь появятся мастера студии: уровень, статус, рабочие дни и часы, записи на сегодня.</p>
+          <div class="admin-head__actions">
+            <a class="btn btn--primary btn--small" href="/admin/masters/form">+ Добавить мастера</a>
+          </div>
+          <p class="admin-head__summary" data-summary></p>
         </div>
+
+        <div data-page-loading aria-busy="true">
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем данные…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <!-- Мастера, включая отключенных — js/admin-masters.js -->
+        <div class="master-tiles" data-list></div>
       </div>
     </main>
   </div>

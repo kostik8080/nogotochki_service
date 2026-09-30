@@ -67,6 +67,8 @@ export type Handler = (ctx: Context) => Result | Promise<Result>;
 
 interface Route {
   method: Method;
+  /** Шаблон адреса, как его зарегистрировали: /api/bookings/:id. */
+  path: string;
   pattern: RegExp;
   keys: string[];
   handler: Handler;
@@ -82,7 +84,7 @@ export class Router {
       keys.push(key);
       return '([^/]+)';
     }) + '/?$');
-    this.routes.push({ method, pattern, keys, handler, raw });
+    this.routes.push({ method, path, pattern, keys, handler, raw });
     return this;
   }
 
@@ -91,6 +93,11 @@ export class Router {
   patch = (path: string, handler: Handler) => this.add('PATCH', path, handler);
   put = (path: string, handler: Handler) => this.add('PUT', path, handler);
   delete = (path: string, handler: Handler) => this.add('DELETE', path, handler);
+
+  /** Все маршруты: метод и шаблон адреса. Для тестов, которые проверяют права на каждом маршруте. */
+  list(): { method: Method; path: string }[] {
+    return this.routes.map((r) => ({ method: r.method, path: r.path }));
+  }
 
   /** Обработчик и параметры пути. 404 — пути нет, 405 — путь есть, но не с этим методом. */
   match(method: string, pathname: string): { handler: Handler; params: Record<string, string>; raw?: RawBodyOptions } {
