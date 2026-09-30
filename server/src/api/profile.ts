@@ -124,7 +124,7 @@ export function profileRoutes(router: Router): void {
   });
 
   // Удаление аккаунта (CAB-10, сценарий 17, решение 20) — обезличивание: предстоящие записи отменяются,
-  // имя, контакты, пароль, карточка и заметки стираются, неопубликованные фото визитов удаляются.
+  // имя, контакты, пароль, карточка, заметки и уведомления стираются, неопубликованные фото визитов удаляются.
   // Прошедшие визиты остаются в истории студии без связи с человеком.
   router.delete('/api/profile', (ctx): Result => {
     const user = requireRole(ctx, 'client');
@@ -153,6 +153,8 @@ export function profileRoutes(router: Router): void {
       `).all(user.id) as { id: number; file_path: string }[];
       for (const p of photos) ctx.db.prepare('DELETE FROM work_photos WHERE id = ?').run(p.id);
 
+      // В тексте уведомления есть время визита клиента — оно стирается вместе с остальными его данными
+      ctx.db.prepare('DELETE FROM notifications WHERE user_id = ?').run(user.id);
       ctx.db.prepare('DELETE FROM client_notes WHERE client_id = ?').run(user.id);
       ctx.db.prepare('DELETE FROM client_profiles WHERE user_id = ?').run(user.id);
       ctx.db.prepare('DELETE FROM auth_codes WHERE user_id = ?').run(user.id);

@@ -13,9 +13,11 @@
   <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
   <link rel="stylesheet" href="css/admin.css">
   <script type="module" src="js/header.js"></script>
   <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/admin-bookings.js"></script>
 </head>
 <body class="admin-body">
   <a class="skip-link" href="/admin#main">К содержимому</a>
@@ -27,7 +29,7 @@
     <!-- Меню раздела «Записи», «Услуги», «Мастера»: появляется после проверки роли — js/admin.js -->
     <admin-nav></admin-nav>
 
-    <!-- A-01 Шахматка (docs/ui-map.md, «Раздел администратора») -->
+    <!-- A-01 Записи на день (docs/ui-map.md, «Раздел администратора») -->
     <main class="admin__main" id="main" data-theme="admin" data-admin-main>
       <div class="admin__loading" data-view="loading" aria-busy="true">
         <span class="skeleton skeleton--heading" aria-hidden="true"></span>
@@ -43,19 +45,298 @@
       </div>
 
       <div data-view="content" hidden>
-        <p class="admin__eyebrow">Раздел администратора</p>
-        <h1 class="admin__title">Записи</h1>
+        <p class="alert admin-flash" role="status" data-flash hidden></p>
 
-        <!-- Пока пусто: данные экрана подключаются в следующей итерации -->
-        <div class="admin-state">
-          <div class="admin-state__icon">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></svg>
+        <div class="admin-head">
+          <div>
+            <p class="admin__eyebrow">Раздел администратора</p>
+            <h1 class="admin__title">Записи</h1>
           </div>
-          <p class="admin-state__title">Раздел в работе</p>
-          <p class="admin-state__text">Здесь появятся записи всех клиентов по мастерам на день и неделю: создание, перенос и отмена записи.</p>
+          <div class="admin-head__actions">
+            <button class="btn btn--outline btn--small" type="button" data-open-block>+ Блокировка времени</button>
+            <button class="btn btn--primary btn--small" type="button" data-open-new>+ Новая запись</button>
+          </div>
         </div>
+
+        <!-- Период (день, неделя, месяц), переключение дат и фильтр по мастеру -->
+        <div class="day-bar">
+          <div class="view-switch" role="radiogroup" aria-label="Период">
+            <input type="radio" id="view-day" name="view" value="day" checked>
+            <label for="view-day">День</label>
+            <input type="radio" id="view-week" name="view" value="week">
+            <label for="view-week">Неделя</label>
+            <input type="radio" id="view-month" name="view" value="month">
+            <label for="view-month">Месяц</label>
+          </div>
+          <div class="day-bar__dates">
+            <button class="day-bar__arrow" type="button" data-prev aria-label="Предыдущий период">‹</button>
+            <label class="visually-hidden" for="day-date">Дата</label>
+            <input class="input day-bar__date" id="day-date" type="date" data-date>
+            <button class="day-bar__arrow" type="button" data-next aria-label="Следующий период">›</button>
+            <button class="btn btn--outline btn--small" type="button" data-today>Сегодня</button>
+          </div>
+          <div class="field day-bar__master">
+            <label class="field__label" for="day-master">Мастер</label>
+            <select class="input" id="day-master" data-master-filter>
+              <option value="">Все мастера</option>
+            </select>
+          </div>
+        </div>
+
+        <p class="day-bar__caption" data-day-caption></p>
+        <p class="admin-head__summary" data-summary></p>
+
+        <div data-page-loading aria-busy="true" hidden>
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем записи…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <!-- Записи и блокировки дня по времени — js/admin-bookings.js -->
+        <div data-list></div>
       </div>
     </main>
   </div>
+
+  <!-- A-02 Новая запись: клиент, услуги, мастер, время. При занятом времени — подтверждение наложения -->
+  <dialog class="modal modal--wide" data-theme="powder" aria-labelledby="new-title" data-new-dialog>
+    <form class="form" data-new-form novalidate>
+      <p class="modal__title modal__title--display" id="new-title">Новая запись</p>
+
+      <div class="alert" role="alert" data-new-alert hidden></div>
+
+      <!-- Предупреждение о занятом времени: варианты и подтверждение наложения -->
+      <div class="alert alert--warning" data-overbooking hidden>
+        <p><strong>Это время уже занято.</strong> <span data-overbooking-text></span></p>
+        <div class="chips" data-alternatives></div>
+        <label class="check__label">
+          <input type="checkbox" data-overbooking-confirm>
+          <span>Записать поверх занятого времени — мастер примет двух клиентов</span>
+        </label>
+      </div>
+
+      <fieldset class="admin-panel">
+        <legend class="admin-panel__title">Клиент</legend>
+        <div class="field">
+          <label class="field__label" for="new-client-search">Поиск по имени или телефону</label>
+          <input class="input" id="new-client-search" type="search" autocomplete="off" data-client-search
+                 placeholder="Например: Ольга или 4451234">
+          <p class="field__error" data-error-for="clientId" hidden></p>
+        </div>
+        <div class="client-results" data-client-results></div>
+        <p class="admin-panel__hint" data-client-chosen hidden></p>
+        <button class="text-link" type="button" data-new-client-toggle>+ Новый клиент</button>
+        <div class="admin-fields" data-new-client-fields hidden>
+          <div class="field">
+            <label class="field__label" for="new-client-name">Имя</label>
+            <input class="input" id="new-client-name" name="newClientName" maxlength="100" autocomplete="off">
+            <p class="field__error" data-error-for="newClientName" hidden></p>
+          </div>
+          <div class="field">
+            <label class="field__label" for="new-client-phone">Телефон</label>
+            <input class="input" id="new-client-phone" name="newClientPhone" type="tel" autocomplete="off" placeholder="+7 911 222-33-44">
+            <p class="field__error" data-error-for="newClientPhone" hidden></p>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="admin-panel">
+        <legend class="admin-panel__title">Услуги</legend>
+        <div class="admin-checks" data-new-services></div>
+        <p class="field__error" data-error-for="services" hidden></p>
+        <p class="admin-panel__hint" data-visit-total></p>
+      </fieldset>
+
+      <fieldset class="admin-panel">
+        <legend class="admin-panel__title">Мастер, дата и время</legend>
+        <div class="admin-fields">
+          <div class="field">
+            <label class="field__label" for="new-master">Мастер</label>
+            <select class="input" id="new-master" data-new-master></select>
+            <p class="field__error" data-error-for="masterId" hidden></p>
+          </div>
+          <div class="field">
+            <label class="field__label" for="new-date">Дата</label>
+            <input class="input" id="new-date" type="date" data-new-date>
+            <p class="field__error" data-error-for="date" hidden></p>
+          </div>
+          <div class="field">
+            <label class="field__label" for="new-time">Время начала</label>
+            <input class="input" id="new-time" type="time" step="300" data-new-time>
+            <p class="field__hint">Часовой пояс студии.</p>
+            <p class="field__error" data-error-for="time" hidden></p>
+          </div>
+        </div>
+        <p class="admin-panel__hint" data-free-slots></p>
+      </fieldset>
+
+      <div class="field">
+        <label class="field__label" for="new-comment">Комментарий мастеру</label>
+        <textarea class="input" id="new-comment" maxlength="500" data-new-comment></textarea>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn btn--outline" type="button" data-close-dialog>Отмена</button>
+        <button class="btn btn--primary" type="submit">Создать запись</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- A-04 Перенос записи: меняется время той же записи, новая не создается -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="move-title" data-move-dialog>
+    <form class="form" data-move-form novalidate>
+      <p class="modal__title modal__title--display" id="move-title">Перенести запись</p>
+      <p class="modal__text" data-move-summary></p>
+
+      <div class="alert" role="alert" data-move-alert hidden></div>
+
+      <div class="alert alert--warning" data-move-overbooking hidden>
+        <p><strong>Это время уже занято.</strong> <span data-move-overbooking-text></span></p>
+        <div class="chips" data-move-alternatives></div>
+        <label class="check__label">
+          <input type="checkbox" data-move-overbooking-confirm>
+          <span>Перенести поверх занятого времени — мастер примет двух клиентов</span>
+        </label>
+      </div>
+
+      <div class="admin-fields">
+        <div class="field">
+          <label class="field__label" for="move-master">Мастер</label>
+          <select class="input" id="move-master" data-move-master></select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="move-date">Новая дата</label>
+          <input class="input" id="move-date" type="date" data-move-date>
+        </div>
+        <div class="field">
+          <label class="field__label" for="move-time">Новое время</label>
+          <input class="input" id="move-time" type="time" step="300" data-move-time>
+        </div>
+      </div>
+      <p class="admin-panel__hint" data-move-slots></p>
+
+      <div class="field">
+        <label class="field__label" for="move-reason">Причина переноса</label>
+        <input class="input" id="move-reason" maxlength="500" data-move-reason placeholder="Например: клиент попросил перенести">
+        <p class="field__hint">Сохранится в истории записи вместе со старым и новым временем.</p>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn btn--outline" type="button" data-close-dialog>Отмена</button>
+        <button class="btn btn--primary" type="submit">Перенести запись</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- A-05 Отмена записи: строка остается в истории, время освобождается -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="cancel-title" data-cancel-dialog>
+    <form class="form" data-cancel-form novalidate>
+      <p class="modal__title modal__title--display" id="cancel-title">Отменить запись</p>
+      <p class="modal__text" data-cancel-summary></p>
+
+      <div class="alert" role="alert" data-cancel-alert hidden></div>
+
+      <fieldset class="cancel-reasons">
+        <legend class="field__label">Кто отменил</legend>
+        <label class="check__label"><input type="radio" name="by" value="studio" checked> Студия — болезнь мастера, изменение графика</label>
+        <label class="check__label"><input type="radio" name="by" value="client"> Клиент — позвонил и попросил отменить</label>
+      </fieldset>
+
+      <div class="field">
+        <label class="field__label" for="cancel-reason">Причина</label>
+        <input class="input" id="cancel-reason" maxlength="500" data-cancel-reason placeholder="Например: заболел мастер">
+        <p class="field__hint">Клиент увидит причину в карточке записи, если отменила студия.</p>
+      </div>
+
+      <p class="modal__text">Запись останется в списке с пометкой «Отменена», а время мастера освободится сразу.
+        Удалить запись нельзя — это история студии.</p>
+
+      <div class="modal__actions">
+        <button class="btn btn--outline" type="button" data-close-dialog>Не отменять</button>
+        <button class="btn btn--danger" type="submit">Отменить запись</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- A-06 Итог визита: «Визит завершен» или «Клиент не пришел» -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="result-title" data-result-dialog>
+    <form class="form" data-result-form novalidate>
+      <p class="modal__title modal__title--display" id="result-title" data-result-title>Итог визита</p>
+      <p class="modal__text" data-result-summary></p>
+      <div class="alert" role="alert" data-result-alert hidden></div>
+      <p class="modal__text" data-result-note></p>
+      <div class="modal__actions">
+        <button class="btn btn--outline" type="button" data-close-dialog>Отмена</button>
+        <button class="btn btn--primary" type="submit" data-result-submit>Подтвердить</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Блокировка времени мастера: перерыв, личное время, выходной, отпуск, больничный -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="block-title" data-block-dialog>
+    <form class="form" data-block-form novalidate>
+      <p class="modal__title modal__title--display" id="block-title">Заблокировать время</p>
+      <p class="modal__text">Мастер останется в списке и в записи — недоступными станут только эти дата и часы.
+        Клиенты перестанут видеть это время свободным.</p>
+
+      <div class="alert" role="alert" data-block-alert hidden></div>
+      <div class="alert alert--warning" data-block-affected hidden></div>
+
+      <div class="field">
+        <label class="field__label" for="block-master">Мастер</label>
+        <select class="input" id="block-master" data-block-master></select>
+        <p class="field__error" data-error-for="masterId" hidden></p>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="block-type">Причина</label>
+        <select class="input" id="block-type" data-block-type>
+          <option value="lunch">Обед</option>
+          <option value="personal">Личное время</option>
+          <option value="day_off">Выходной</option>
+          <option value="vacation">Отпуск</option>
+          <option value="sick_leave">Больничный</option>
+          <option value="other">Другое</option>
+        </select>
+      </div>
+
+      <div class="admin-fields">
+        <div class="field">
+          <label class="field__label" for="block-from">С даты</label>
+          <input class="input" id="block-from" type="date" data-block-from>
+          <p class="field__error" data-error-for="startsAt" hidden></p>
+        </div>
+        <div class="field">
+          <label class="field__label" for="block-to">По дату</label>
+          <input class="input" id="block-to" type="date" data-block-to>
+          <p class="field__hint">Для отпуска и больничного — последний день включительно.</p>
+          <p class="field__error" data-error-for="endsAt" hidden></p>
+        </div>
+      </div>
+
+      <div class="admin-fields" data-block-hours>
+        <div class="field">
+          <label class="field__label" for="block-start">Начало</label>
+          <input class="input" id="block-start" type="time" step="300" data-block-start value="13:00">
+        </div>
+        <div class="field">
+          <label class="field__label" for="block-end">Конец</label>
+          <input class="input" id="block-end" type="time" step="300" data-block-end value="14:00">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="block-comment">Пояснение</label>
+        <input class="input" id="block-comment" maxlength="500" data-block-comment>
+        <p class="field__error" data-error-for="comment" hidden></p>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn btn--outline" type="button" data-close-dialog>Отмена</button>
+        <button class="btn btn--primary" type="submit">Заблокировать</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>

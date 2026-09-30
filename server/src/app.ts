@@ -12,6 +12,7 @@ import { bookingRoutes } from './api/bookings.js';
 import { catalogRoutes } from './api/catalog.js';
 import { holdRoutes } from './api/holds.js';
 import { masterRoutes } from './api/master.js';
+import { notificationRoutes } from './api/notifications.js';
 import { passwordResetRoutes } from './api/password-reset.js';
 import { photoRoutes } from './api/photos.js';
 import { profileRoutes } from './api/profile.js';
@@ -160,6 +161,7 @@ export function createRouter(options: { secureCookies: boolean }): Router {
   holdRoutes(router);
   bookingRoutes(router);
   masterRoutes(router);
+  notificationRoutes(router);
   photoRoutes(router);
   adminServiceRoutes(router);
   adminMasterRoutes(router);

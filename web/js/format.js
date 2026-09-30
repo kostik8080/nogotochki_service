@@ -72,3 +72,39 @@ export function escapeHtml(value) {
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 }
+
+/**
+ * Календарная дата студии для момента времени: «2026-09-30». Обратная к zonedTimeToUtc.
+ * @param {string | number | Date} at
+ * @param {string} timeZone часовой пояс студии из GET /api/studio
+ */
+export const studioDate = (at, timeZone) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone }).format(new Date(at));
+
+/** Насколько часы пояса впереди UTC в этот момент, в миллисекундах. */
+function offsetMs(at, timeZone) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(at).map((p) => [p.type, p.value]),
+  );
+  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute, +parts.second);
+  return asUtc - at.getTime();
+}
+
+/**
+ * Дата и время студии → момент в UTC для API: ('2026-09-30', '10:00', 'Europe/Moscow') → '2026-09-30T07:00:00.000Z'.
+ * Администратор вводит время так, как его называет студия, а API принимает только UTC (docs/api.md).
+ * Смещение пояса берется на сам этот момент, поэтому перевод верен и после смены смещения в стране.
+ * @param {string} date «2026-09-30»
+ * @param {string} time «10:00»
+ * @param {string} timeZone
+ */
+export function zonedTimeToUtc(date, time, timeZone) {
+  const naive = Date.parse(`${date}T${time.length === 5 ? time + ':00' : time}Z`);
+  if (Number.isNaN(naive)) throw new RangeError(`Неверные дата или время: ${date} ${time}`);
+  // Смещение зависит от самого момента, поэтому берется второй раз — уже по предварительному результату.
+  let utc = naive - offsetMs(new Date(naive), timeZone);
+  utc = naive - offsetMs(new Date(utc), timeZone);
+  return new Date(utc).toISOString();
+}

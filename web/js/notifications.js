@@ -1,12 +1,16 @@
 // Уведомления клиента — колокольчик со счетчиком в шапке (docs/ui-map.md, «Уведомления»). Два вида:
-//   1. Сообщение студии «Студия отменила / перенесла запись»: у записи из GET /api/bookings есть studioChange
-//      ({ type: cancelled | rescheduled, at }), пока клиент его не закроет. ✕ → POST /api/bookings/:id/acknowledge.
-//      То же сообщение показывают «Мои записи» и карточка записи: закрытое в одном месте пропадает во всех —
-//      страницы сообщают друг другу об этом событием на document.
+//   1. Уведомление студии из GET /api/notifications: его создает сервер, когда запись клиента изменил
+//      администратор — отменил, перенес или поставил на это же время второй визит. Текст приходит готовым,
+//      с конкретными датой и временем, и ведет на карточку своей записи. ✕ → POST /api/notifications/:id/read:
+//      уведомление становится прочитанным и уходит из списка и из счетчика. Счетчик непрочитанных приходит
+//      вместе со списком (`unreadCount`) — отдельного запроса ради одного числа нет.
+//      Своих действий клиент не получает: записался, перенес или отменил сам — уведомления не будет.
 //   2. Напоминание о визите за сутки, за 2 часа и за 15 минут. Считается здесь, в браузере, по времени начала
-//      активной записи: отдельного API уведомлений нет, SMS и письма о записях сервис не отправляет (паспорт).
+//      активной записи: в базе напоминаний нет, SMS и письма о записях сервис не отправляет (паспорт).
 //      Поэтому напоминание видно, только когда клиент открыл сайт. Закрытое ✕ напоминание помнит этот браузер
 //      (localStorage); следующее напоминание о той же записи появится в свой срок.
+// Баннер «Студия отменила запись» на «Моих записях» и в карточке записи — отдельный механизм (studioChange
+// и POST /api/bookings/:id/acknowledge): он живет на самой странице записи, а не в колокольчике.
 import * as api from './api.js';
 import { bindDropdown } from './dropdown.js';
 import { dateLabel, escapeHtml as esc, plural, timeLabel } from './format.js';
@@ -120,11 +124,14 @@ export function mountNotifications(container) {
   const toggle = /** @type {HTMLButtonElement} */ (root.querySelector('[data-dropdown-toggle]'));
   const count = /** @type {HTMLElement} */ (root.querySelector('[data-count]'));
   const body = /** @type {HTMLElement} */ (root.querySelector('[data-body]'));
-  const listeners = bindDropdown(root);
+  bindDropdown(root);
 
-  /** Все записи клиента и студия — из API; уведомления из них собираются заново при каждом пересчете */
+  /** Записи и студия — для напоминаний; уведомления студии приходят готовыми из API */
   let bookings = [];
   let studio = null;
+  /** Непрочитанные уведомления и их число: и то и другое из одного ответа GET /api/notifications */
+  let notifications = [];
+  let unreadCount = 0;
   let dismissed = readDismissed();
   /** Что сейчас нарисовано: список перерисовывается, только когда состав уведомлений изменился */
   let shown = null;
@@ -137,9 +144,7 @@ export function mountNotifications(container) {
       .filter((r) => r.stage && !dismissed.includes(`${r.booking.id}:${r.stage.key}`))
       .sort((a, z) => Date.parse(a.booking.startsAt) - Date.parse(z.booking.startsAt))
       .map((r) => ({ kind: 'reminder', key: `${r.booking.id}:${r.stage.key}`, booking: r.booking, stage: r.stage }));
-    const changes = bookings
-      .filter((b) => b.studioChange)
-      .map((b) => ({ kind: 'change', key: `change:${b.id}`, booking: b }));
+    const changes = notifications.map((n) => ({ kind: 'change', key: `note:${n.id}`, note: n }));
     return [...reminders, ...changes];
   }
 
@@ -165,24 +170,19 @@ export function mountNotifications(container) {
     const signature = items.map((i) => i.key).join('|');
     if (!force && signature === shown) return;
     shown = signature;
-    renderCount(items.length);
+    // В счетчике — непрочитанные уведомления студии (число с сервера) и напоминания, которые сейчас действуют
+    renderCount(unreadCount + items.filter((i) => i.kind === 'reminder').length);
     if (!items.length) {
-      body.innerHTML = '<p class="notify__empty">Новых уведомлений нет. Здесь появятся напоминания о визите и сообщения студии, если она отменит или перенесет запись.</p>';
+      body.innerHTML = '<p class="notify__empty">Новых уведомлений нет. Здесь появятся напоминания о визите и сообщения студии, если она отменит, перенесет запись или назначит на ваше время второй визит.</p>';
       return;
     }
     body.innerHTML = `<ul class="notify__list">${items.map((item) => `
       <li class="notify__item${item.kind === 'reminder' ? ' notify__item--reminder' : ''}">
         <span class="notify__kind">${item.kind === 'reminder' ? 'Напоминание о визите' : 'Сообщение студии'}</span>
-        <a class="notify__link" href="${esc(routes.bookingCard(item.booking.id))}">${esc(item.kind === 'reminder' ? reminderText(item) : studioChangeText(item.booking, studio.timezone))}</a>
+        <a class="notify__link" href="${esc(routes.bookingCard(item.kind === 'reminder' ? item.booking.id : item.note.bookingId))}">${esc(item.kind === 'reminder' ? reminderText(item) : item.note.text)}</a>
         <button class="notify__close" type="button" aria-label="Закрыть уведомление" data-close="${esc(item.key)}">✕</button>
         <p class="notify__error" role="alert" hidden></p>
       </li>`).join('')}</ul>`;
-  }
-
-  /** Сообщение студии закрыто — на сервере или в другой части страницы */
-  function removeChange(bookingId) {
-    bookings = bookings.map((b) => (b.id === bookingId ? { ...b, studioChange: null } : b));
-    render();
   }
 
   body.addEventListener('click', async (event) => {
@@ -191,7 +191,7 @@ export function mountNotifications(container) {
     const key = button.dataset.close;
 
     // Напоминание закрывается только в этом браузере — сервер о нем не знает
-    if (!key.startsWith('change:')) {
+    if (!key.startsWith('note:')) {
       dismissed = [...dismissed.filter((k) => k !== key), key];
       saveDismissed(dismissed);
       render();
@@ -199,14 +199,16 @@ export function mountNotifications(container) {
       return;
     }
 
-    const bookingId = Number(key.slice('change:'.length));
+    // Уведомление студии: «прочитано» на сервере — счетчик приходит в том же ответе
+    const id = Number(key.slice('note:'.length));
     const error = /** @type {HTMLElement} */ (button.closest('.notify__item').querySelector('.notify__error'));
     button.disabled = true;
     error.hidden = true;
     try {
-      await api.acknowledgeBooking(bookingId);
-      removeChange(bookingId);
-      announceAcknowledged(bookingId);
+      const answer = await api.markNotificationRead(id);
+      unreadCount = answer.unreadCount;
+      notifications = notifications.filter((n) => n.id !== id);
+      render();
       toggle.focus();
     } catch (e) {
       error.textContent = `Не удалось закрыть уведомление. ${e.message}`;
@@ -214,8 +216,6 @@ export function mountNotifications(container) {
       button.disabled = false;
     }
   });
-
-  onAcknowledged(removeChange, listeners.signal);
 
   // «Настройки уведомлений» на самой странице профиля меняет только вкладку — список закрываем сами
   root.querySelector('.notify__settings').addEventListener('click', () => {
@@ -230,7 +230,13 @@ export function mountNotifications(container) {
 
   async function load() {
     try {
-      [bookings, studio] = await Promise.all([api.getBookings(), api.getStudio()]);
+      const [inbox, list, settings] = await Promise.all([
+        api.getNotifications({ unread: true }), api.getBookings(), api.getStudio(),
+      ]);
+      notifications = inbox.notifications;
+      unreadCount = inbox.unreadCount;
+      bookings = list;
+      studio = settings;
       if (!root.isConnected) return;
       render({ force: true });
     } catch (error) {

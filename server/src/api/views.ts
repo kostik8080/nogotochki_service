@@ -227,6 +227,34 @@ function eventView(e: EventRow) {
 }
 
 // ---------------------------------------------------------------------------
+// Уведомления клиента
+// ---------------------------------------------------------------------------
+
+export interface NotificationRow {
+  id: number;
+  booking_id: number;
+  event_type: string;
+  text: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+/**
+ * Уведомления для кабинета: готовый текст, событие, номер записи (по нему открывается ее карточка)
+ * и отметка о прочтении. Счетчик непрочитанных приходит рядом со списком — см. api/notifications.ts.
+ */
+export function notificationViews(rows: NotificationRow[]) {
+  return rows.map((n) => ({
+    id: n.id,
+    type: n.event_type,
+    text: n.text,
+    bookingId: n.booking_id,
+    isRead: n.read_at !== null,
+    createdAt: n.created_at,
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // Бронь времени
 // ---------------------------------------------------------------------------
 

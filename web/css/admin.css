@@ -768,3 +768,328 @@ admin-nav {
   justify-content: space-between;
   gap: var(--space-2);
 }
+
+/* ======================================================================
+ * «Записи» (A-01): панель дня, список записей и блокировок, окна действий
+ * (A-02 новая запись, A-04 перенос, A-05 отмена, A-06 итог, блокировка).
+ * ====================================================================== */
+
+/* ---------- Панель: переключение дат и фильтр по мастеру ---------- */
+
+.day-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+/* На узком экране «Сегодня» переносится под поле даты: строка не должна вылезать за край */
+.day-bar__dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.day-bar__arrow {
+  width: calc(var(--space-8) + var(--space-2));
+  height: calc(var(--space-8) + var(--space-2));
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-size: var(--text-body-l-size);
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 150ms ease-out;
+}
+
+.day-bar__arrow:hover {
+  border-color: var(--color-button-bg);
+}
+
+.day-bar__date {
+  flex: 1 1 calc(var(--space-24) * 1.5);
+  width: auto;
+  min-width: 0;
+}
+
+.day-bar__master {
+  min-width: calc(var(--space-24) * 2);
+}
+
+.day-bar__caption {
+  font-family: var(--font-display);
+  font-size: var(--text-body-l-size);
+  font-weight: var(--text-h1-weight);
+  line-height: var(--text-body-l-line);
+}
+
+.day-bar__caption::first-letter {
+  text-transform: uppercase;
+}
+
+/* ---------- Строка дня: запись или блокировка ---------- */
+
+.day-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-4);
+  margin-top: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: var(--space-1) solid var(--color-status-active);
+  border-radius: var(--radius-card);
+}
+
+@media (min-width: 1024px) {
+  .day-row {
+    grid-template-columns: calc(var(--space-24) * 1.4) minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--space-2) var(--space-4);
+  }
+
+  /* Кнопки — во второй строке под содержимым, справа */
+  .day-row__actions {
+    grid-column: 2 / -1;
+    justify-content: flex-end;
+  }
+}
+
+/* Отмененная запись остается в списке, но время мастера свободно: приглушаем и снимаем цветную метку */
+.day-row.is-cancelled {
+  border-left-color: var(--color-status-cancelled);
+  color: var(--color-text-muted);
+}
+
+.day-row--block {
+  border-left-color: var(--color-text-muted);
+  border-left-style: dashed;
+}
+
+.day-row__time {
+  font-weight: var(--text-button-weight);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.day-row__main {
+  min-width: 0;
+}
+
+.day-row__client {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--text-label-weight);
+}
+
+.day-row__meta {
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+.day-row__muted {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-body-s-line);
+}
+
+.day-row__time .day-row__muted {
+  display: block;
+  font-weight: 400;
+}
+
+.day-row__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.day-row__price {
+  font-weight: var(--text-button-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.day-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Бейджи состояний, которых нет в списках услуг и мастеров */
+.admin-badge--done {
+  background: var(--color-status-completed-bg);
+  color: var(--color-status-completed-text);
+}
+
+.admin-badge--no-show {
+  background: var(--color-status-no-show-bg);
+  color: var(--color-status-no-show-text);
+}
+
+.admin-badge--warn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+/* ---------- Окна действий ---------- */
+
+/* Окно новой записи шире обычного: в нем клиент, услуги, мастер и время */
+.modal--wide {
+  width: min(100% - 2 * var(--page-gutter-mobile), calc(var(--space-24) * 7));
+  max-height: calc(100vh - 2 * var(--space-8));
+  max-height: calc(100dvh - 2 * var(--space-8));
+  overflow-y: auto;
+}
+
+.modal fieldset.admin-panel {
+  margin: 0;
+  border: 1px solid var(--color-border);
+}
+
+.modal .admin-panel__title {
+  padding: 0;
+}
+
+/* Варианты ближайшего свободного времени из ответа «время занято» */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.chip {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-button-weight);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--color-button-bg);
+}
+
+/* Поиск клиента при записи */
+.client-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.client-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-size: var(--text-body-s-size);
+  text-align: left;
+  cursor: pointer;
+}
+
+.client-result:hover {
+  border-color: var(--color-button-bg);
+  background: var(--color-surface-accent);
+}
+
+.cancel-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* ---------- Переключатель периода: день, неделя, месяц ---------- */
+
+.view-switch {
+  position: relative;
+  display: inline-flex;
+  align-self: flex-end;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.view-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.view-switch label {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-button-weight);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.view-switch input:checked + label {
+  background: var(--color-button-bg);
+  color: var(--color-button-text);
+}
+
+.view-switch input:focus-visible + label {
+  outline: 2px solid var(--color-focus-border);
+  outline-offset: -2px;
+}
+
+/* ---------- Дни внутри недели и месяца ---------- */
+
+.day-group + .day-group {
+  margin-top: var(--space-8);
+}
+
+.day-group__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-body-m-size);
+}
+
+/* Заголовок дня открывает этот день в режиме «День» */
+.day-group__link {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: var(--text-body-m-size);
+  font-weight: var(--text-button-weight);
+  cursor: pointer;
+}
+
+.day-group__link::first-letter {
+  text-transform: uppercase;
+}
+
+.day-group__link:hover {
+  color: var(--color-text-accent);
+}
+
+.day-group__count {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+}

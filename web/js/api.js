@@ -348,9 +348,14 @@ export const updateMaster = (id, body) => request('PATCH', adminPath('/api/admin
  */
 export const deleteMaster = (id) => request('DELETE', adminPath('/api/admin/masters', id));
 
+// ---------- Раздел администратора: записи, блокировки времени ----------
+
 /**
- * Записи студии за период (даты студии включительно). `{ timezone, total, bookings }`.
- * @param {{ dateFrom?: string, dateTo?: string, masterId?: number, status?: string, limit?: number }} [filter]
+ * Записи студии за период и с фильтрами. Ответ: `{ timezone, total, limit, offset, bookings }`.
+ * У каждой записи — клиент с контактами, мастер, услуги, статус, `cancellation` (кто и почему отменил),
+ * `isOverbooking` (наложение), `busyUntil` (конец уборки), `version`.
+ * @param {{ dateFrom?: string, dateTo?: string, masterId?: number, serviceId?: number, clientId?: number,
+ *   status?: string, limit?: number, offset?: number }} [filter] даты — по календарю студии (YYYY-MM-DD)
  */
 export function getAdminBookings(filter = {}) {
   const query = new URLSearchParams();
@@ -358,3 +363,97 @@ export function getAdminBookings(filter = {}) {
   const qs = query.toString();
   return request('GET', '/api/admin/bookings' + (qs ? '?' + qs : ''));
 }
+
+/**
+ * Запись за клиента: `clientId` — клиент из базы, `newClient` — новый по имени и телефону.
+ * `isOverbooking: true` — осознанное наложение поверх записи другого клиента или блокировки мастера:
+ * рабочее время и чужие брони им не перекрываются. 201 — запись; 409 SLOT_TAKEN с `details.alternatives`;
+ * 409 PHONE_TAKEN (`details.clientId`); 400 CLIENT_NOT_FOUND / MASTER_INACTIVE / MASTER_CANNOT_DO_SERVICE.
+ * @param {{ masterId: number, startsAt: string, services: { serviceId: number, quantity?: number }[],
+ *   comment?: string | null, clientId?: number, newClient?: { name: string, phone: string }, isOverbooking?: boolean }} body
+ */
+export async function createAdminBooking(body) {
+  return (await request('POST', '/api/bookings', body)).booking;
+}
+
+/**
+ * Перенос той же записи администратором: без брони и без правила 24 часов. Старое и новое время, мастер
+ * и суммы попадают в историю записи. `isOverbooking: true` — перенос поверх занятого времени.
+ * 200 — запись; 409 SLOT_TAKEN / VERSION_CONFLICT / BOOKING_NOT_ACTIVE; 400 NOTHING_TO_CHANGE.
+ * @param {number} id
+ * @param {{ startsAt: string, masterId?: number, reason: string | null, version: number, isOverbooking?: boolean }} body
+ */
+export async function rescheduleAdminBooking(id, body) {
+  return (await request('POST', `/api/bookings/${encodeURIComponent(String(id))}/reschedule`, body)).booking;
+}
+
+/**
+ * Отмена записи администратором: `by` — кто отменил («studio» или «client»), `reason` — причина.
+ * Строка записи остается в истории со статусом отмены, время мастера освобождается сразу.
+ * @param {number} id
+ * @param {{ reason: string | null, by: 'client' | 'studio', version: number }} body
+ */
+export async function cancelAdminBooking(id, body) {
+  return (await request('POST', `/api/bookings/${encodeURIComponent(String(id))}/cancel`, body)).booking;
+}
+
+/**
+ * Итог визита: `completed` — «Визит завершен», `no_show` — «Клиент не пришел». Только для начавшегося визита
+ * (иначе 409 VISIT_NOT_STARTED); отмененную запись отметить нельзя (409 BOOKING_NOT_ACTIVE).
+ * @param {number} id
+ * @param {{ status: 'completed' | 'no_show', reason?: string | null, version: number }} body
+ */
+export async function setBookingResult(id, body) {
+  return (await request('POST', `/api/bookings/${encodeURIComponent(String(id))}/status`, body)).booking;
+}
+
+/**
+ * Блокировки времени мастеров за период: `{ timeBlocks }` — `id`, `masterId`, `type`, `startsAt`, `endsAt`, `comment`.
+ * @param {{ from?: string, to?: string, masterId?: number }} [filter] даты студии
+ */
+export async function getTimeBlocks(filter = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filter)) if (value !== undefined) query.set(key, String(value));
+  const qs = query.toString();
+  return (await request('GET', '/api/admin/time-blocks' + (qs ? '?' + qs : ''))).timeBlocks;
+}
+
+/**
+ * Блокировка времени мастера: обед, личное время, выходной, отпуск, больничный. Слоты на это время
+ * пропадают у клиентов сразу. В ответе `affectedBookings` — действующие записи под блокировкой:
+ * база их не трогает, администратор переносит или отменяет их сам. `dryRun: true` — только показать их.
+ * @param {{ masterId: number, type: 'lunch' | 'personal' | 'day_off' | 'vacation' | 'sick_leave' | 'other',
+ *   startsAt: string, endsAt: string, comment?: string | null, dryRun?: boolean }} body
+ */
+export const createTimeBlock = (body) => request('POST', '/api/admin/time-blocks', body);
+
+/** Снять блокировку: 204, время снова свободно. */
+export const deleteTimeBlock = (id) => request('DELETE', `/api/admin/time-blocks/${encodeURIComponent(String(id))}`);
+
+/** Клиенты студии для поиска при записи: `{ total, clients }` — имя, телефон, метки, черный список. */
+export async function findAdminClients(search, limit = 8) {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (search) query.set('search', search);
+  return (await request('GET', '/api/admin/clients?' + query.toString())).clients;
+}
+
+// ---------- Уведомления клиента в кабинете ----------
+
+/**
+ * Свои уведомления и число непрочитанных одним ответом: `{ unreadCount, notifications }`.
+ * У уведомления — `id`, `type` (`booking_cancelled`, `booking_rescheduled`, `booking_overbooked`),
+ * готовый `text`, `bookingId` (по нему открывается карточка записи), `isRead`, `createdAt`.
+ * Отдельного запроса ради счетчика не нужно.
+ * @param {{ unread?: boolean, limit?: number }} [filter] `unread: true` — только непрочитанные
+ */
+export function getNotifications(filter = {}) {
+  const query = new URLSearchParams();
+  if (filter.unread) query.set('unread', 'true');
+  if (filter.limit !== undefined) query.set('limit', String(filter.limit));
+  const qs = query.toString();
+  return request('GET', '/api/notifications' + (qs ? '?' + qs : ''));
+}
+
+/** Отметить уведомление прочитанным. Ответ — новый `{ unreadCount }`. 404 — чужое или несуществующее. */
+export const markNotificationRead = (id) =>
+  request('POST', `/api/notifications/${encodeURIComponent(String(id))}/read`);

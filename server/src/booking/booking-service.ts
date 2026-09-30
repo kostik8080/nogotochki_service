@@ -13,6 +13,7 @@
 import { hasRole, type Role } from '../auth/sessions.js';
 import { type Db, transaction } from '../db/connection.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../http/errors.js';
+import { notifyCancelled, notifyOverbooked, notifyRescheduled } from '../notify/notifications.js';
 import { readSettings } from '../studio/settings.js';
 import { checkSlot, isSlotConflict, nearestFreeSlots, SlotUnavailable, slotTaken } from './availability.js';
 import { type ExistingBooking, loadBooking, pricesAtLevel } from './existing.js';
@@ -280,13 +281,21 @@ export function createBooking(db: Db, actor: Actor, req: CreateBookingRequest, n
       // Своя бронь снимается до вставки: триггер записи учитывает любые действующие брони (раздел 8).
       db.prepare('DELETE FROM slot_holds WHERE owner_id = ?').run(actor.id);
       // Уровень 2: пересечение отклонит триггер bookings_no_overlap_insert.
-      return insertBookingRows(db, {
+      const id = insertBookingRows(db, {
         clientId, masterId: req.masterId, priceLevel: master.level, startsAt: req.startsAt, cleanupMin: visit.cleanupMin,
         lines: visit.lines.map((l) => ({
           serviceId: l.serviceId, name: l.name, unitPriceKop: unitPrice(l, master.level), quantity: l.quantity, durationMin: l.durationMin,
         })),
         isAnyMaster: req.isAnyMaster, isOverbooking, comment: req.comment, createdBy: actor.id, createdAt: now.toISOString(),
       });
+      // Наложение: клиенты, чье время администратор занял вторым визитом, узнают об этом в кабинете.
+      // Сам записанный клиент уведомления не получает — для него это обычная запись.
+      if (isOverbooking) {
+        notifyOverbooked(db, actor, {
+          id, masterId: req.masterId, startsAt: req.startsAt, busyUntil,
+        }, now.toISOString());
+      }
+      return id;
     });
   } catch (error) {
     // Уровень 3: транзакция откатилась. Вместо текста ошибки базы — 409 и ближайшее свободное время мастера.
@@ -354,6 +363,16 @@ export function rescheduleBooking(db: Db, actor: Actor, bookingId: number, req: 
       writeReschedule(db, booking, {
         masterId, level: master.level, startsAt: req.startsAt, actorId: actor.id, reason: req.reason, at: now.toISOString(), isOverbooking,
       });
+      // Перенос сделал администратор — клиент узнает об этом в кабинете: откуда, куда и к кому.
+      // Свой перенос клиент не получает: он только что выбрал время сам.
+      notifyRescheduled(db, actor, booking, { startsAt: req.startsAt, masterId }, now.toISOString());
+      // Перенос поверх занятого времени — то же наложение: предупреждаем тех, чье время теперь делится.
+      if (isOverbooking) {
+        notifyOverbooked(db, actor, {
+          id: booking.id, masterId, startsAt: req.startsAt,
+          busyUntil: addMin(addMin(req.startsAt, booking.durationMin), booking.cleanupMin),
+        }, now.toISOString());
+      }
     });
   } catch (error) {
     if (isSlotConflict(error) && target) {
@@ -394,6 +413,9 @@ export function cancelBooking(db: Db, actor: Actor, bookingId: number, req: Canc
       status: hasRole(actor, 'client') || req.by === 'client' ? 'cancelled_by_client' : 'cancelled_by_studio',
       actorId: actor.id, reason: req.reason, at: now.toISOString(),
     });
+    // Отмену внес администратор — клиент узнает о ней в кабинете. Свою отмену клиент не получает,
+    // как и отмену предстоящих записей при удалении собственного аккаунта.
+    notifyCancelled(db, actor, { id: bookingId, client_id: booking.client_id, starts_at: booking.starts_at }, req.reason, now.toISOString());
   });
 }
 
