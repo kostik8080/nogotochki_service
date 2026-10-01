@@ -96,7 +96,7 @@ export const config = {
     port: smtpPort,
     user: env('SMTP_USER'),
     password: env('SMTP_PASSWORD'),
-    from: env('SMTP_FROM'),
+    from: env('MAIL_FROM'),
   },
   backup: {
     dir: path.resolve(SERVER_ROOT, env('BACKUP_DIR') ?? 'backups'),

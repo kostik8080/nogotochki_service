@@ -24,7 +24,7 @@ if (pending.length > 0) {
 // В production без SMTP ссылки и коды на e-mail не уходят — их заменяет администратор.
 const { smtp } = config;
 if (smtp.host && !smtp.from) {
-  console.error('SMTP_HOST задан, а SMTP_FROM нет: укажите адрес отправителя, например "Ноготочки <noreply@nogotochki.ru>".');
+  console.error('SMTP_HOST задан, а MAIL_FROM нет: укажите адрес отправителя, например "Ноготочки <noreply@nogotochki.ru>".');
   process.exit(1);
 }
 const mailer: Mailer | null = smtp.host
