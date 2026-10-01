@@ -1,5 +1,7 @@
 // AUTH-06 Восстановление пароля (docs/ui-map.md). POST /api/auth/password-reset/request { login }:
-// всегда 202 с одинаковым ответом — по нему нельзя узнать, есть ли аккаунт; 429 — слишком много запросов с одного адреса.
+// 202 с одинаковым ответом — по нему нельзя узнать, есть ли аккаунт; 429 — слишком много запросов с одного адреса.
+// Исключение — аккаунт без пароля: ответ 200 с `provider`, письма нет, и экран объясняет, что вход
+// выполняется через Яндекс. Сбрасывать там нечего, и ждать письмо человеку незачем.
 // Телефон студии для подсказки — GET /api/studio.
 import * as api from './api.js';
 import {
@@ -12,6 +14,7 @@ const alert = /** @type {HTMLElement} */ (form.querySelector('[data-alert]'));
 const loginInput = /** @type {HTMLInputElement} */ (form.elements.namedItem('login'));
 const formStep = /** @type {HTMLElement} */ (document.querySelector('[data-step="form"]'));
 const sentStep = /** @type {HTMLElement} */ (document.querySelector('[data-step="sent"]'));
+const providerStep = /** @type {HTMLElement} */ (document.querySelector('[data-step="provider"]'));
 
 clearOnInput(form);
 
@@ -43,6 +46,14 @@ async function showSent() {
   link.hidden = false;
 }
 
+/** Аккаунт без пароля: текст приходит от сервера — он знает, какой это внешний сервис. */
+function showProvider(message) {
+  formStep.hidden = true;
+  providerStep.hidden = false;
+  /** @type {HTMLElement} */ (providerStep.querySelector('[data-provider-message]')).textContent = message;
+  /** @type {HTMLElement} */ (providerStep.querySelector('h1')).focus();
+}
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   clearErrors(form, alert);
@@ -52,8 +63,9 @@ form.addEventListener('submit', async (event) => {
   const done = setBusy(/** @type {HTMLButtonElement} */ (form.querySelector('[type=submit]')), 'Отправляем…');
   try {
     // Текст ответа сервера обещает код от администратора — его не показываем (docs/ui-map.md, пункт 10.1)
-    await api.requestPasswordReset({ login: login.includes('@') ? login : normalizePhone(login) ?? login });
-    await showSent();
+    const res = await api.requestPasswordReset({ login: login.includes('@') ? login : normalizePhone(login) ?? login });
+    if (res?.provider) showProvider(res.message);
+    else await showSent();
   } catch (error) {
     done();
     if (error instanceof api.ApiError && error.status === 429) {

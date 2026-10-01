@@ -3,6 +3,7 @@
 import { CODE_TTL_MIN, consumeCode, issueCode, lastCodeAt, RESEND_INTERVAL_MS } from '../auth/codes.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { clearSessionCookie, createSession, revokeSession, sessionCookie } from '../auth/sessions.js';
+import { YANDEX_PROVIDER } from '../auth/yandex.js';
 import { config } from '../config.js';
 import { transaction } from '../db/connection.js';
 import { badRequest, conflict, forbidden, HttpError, unauthorized } from '../http/errors.js';
@@ -56,10 +57,13 @@ export function authRoutes(router: Router, options: { secureCookies: boolean }):
 
     const now = ctx.now.toISOString();
     const owner = phone
-      ? ctx.db.prepare('SELECT id, role, password_hash, deleted_at FROM users WHERE phone = ?').get(phone) as
-        { id: number; role: string; password_hash: string | null; deleted_at: string | null } | undefined
+      ? ctx.db.prepare('SELECT id, role, password_hash, provider, deleted_at FROM users WHERE phone = ?').get(phone) as
+        { id: number; role: string; password_hash: string | null; provider: string | null; deleted_at: string | null } | undefined
       : undefined;
-    const card = owner && owner.role === 'client' && owner.password_hash === null && owner.deleted_at === null ? owner : undefined;
+    // Карточка — это клиент без пароля, которого завел администратор. У клиента, который входит через
+    // Яндекс, пароля тоже нет, но это зарегистрированный аккаунт: его отличает provider (миграция 009).
+    const card = owner && owner.role === 'client' && owner.password_hash === null && owner.provider === null
+      && owner.deleted_at === null ? owner : undefined;
     if (owner && !card) throw conflict('PHONE_TAKEN', 'Этот телефон уже зарегистрирован. Войдите или восстановите пароль');
     if (email && ctx.db.prepare('SELECT 1 FROM users WHERE email = ? AND id IS NOT ?').get(email, card?.id ?? null)) {
       throw conflict('EMAIL_TAKEN', 'Этот e-mail уже зарегистрирован. Войдите или восстановите пароль');
@@ -188,6 +192,69 @@ export function authRoutes(router: Router, options: { secureCookies: boolean }):
       startSession(ctx, user.id);
     });
     return { status: 200, body: { user: selfView(ctx.db, user.id) } };
+  });
+
+  /**
+   * Вход через Яндекс в один клик. Браузер только нажимает кнопку: e-mail и имя сервер берет
+   * у внешнего сервиса сам (ctx.services.yandexLogin — настоящий Яндекс или заглушка,
+   * src/auth/yandex.ts). **Эти поля нельзя принимать из тела запроса**: тогда любой прислал бы чужой
+   * адрес и вошел бы в чужой кабинет без пароля. `code` — одноразовый код Яндекса, он понадобится,
+   * когда приложение в Яндексе будет зарегистрировано; заглушка его не использует.
+   *
+   * Что дальше (порядок важен):
+   *   1. пользователь ищется по e-mail из профиля;
+   *   2. нашелся — внешний вход привязывается к нему, второй аккаунт не создается: иначе записи
+   *      одной клиентки разъехались бы по двум кабинетам;
+   *   3. не нашелся — создается новый аккаунт;
+   *   4. роль всегда client: она записана в INSERT строкой, из запроса не читается, а база не даст
+   *      поставить provider учетной записи администратора или мастера (миграция 009);
+   *   5. выдается своя сессия сервиса — та же cookie, тот же срок, что при входе по паролю;
+   *   6. токен Яндекса не сохраняется и в сервисе ничего не открывает.
+   */
+  router.post('/api/auth/yandex', async (ctx): Promise<Result> => {
+    ctx.limit('login', ctx.ip);
+    const input = Input.body(ctx.body);
+    const code = input.string('code', { optional: true, max: 500 });
+    input.done();
+
+    const profile = await ctx.services.yandexLogin({ code });
+    const now = ctx.now.toISOString();
+    const existing = ctx.db.prepare(`
+      SELECT id, role, blocked_at FROM users WHERE email = ? AND deleted_at IS NULL
+    `).get(profile.email) as { id: number; role: string; blocked_at: string | null } | undefined;
+
+    // Учетную запись сотрудника внешний вход не открывает: администратор и мастер входят по паролю
+    // (паспорт: роль после создания не меняется, сотруднику для записи нужен отдельный аккаунт клиента).
+    if (existing && existing.role !== 'client') {
+      throw forbidden('Это учетная запись сотрудника: войдите по телефону или e-mail и паролю', 'STAFF_PASSWORD_LOGIN_ONLY');
+    }
+    if (existing?.blocked_at) throw forbidden('Доступ к учетной записи закрыт. Обратитесь в студию', 'ACCOUNT_BLOCKED');
+
+    const { userId, created } = transaction(ctx.db, () => {
+      if (existing) {
+        // Адрес подтвержден Яндексом, поэтому e-mail считается подтвержденным. Согласие на обработку
+        // данных записывается, если его еще не было: под кнопкой на экране входа об этом сказано.
+        // Если этот provider_id уже привязан к другому аккаунту (в Яндексе сменили адрес), UNIQUE даст 409.
+        ctx.db.prepare(`
+          UPDATE users SET provider = ?, provider_id = ?, email_verified_at = coalesce(email_verified_at, ?),
+                           pd_consent_at = coalesce(pd_consent_at, ?), pd_consent_version = coalesce(pd_consent_version, ?),
+                           failed_login_attempts = 0, locked_until = NULL, updated_at = ?
+          WHERE id = ?
+        `).run(YANDEX_PROVIDER, profile.providerId, now, now, config.pdPolicyVersion, now, existing.id);
+        startSession(ctx, existing.id);
+        return { userId: existing.id, created: false };
+      }
+      const id = Number(ctx.db.prepare(`
+        INSERT INTO users (role, name, email, provider, provider_id, email_verified_at,
+                           pd_consent_at, pd_consent_version, created_at, updated_at)
+        VALUES ('client', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(profile.name, profile.email, YANDEX_PROVIDER, profile.providerId, now, now,
+        config.pdPolicyVersion, now, now).lastInsertRowid);
+      startSession(ctx, id);
+      return { userId: id, created: true };
+    });
+
+    return { status: created ? 201 : 200, body: { user: selfView(ctx.db, userId), provider: YANDEX_PROVIDER, registered: created } };
   });
 
   // Выход закрывает сессию и снимает бронь времени, чтобы слот освободился сразу (раздел 8, шаг 5).

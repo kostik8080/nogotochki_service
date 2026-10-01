@@ -129,6 +129,13 @@
   font-weight: var(--text-button-weight);
 }
 
+/* Пояснение в карточке: «вход через Яндекс, пароля нет» */
+.profile-card__text {
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
 /* «Выйти» слева, «Удалить аккаунт» справа */
 .profile-card--row {
   display: flex;

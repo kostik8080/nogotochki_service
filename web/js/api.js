@@ -173,6 +173,17 @@ export async function logout() {
 export const login = (body) => request('POST', '/api/auth/login', body);
 
 /**
+ * Вход через Яндекс в один клик. Браузер только нажимает кнопку: e-mail и имя сервер берет у Яндекса сам
+ * (пока приложение в Яндексе не зарегистрировано — у заглушки, server/src/auth/yandex.ts), поэтому в теле
+ * запроса их нет и быть не должно. 201 — аккаунт создан, 200 — вход в существующий; оба раза сервер
+ * ставит свою cookie сессии, как при входе по паролю. 503 YANDEX_LOGIN_UNAVAILABLE — вход через Яндекс
+ * не подключен; 403 STAFF_PASSWORD_LOGIN_ONLY — это учетная запись сотрудника, ей нужен пароль;
+ * 403 ACCOUNT_BLOCKED — доступ закрыт студией.
+ * @returns {Promise<{ user: object, provider: string, registered: boolean }>}
+ */
+export const loginWithYandex = () => request('POST', '/api/auth/yandex');
+
+/**
  * Регистрация клиента. 201 — { user } и вход выполнен; 202 — номер уже в карточке клиента, нужен код
  * (сценарий 16): тогда тот же запрос повторяется с `code`. 409 PHONE_TAKEN / EMAIL_TAKEN.
  * @param {{ name: string, phone?: string, email?: string, password: string, pdConsent: true,
@@ -187,7 +198,10 @@ export async function register(body) {
 
 /**
  * Ссылка для нового пароля на e-mail аккаунта. Ответ всегда одинаковый (202), есть такой аккаунт или нет.
+ * Исключение — аккаунт без пароля: ответ 200 с `provider: 'yandex'`, письма нет, в такой аккаунт входят
+ * кнопкой «Войти через Яндекс».
  * @param {{ login: string }} body
+ * @returns {Promise<{ message: string, provider?: string }>}
  */
 export const requestPasswordReset = (body) => request('POST', '/api/auth/password-reset/request', body);
 

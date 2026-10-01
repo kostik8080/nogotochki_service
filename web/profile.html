@@ -119,8 +119,14 @@
 
           <!-- Безопасность: смена пароля, выход, удаление аккаунта -->
           <section class="profile-panel" role="tabpanel" id="panel-security" aria-labelledby="tab-security" tabindex="0" hidden>
+            <!-- Вход через Яндекс: пароля у аккаунта нет, менять нечего (user.hasPassword === false) -->
+            <div class="profile-card" data-external-login-card hidden>
+              <h2 class="profile-card__title">Вход в аккаунт</h2>
+              <p class="profile-card__text">Вы входите через Яндекс — пароля у этого аккаунта нет, и менять его не нужно.</p>
+            </div>
+
             <!-- Смена пароля → POST /api/profile/password { currentPassword, newPassword } -->
-            <div class="profile-card">
+            <div class="profile-card" data-password-card>
               <h2 class="profile-card__title">Смена пароля</h2>
               <form class="form" data-password-form novalidate>
                 <div class="alert" role="alert" data-alert hidden></div>
@@ -250,7 +256,8 @@
       <p class="modal__text">Все предстоящие записи будут отменены, имя, телефон и e-mail — удалены. Прошедшие визиты останутся в истории студии без ваших данных. Это действие нельзя отменить.</p>
       <div class="alert" role="alert" data-alert hidden></div>
 
-      <div class="field">
+      <!-- У входа через Яндекс пароля нет: поле скрывается, подтверждение — сама кнопка -->
+      <div class="field" data-delete-password>
         <label class="field__label" for="delete-password">Введите пароль, чтобы удалить аккаунт</label>
         <input class="input" id="delete-password" name="password" type="password" autocomplete="current-password"
                maxlength="128" aria-describedby="password-error">

@@ -18,16 +18,20 @@ import { readSettings } from '../studio/settings.js';
  */
 export function selfView(db: Db, userId: number) {
   const u = db.prepare(`
-    SELECT id, role, name, phone, email, phone_verified_at, email_verified_at, marketing_consent_at
+    SELECT id, role, name, phone, email, password_hash, provider, phone_verified_at, email_verified_at, marketing_consent_at
     FROM users WHERE id = ?
   `).get(userId) as {
     id: number; role: Role; name: string; phone: string | null; email: string | null;
+    password_hash: string | null; provider: string | null;
     phone_verified_at: string | null; email_verified_at: string | null; marketing_consent_at: string | null;
   };
   return {
     id: u.id, roles: rolesOf(u.role), role: u.role, name: u.name, phone: u.phone, email: u.email,
     phoneVerified: u.phone_verified_at !== null, emailVerified: u.email_verified_at !== null,
     marketingConsent: u.marketing_consent_at !== null,
+    // Через какой внешний сервис человек входит (`yandex`) и есть ли у него пароль: по ним профиль
+    // решает, показывать ли смену пароля и спрашивать ли пароль при удалении аккаунта. Сам хеш не уходит.
+    provider: u.provider, hasPassword: u.password_hash !== null,
   };
 }
 

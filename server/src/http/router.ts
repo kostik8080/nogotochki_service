@@ -4,6 +4,7 @@
 import type { IncomingMessage } from 'node:http';
 import type { Db } from '../db/connection.js';
 import type { SessionUser } from '../auth/sessions.js';
+import type { ExternalLogin } from '../auth/yandex.js';
 import type { Mailer } from '../notify/mailer.js';
 import { HttpError } from './errors.js';
 
@@ -17,6 +18,11 @@ export interface Services {
   uploadsDir: string;
   /** Флаг Secure у cookie сессии. */
   secureCookies: boolean;
+  /**
+   * Откуда берутся e-mail и имя при входе через Яндекс: настоящий Яндекс или заглушка
+   * (src/auth/yandex.ts). Браузер эти данные не передает — иначе входом стал бы любой чужой адрес.
+   */
+  yandexLogin: ExternalLogin;
 }
 
 /** Маршрут принимает тело как есть (файл), а не JSON: допустимые типы и наибольший размер. */

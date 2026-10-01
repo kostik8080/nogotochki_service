@@ -1,4 +1,5 @@
-// AUTH-01 Вход (docs/ui-map.md). POST /api/auth/login { login, password }.
+// AUTH-01 Вход (docs/ui-map.md). POST /api/auth/login { login, password }; кнопка рядом с формой —
+// POST /api/auth/yandex (js/yandex-login.js).
 // Сессию сервер ставит сам — cookie HttpOnly; страница ее не читает и ничего не сохраняет.
 // Успех → по ролям: клиент — CAB-01 «Мои записи», администратор — /admin, мастер — /master (или страница из ?next=).
 import * as api from './api.js';
@@ -8,6 +9,7 @@ import {
 } from './form.js';
 import { hasRole } from './roles.js';
 import { routes } from './routes.js';
+import { bindYandexLogin } from './yandex-login.js';
 
 // Логин, подставленный с регистрации («Такой аккаунт уже есть» → «Войти»). Сразу удаляется.
 const PREFILL_KEY = 'nog_login_prefill';
@@ -24,6 +26,9 @@ if (safeNext('') === routes.bookingTimeStep) {
 
 bindPasswordToggle(passwordInput, form.querySelector('[data-password-toggle]'));
 clearOnInput(form);
+
+// Кнопка «Войти через Яндекс» рядом с формой: ведет туда же, куда вход по паролю
+bindYandexLogin({ button: document.querySelector('[data-yandex-login]'), alert, after: homeAfterLogin });
 
 try {
   const prefill = sessionStorage.getItem(PREFILL_KEY);

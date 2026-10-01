@@ -13,6 +13,7 @@ import {
 import { phone as formatPhone, phoneHref, plural } from './format.js';
 import { routes } from './routes.js';
 import { getDraft } from './store.js';
+import { bindYandexLogin } from './yandex-login.js';
 
 const PREFILL_KEY = 'nog_login_prefill';
 
@@ -37,6 +38,9 @@ const input = (f, name) => /** @type {HTMLInputElement} */ (f.elements.namedItem
 bindPasswordHints(input(form, 'password'), form.querySelector('[data-password-rules]'));
 clearOnInput(form);
 clearOnInput(codeForm);
+
+// Кнопка «Войти через Яндекс»: аккаунт создается без пароля и кода, дальше — как после регистрации
+bindYandexLogin({ button: document.querySelector('[data-yandex-login]'), alert, after: afterRegister });
 
 /** Тело запроса, отправленное последним: на шаге кода оно повторяется с полем code. */
 let pending = null;

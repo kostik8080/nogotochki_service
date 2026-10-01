@@ -49,6 +49,8 @@ describe('регистрация, вход и выход', () => {
     assert.deepEqual(res.body.user, {
       id: res.body.user.id, roles: ['client'], role: 'client', name: 'Иван Петров', phone: '+79165551234', email: 'ivan@example.com',
       phoneVerified: false, emailVerified: false, marketingConsent: false,
+      // Вход по паролю: внешнего сервиса у аккаунта нет (вход через Яндекс — test/yandex-login.test.ts)
+      provider: null, hasPassword: true,
     });
     assert.ok(ivan.cookie);
     const row = db.prepare('SELECT password_hash, pd_consent_version FROM users WHERE id = ?').get(res.body.user.id) as { password_hash: string; pd_consent_version: string };

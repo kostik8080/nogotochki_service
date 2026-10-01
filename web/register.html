@@ -81,6 +81,17 @@
         <button class="btn btn--primary btn--block" type="submit">Зарегистрироваться</button>
       </form>
 
+
+      <!-- Вход через Яндекс в один клик. В прототипе кнопки нет: функция появилась после него
+           (docs/ui-map.md, список 2, пункт 7). Оформление — кнопка с рамкой из дизайн-системы -->
+      <div class="auth__divider"><span>или</span></div>
+
+      <button class="btn btn--outline btn--block" type="button" data-yandex-login>
+        <span class="provider-mark" aria-hidden="true">Я</span>Войти через Яндекс
+      </button>
+      <p class="auth__note">Яндекс сообщит студии только имя и адрес электронной почты. Если аккаунта еще нет, он создастся,
+        и вы соглашаетесь на обработку <a class="text-link" href="privacy.html" target="_blank" rel="noopener">персональных данных</a>.</p>
+
       <div class="auth__links auth__links--center">
         <span>Уже есть аккаунт? <a class="text-link" href="login.html">Войти</a></span>
       </div>

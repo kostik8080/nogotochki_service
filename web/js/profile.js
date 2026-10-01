@@ -6,6 +6,8 @@
 //     → POST /api/profile/email/confirm { code }; до кода в профиле остается прежний адрес;
 //   смена пароля → POST /api/profile/password: 204 — остальные сессии закрыты, 403 WRONG_PASSWORD;
 //   «Выйти» → POST /api/auth/logout; «Удалить аккаунт» → DELETE /api/profile { password } → главная.
+// У аккаунта с входом через Яндекс пароля нет (user.hasPassword === false): смена пароля заменяется
+// пояснением, а удаление аккаунта обходится без пароля — подтверждение там сама сессия.
 // Телефон только для чтения: номер меняет администратор (пункт 11.2 карты). Без входа — на вход с возвратом сюда.
 import * as api from './api.js';
 import {
@@ -99,6 +101,12 @@ function renderUser() {
   $('[data-email-unverified]').hidden = !user.email || user.emailVerified;
   $('[data-email-verify]').hidden = !user.email || user.emailVerified;
   $('[data-email-edit]').textContent = user.email ? 'Изменить' : 'Добавить';
+
+  // Вход через Яндекс (user.provider): пароля у аккаунта нет — смена пароля не показывается,
+  // и для удаления аккаунта пароль не нужен (DELETE /api/profile без тела)
+  $('[data-password-card]').hidden = !user.hasPassword;
+  $('[data-external-login-card]').hidden = user.hasPassword;
+  $('[data-delete-password]').hidden = !user.hasPassword;
 
   $('[data-marketing]').checked = user.marketingConsent;
   $('[data-marketing-hint]').textContent = user.email
@@ -398,7 +406,7 @@ $('[data-delete-open]').addEventListener('click', () => {
   deleteForm.reset();
   clearErrors(deleteForm, deleteAlert);
   deleteDialog.showModal();
-  input(deleteForm, 'password').focus();
+  if (user.hasPassword) input(deleteForm, 'password').focus();
 });
 $('[data-delete-close]').addEventListener('click', () => deleteDialog.close());
 clearOnInput(deleteForm);
@@ -407,11 +415,11 @@ deleteForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   clearErrors(deleteForm, deleteAlert);
   const password = input(deleteForm, 'password').value;
-  if (!showErrors(deleteForm, { password: password ? null : 'Введите пароль' })) return;
+  if (user.hasPassword && !showErrors(deleteForm, { password: password ? null : 'Введите пароль' })) return;
 
   const done = setBusy(/** @type {HTMLButtonElement} */ ($('[type=submit]', deleteForm)), 'Удаляем…');
   try {
-    await api.deleteAccount({ password });
+    await api.deleteAccount(user.hasPassword ? { password } : {});
     window.location.replace(routes.home);
   } catch (error) {
     done();

@@ -10,6 +10,7 @@ import { SERVER_ROOT } from '../../src/config.js';
 import { type Db, openDatabase } from '../../src/db/connection.js';
 import { runMigrations } from '../../src/db/migrator.js';
 import { seedDevData } from '../../src/db/seed/dev-seed.js';
+import type { ExternalLogin } from '../../src/auth/yandex.js';
 import { addDays, isoWeekday, zonedDate, zonedTimeToUtc } from '../../src/lib/studio-time.js';
 import { MemoryMailer } from '../../src/notify/mailer.js';
 
@@ -126,8 +127,10 @@ export interface TestApi {
  * rateLimit: true — включить ограничение частоты запросов. По умолчанию выключено: счетчики общие на
  * приложение, и тесты, которые к нему не относятся, глушили бы друг друга. Включает его rate-limit.test.ts,
  * и там на каждый счетчик поднимается отдельное приложение — иначе один тест выбирал бы лимит другого.
+ * yandexLogin — профиль внешнего входа; по умолчанию как на сервере без настроек: вход через Яндекс
+ * не подключен (503), заглушку тест подставляет сам (yandex-login.test.ts).
  */
-export async function startApi(options: { mail?: boolean; rateLimit?: boolean } = {}): Promise<TestApi> {
+export async function startApi(options: { mail?: boolean; rateLimit?: boolean; yandexLogin?: ExternalLogin } = {}): Promise<TestApi> {
   const db = openDatabase(':memory:');
   runMigrations(db);
   seedDevData(db, PASSWORDS);
@@ -138,6 +141,7 @@ export async function startApi(options: { mail?: boolean; rateLimit?: boolean } 
     mailer: options.mail === false ? null : mailer,
     appUrl: 'https://nogotochki.test',
     uploadsDir,
+    ...(options.yandexLogin ? { yandexLogin: options.yandexLogin } : {}),
   }).handle);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

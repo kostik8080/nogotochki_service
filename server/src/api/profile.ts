@@ -55,6 +55,11 @@ export function profileRoutes(router: Router): void {
     const newPassword = input.password('newPassword');
     input.done();
 
+    // У аккаунта с внешним входом (Яндекс) пароля нет — менять нечего, и «неверный текущий пароль»
+    // здесь только запутало бы.
+    if (passwordHashOf(ctx, user.id) === null) {
+      throw forbidden('В этот аккаунт вход выполняется через Яндекс: пароля у него нет', 'EXTERNAL_LOGIN_ONLY');
+    }
     requirePassword(ctx, user.id, currentPassword);
     const hash = hashPassword(newPassword);
     transaction(ctx.db, () => {
@@ -129,10 +134,15 @@ export function profileRoutes(router: Router): void {
   router.delete('/api/profile', (ctx): Result => {
     const user = requireRole(ctx, 'client');
     const input = Input.body(ctx.body);
-    const password = input.field<string>('password', undefined, (raw) =>
+    const password = input.field<string>('password', { optional: true }, (raw) =>
       typeof raw === 'string' && raw.length > 0 && raw.length <= 128 ? { value: raw } : { error: 'Введите пароль' });
+    // Удаление подтверждается паролем. У аккаунта с внешним входом (Яндекс) пароля нет, и требовать его
+    // было бы тупиком: отозвать свои данные человек должен иметь возможность всегда (152-ФЗ). Там
+    // подтверждение — сама сессия: ее открывает только внешний сервис после проверки владельца ящика.
+    const byPassword = passwordHashOf(ctx, user.id) !== null;
+    if (byPassword && password === undefined) input.fail('password', 'Введите пароль');
     input.done();
-    requirePassword(ctx, user.id, password);
+    if (byPassword) requirePassword(ctx, user.id, password!);
 
     const now = ctx.now.toISOString();
     const files = transaction(ctx.db, () => {
@@ -161,7 +171,8 @@ export function profileRoutes(router: Router): void {
       ctx.db.prepare('DELETE FROM slot_holds WHERE owner_id = ?').run(user.id);
       ctx.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
       ctx.db.prepare(`
-        UPDATE users SET name = ?, phone = NULL, email = NULL, password_hash = NULL, phone_verified_at = NULL,
+        UPDATE users SET name = ?, phone = NULL, email = NULL, password_hash = NULL, provider = NULL, provider_id = NULL,
+                         phone_verified_at = NULL,
                          email_verified_at = NULL, pd_consent_at = NULL, pd_consent_version = NULL, marketing_consent_at = NULL,
                          failed_login_attempts = 0, locked_until = NULL, deleted_at = ?, updated_at = ?
         WHERE id = ?

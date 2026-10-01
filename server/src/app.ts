@@ -18,6 +18,7 @@ import { photoRoutes } from './api/photos.js';
 import { requestRoutes } from './api/requests.js';
 import { profileRoutes } from './api/profile.js';
 import { clearSessionCookie, findSession, SESSION_COOKIE, type SessionUser } from './auth/sessions.js';
+import { type ExternalLogin, yandexLoginFromConfig } from './auth/yandex.js';
 import { config } from './config.js';
 import type { Db } from './db/connection.js';
 import { fromDatabaseError, HttpError } from './http/errors.js';
@@ -46,6 +47,8 @@ export interface AppOptions {
   uploadsDir: string;
   /** Папка интерфейса web/ — страницы раздела администратора /admin. По умолчанию из настроек (WEB_DIR). */
   webDir?: string;
+  /** Откуда берется профиль при входе через Яндекс; по умолчанию — по настройкам (заглушка или Яндекс). */
+  yandexLogin?: ExternalLogin;
 }
 
 export interface App {
@@ -64,6 +67,7 @@ export function createApp(db: Db, options: AppOptions): App {
     appUrl: options.appUrl ?? 'http://localhost:3000',
     uploadsDir: options.uploadsDir,
     secureCookies,
+    yandexLogin: options.yandexLogin ?? yandexLoginFromConfig(),
   };
 
   // Вход — 20 попыток в минуту с одного IP; регистрация — 10 в час; бронь — 30 в минуту на пользователя;

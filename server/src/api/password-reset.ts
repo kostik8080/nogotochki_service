@@ -19,14 +19,36 @@ interface ResetUser {
 
 /** Пользователь по логину: только с паролем, не удаленный и не заблокированный. */
 function findByLogin(db: Db, login: string): { user: ResetUser | undefined } {
-  const byPhone = !login.includes('@');
-  const value = byPhone ? normalizePhone(login) : login.trim().toLowerCase();
+  const value = loginValue(login);
   if (!value) return { user: undefined };
   const user = db.prepare(`
     SELECT id, phone, email FROM users
-    WHERE ${byPhone ? 'phone' : 'email'} = ? AND password_hash IS NOT NULL AND deleted_at IS NULL AND blocked_at IS NULL
-  `).get(value) as ResetUser | undefined;
+    WHERE ${value.field} = ? AND password_hash IS NOT NULL AND deleted_at IS NULL AND blocked_at IS NULL
+  `).get(value.value) as ResetUser | undefined;
   return { user };
+}
+
+/** Логин — e-mail, если в нем есть «@», иначе телефон в формате базы. */
+function loginValue(login: string): { field: 'phone' | 'email'; value: string } | null {
+  if (login.includes('@')) return { field: 'email', value: login.trim().toLowerCase() };
+  const phone = normalizePhone(login);
+  return phone ? { field: 'phone', value: phone } : null;
+}
+
+/**
+ * Внешний сервис, через который этот аккаунт входит, если пароля у него нет (users.provider).
+ * Такому человеку сбрасывать нечего: письмо со ссылкой на новый пароль только сбило бы его с толку,
+ * потому что в аккаунт он попадает кнопкой «Войти через Яндекс».
+ */
+function loginProvider(db: Db, login: string): string | null {
+  const value = loginValue(login);
+  if (!value) return null;
+  const row = db.prepare(`
+    SELECT provider FROM users
+    WHERE ${value.field} = ? AND password_hash IS NULL AND provider IS NOT NULL
+      AND deleted_at IS NULL AND blocked_at IS NULL
+  `).get(value.value) as { provider: string } | undefined;
+  return row?.provider ?? null;
 }
 
 const invalidCode = (details?: unknown) =>
@@ -39,6 +61,21 @@ export function passwordResetRoutes(router: Router): void {
     const input = Input.body(ctx.body);
     const login = input.string('login', { max: 254 });
     input.done();
+
+    // У аккаунта с внешним входом пароля нет: вместо письма — объяснение, чем в него входить.
+    // Это единственный ответ, по которому видно, что аккаунт есть, и он осознанный: без него человек
+    // бесконечно ждал бы письмо, которого не будет (docs/api.md, «Вход»).
+    const provider = loginProvider(ctx.db, login);
+    if (provider !== null) {
+      return {
+        status: 200,
+        body: {
+          provider,
+          message: 'В этот аккаунт вход выполняется через Яндекс, пароля у него нет. '
+            + 'Вернитесь на страницу входа и нажмите «Войти через Яндекс»',
+        },
+      };
+    }
 
     const { mailer, appUrl } = ctx.services;
     const { user } = findByLogin(ctx.db, login);

@@ -51,6 +51,17 @@ if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
   throw new Error(`SMTP_PORT=${smtpPortRaw}: нужен номер порта от 1 до 65535`);
 }
 
+// Заглушка входа через Яндекс (src/auth/yandex.ts). По умолчанию выключена, в production запрещена.
+const yandexStubRaw = env('YANDEX_LOGIN_STUB') ?? '0';
+if (!['0', '1'].includes(yandexStubRaw)) throw new Error(`YANDEX_LOGIN_STUB=${yandexStubRaw}: допустимы 0 и 1`);
+const yandexLoginStub = yandexStubRaw === '1';
+const yandexStubEmail = (env('YANDEX_STUB_EMAIL') ?? 'yandex-test@example.com').toLowerCase();
+const yandexStubName = env('YANDEX_STUB_NAME') ?? 'Яна Тестовая';
+// Адрес заглушки попадает в users.email, а база принимает только адрес в нижнем регистре с «@».
+if (yandexLoginStub && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(yandexStubEmail)) {
+  throw new Error(`YANDEX_STUB_EMAIL=${yandexStubEmail}: нужен адрес вида name@example.com`);
+}
+
 const backupKeepRaw = env('BACKUP_KEEP') ?? '14';
 const backupKeep = Number(backupKeepRaw);
 if (!Number.isInteger(backupKeep) || backupKeep < 1) {
@@ -91,6 +102,17 @@ export const config = {
     dir: path.resolve(SERVER_ROOT, env('BACKUP_DIR') ?? 'backups'),
     keep: backupKeep,
   },
+  /**
+   * Вход через Яндекс. Приложение в Яндексе еще не зарегистрировано: сервис не опубликован, и постоянного
+   * адреса, на который Яндекс вернет человека, у него нет. Пока вместо обращения к Яндексу работает
+   * заглушка: она подставляет адрес и имя из этих настроек. Временное решение только для разработки —
+   * в production сервер с ней не запускается (checkProductionConfig).
+   */
+  yandex: {
+    loginStub: yandexLoginStub,
+    stubEmail: yandexStubEmail,
+    stubName: yandexStubName,
+  },
   seed: {
     adminPassword: env('SEED_ADMIN_PASSWORD'),
     masterPassword: env('SEED_MASTER_PASSWORD'),
@@ -110,6 +132,12 @@ function checkProductionConfig(): void {
   checkPersistentPath('UPLOADS_DIR', '/var/lib/nogotochki/uploads', errors);
   if (config.backup.dir === path.dirname(config.databasePath)) {
     errors.push('BACKUP_DIR совпадает с папкой базы: храните копии в отдельной папке');
+  }
+
+  // Заглушка входа через Яндекс пускает в аккаунт по одной кнопке, без всякой проверки человека:
+  // на сервере, доступном из интернета, это открытая дверь в чужой кабинет.
+  if (config.yandex.loginStub) {
+    errors.push('YANDEX_LOGIN_STUB=1 — заглушка входа через Яндекс: она пускает в аккаунт без проверки человека и нужна только для разработки. Уберите ее из окружения production');
   }
 
   if (config.seed.adminPassword || config.seed.masterPassword || config.seed.clientPassword) {

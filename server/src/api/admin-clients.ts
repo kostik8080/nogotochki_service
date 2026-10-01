@@ -293,10 +293,16 @@ export function adminClientRoutes(router: Router): void {
     const id = pathId(ctx);
     Input.body(ctx.body).done();
     const result = transaction(ctx.db, () => {
-      const user = ctx.db.prepare('SELECT phone, email, password_hash, blocked_at FROM users WHERE id = ? AND deleted_at IS NULL').get(id) as
-        { phone: string | null; email: string | null; password_hash: string | null; blocked_at: string | null } | undefined;
+      const user = ctx.db.prepare('SELECT phone, email, password_hash, provider, blocked_at FROM users WHERE id = ? AND deleted_at IS NULL').get(id) as
+        { phone: string | null; email: string | null; password_hash: string | null; provider: string | null; blocked_at: string | null } | undefined;
       if (!user) throw notFound('Учетная запись не найдена');
-      if (user.password_hash === null) throw conflict('NO_ACCOUNT', 'У клиента нет учетной записи: сбрасывать нечего');
+      // Пароля нет у двух клиентов: карточки, заведенной администратором по телефону, и того, кто входит
+      // через Яндекс. Сбрасывать нечего ни там, ни там, но причины разные — текст это различает.
+      if (user.password_hash === null) {
+        throw conflict('NO_ACCOUNT', user.provider
+          ? 'У клиента нет пароля: он входит через Яндекс — сбрасывать нечего'
+          : 'У клиента нет учетной записи: сбрасывать нечего');
+      }
       if (user.blocked_at) throw conflict('ACCOUNT_BLOCKED', 'Доступ к учетной записи закрыт: сначала откройте его');
       const login = user.phone ?? user.email!;
       return { code: issueCode(ctx.db, id, 'reset_password', login, ctx.now), login };
