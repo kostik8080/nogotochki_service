@@ -15,6 +15,7 @@ import { masterRoutes } from './api/master.js';
 import { notificationRoutes } from './api/notifications.js';
 import { passwordResetRoutes } from './api/password-reset.js';
 import { photoRoutes } from './api/photos.js';
+import { requestRoutes } from './api/requests.js';
 import { profileRoutes } from './api/profile.js';
 import { clearSessionCookie, findSession, SESSION_COOKIE, type SessionUser } from './auth/sessions.js';
 import { config } from './config.js';
@@ -24,7 +25,7 @@ import { parseCookies, readJson, readRaw, sendFile, sendJson } from './http/io.j
 import { RateLimiter } from './http/rate-limit.js';
 import { type Context, type LimitBucket, Router, type Services } from './http/router.js';
 import type { Mailer } from './notify/mailer.js';
-import { adminPage, isAdminPagePath } from './web/admin-pages.js';
+import { isStaffPagePath, staffPage } from './web/admin-pages.js';
 
 export interface AppOptions {
   /** Текущий момент; тесты подставляют свой. */
@@ -94,10 +95,10 @@ export function createApp(db: Db, options: AppOptions): App {
         else cookies.push(clearSessionCookie(secureCookies));
       }
 
-      // Раздел администратора — одна проверка на весь раздел (api/guards.ts, requireAdmin).
-      // Страницы /admin: доступ решает сервер по сессии (web/admin-pages.ts).
-      if (isAdminPagePath(url.pathname)) {
-        const page = await adminPage({ method, pathname: url.pathname, search: url.search, session: { user, sessionStatus }, webDir });
+      // Разделы сотрудников: /admin и /master. Доступ решает сервер по сессии (web/admin-pages.ts)
+      // теми же функциями, что закрывают эндпоинты этих разделов.
+      if (isStaffPagePath(url.pathname)) {
+        const page = await staffPage({ method, pathname: url.pathname, search: url.search, session: { user, sessionStatus }, webDir });
         res.writeHead(page.status, { ...page.headers, ...(cookies.length ? { 'Set-Cookie': cookies } : {}) });
         res.end(method === 'HEAD' ? undefined : page.body);
         return;
@@ -163,6 +164,7 @@ export function createRouter(options: { secureCookies: boolean }): Router {
   masterRoutes(router);
   notificationRoutes(router);
   photoRoutes(router);
+  requestRoutes(router);
   adminServiceRoutes(router);
   adminMasterRoutes(router);
   adminScheduleRoutes(router);

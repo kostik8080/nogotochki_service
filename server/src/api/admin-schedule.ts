@@ -5,6 +5,7 @@
 // Доступ: весь /api/admin/* закрывает одна проверка requireAdmin (api/guards.ts), ее вызывает app.ts до поиска
 // маршрута. В обработчиках роль не проверяется; пользователя они берут через requireUser.
 import { applyOrPreview, bookingsOutsideWorkingHours, bookingsOverlapping } from '../booking/affected.js';
+import { BLOCK_TYPES, insertTimeBlock } from '../booking/schedule-changes.js';
 import type { Db } from '../db/connection.js';
 import { badRequest, notFound } from '../http/errors.js';
 import { pathId, type Context, type Result, type Router } from '../http/router.js';
@@ -14,7 +15,7 @@ import { readSettings } from '../studio/settings.js';
 import { requireUser } from './guards.js';
 import { bookingViews } from './views.js';
 
-const BLOCK_TYPES = ['lunch', 'personal', 'day_off', 'vacation', 'sick_leave', 'other'] as const;
+
 /** Самая длинная блокировка — год, самый длинный период выборки — тоже: защита от опечатки в годе. */
 const MAX_RANGE_DAYS = 366;
 
@@ -116,9 +117,9 @@ export function adminScheduleRoutes(router: Router): void {
 
     const result = applyOrPreview(ctx.db, dryRun, () => {
       requireMaster(ctx.db, masterId);
-      const id = Number(ctx.db.prepare(`
-        INSERT INTO time_blocks (master_id, block_type, starts_at, ends_at, comment, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(masterId, type, startsAt, endsAt, comment, user.id, ctx.now.toISOString()).lastInsertRowid);
+      const id = insertTimeBlock(ctx.db, {
+        masterId, type, startsAt, endsAt, comment, createdBy: user.id, createdAt: ctx.now.toISOString(),
+      });
       return { id, affected: bookingsOverlapping(ctx.db, masterId, startsAt, endsAt) };
     });
     return {

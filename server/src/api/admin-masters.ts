@@ -6,6 +6,7 @@
 // маршрута. В обработчиках роль не проверяется; пользователя они берут через requireUser.
 import { viewerRole } from '../auth/sessions.js';
 import { applyOrPreview, bookingsOutsideWorkingHours } from '../booking/affected.js';
+import { type ScheduleDay, saveWeeklySchedule } from '../booking/schedule-changes.js';
 import type { Db } from '../db/connection.js';
 import { transaction } from '../db/connection.js';
 import { hashPassword } from '../auth/password.js';
@@ -29,12 +30,6 @@ interface MasterRow {
   is_active: number;
   created_at: string;
   updated_at: string;
-}
-
-interface ScheduleDay {
-  weekday: number;
-  start: string;
-  end: string;
 }
 
 const getMaster = (db: Db, id: number) => db.prepare(`
@@ -113,22 +108,6 @@ function saveServices(db: Db, masterId: number, serviceIds: number[] | undefined
   for (const serviceId of serviceIds) insert.run(masterId, serviceId);
 }
 
-/**
- * Новый график с даты (раздел 10.6, сценарий 14): текущие строки закрываются днем накануне,
- * будущие периоды, начинающиеся с этой даты или позже, заменяются новыми. В одной транзакции.
- */
-function saveSchedule(db: Db, masterId: number, validFrom: string, days: ScheduleDay[]): void {
-  db.prepare('DELETE FROM master_weekly_hours WHERE master_id = ? AND valid_from >= ?').run(masterId, validFrom);
-  db.prepare(`
-    UPDATE master_weekly_hours SET valid_to = ?
-    WHERE master_id = ? AND valid_from < ? AND (valid_to IS NULL OR valid_to >= ?)
-  `).run(addDays(validFrom, -1), masterId, validFrom, validFrom);
-  const insert = db.prepare(`
-    INSERT INTO master_weekly_hours (master_id, weekday, valid_from, valid_to, start_time, end_time) VALUES (?, ?, ?, NULL, ?, ?)
-  `);
-  for (const d of days) insert.run(masterId, d.weekday, validFrom, d.start, d.end);
-}
-
 export function adminMasterRoutes(router: Router): void {
   router.get('/api/admin/masters', (ctx): Result => {
     const today = zonedDate(ctx.now.getTime(), readSettings(ctx.db).timezone);
@@ -153,7 +132,7 @@ export function adminMasterRoutes(router: Router): void {
       `).run(f.name!, f.level ?? 'master', f.specialty ?? null, f.experienceYears ?? null, f.bio ?? null, f.photoUrl ?? null,
         f.sortOrder ?? 0, f.isActive === false ? 0 : 1, now, now).lastInsertRowid);
       saveServices(ctx.db, id, f.serviceIds);
-      if (schedule) saveSchedule(ctx.db, id, schedule.validFrom, schedule.days);
+      if (schedule) saveWeeklySchedule(ctx.db, id, schedule.validFrom, schedule.days);
       return id;
     });
     return { status: 201, body: { master: masterView(ctx.db, getMaster(ctx.db, id)!, today) } };
@@ -304,7 +283,7 @@ export function adminMasterRoutes(router: Router): void {
     const from = new Date(zonedTimeToUtc(validFrom, '00:00', timezone)).toISOString();
     const affected = applyOrPreview(ctx.db, dryRun, () => {
       if (!getMaster(ctx.db, id)) throw notFound('Мастер не найден');
-      saveSchedule(ctx.db, id, validFrom, days);
+      saveWeeklySchedule(ctx.db, id, validFrom, days);
       return bookingsOutsideWorkingHours(ctx.db, { masterId: id, from });
     });
     return {

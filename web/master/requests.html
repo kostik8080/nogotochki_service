@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Страницу отдает сервер API по адресу /master/requests только мастеру (server/src/web/admin-pages.ts).
+       Все относительные адреса — от корня сайта: страница открывается не из корня. -->
+  <base href="/">
+  <title>Мои заявки — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/master-shell.js"></script>
+  <script type="module" src="js/master-requests.js"></script>
+</head>
+<body class="admin-body">
+  <a class="skip-link" href="/master/requests#main">К содержимому</a>
+
+  <!-- Общая шапка сервиса: логотип и меню аккаунта — js/header.js -->
+  <client-header></client-header>
+
+  <div class="admin">
+    <!-- Меню раздела: появляется после проверки роли -->
+    <master-nav></master-nav>
+
+    <!-- Заявки мастера (решение заказчика 30.09.2026) -->
+    <main class="admin__main" id="main" data-theme="admin" data-admin-main>
+      <div class="admin__loading" data-view="loading" aria-busy="true">
+        <span class="skeleton skeleton--heading" aria-hidden="true"></span>
+        <span class="visually-hidden">Загружаем раздел…</span>
+      </div>
+
+      <div class="admin-state" role="alert" data-view="error" hidden>
+        <p class="admin-state__title">Не удалось открыть раздел</p>
+        <p class="admin-state__text" data-error-text></p>
+        <div class="admin-state__actions">
+          <button class="btn btn--primary btn--small" type="button" data-retry>Повторить</button>
+        </div>
+      </div>
+
+      <div data-view="content" hidden>
+        <p class="alert admin-flash" role="status" data-flash hidden></p>
+
+        <div class="admin-head">
+          <div>
+            <p class="admin__eyebrow">Мастер</p>
+            <h1 class="admin__title">Мои заявки</h1>
+          </div>
+          <div class="admin-head__actions">
+            <button class="btn btn--primary btn--small" type="button" data-open-new>+ Новая заявка</button>
+          </div>
+          <p class="admin-head__summary">Отпуск, отгул, больничный и новый график администратор должен одобрить.
+            Пока заявка на рассмотрении, расписание не меняется.</p>
+        </div>
+
+        <div data-page-loading aria-busy="true">
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем данные…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <!-- Свои заявки, новые сверху — js/master-requests.js -->
+        <div data-list></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Новая заявка мастера -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="request-title" data-request-dialog>
+    <form class="form" data-request-form novalidate>
+      <p class="modal__title modal__title--display" id="request-title">Новая заявка</p>
+      <div class="alert" role="alert" data-request-alert hidden></div>
+
+      <div class="field">
+        <label class="field__label" for="request-type">Что нужно</label>
+        <select class="input" id="request-type" data-type>
+          <option value="vacation">Отпуск</option>
+          <option value="day_off">Отгул</option>
+          <option value="sick_leave">Больничный</option>
+          <option value="schedule">Изменить график работы</option>
+          <option value="other">Другое</option>
+        </select>
+      </div>
+
+      <div class="admin-fields" data-period>
+        <div class="field">
+          <label class="field__label" for="request-from">С даты</label>
+          <input class="input" id="request-from" type="date" data-from>
+          <p class="field__error" data-error-for="startsOn" hidden></p>
+        </div>
+        <div class="field">
+          <label class="field__label" for="request-to">По дату</label>
+          <input class="input" id="request-to" type="date" data-to>
+          <p class="field__hint">Последний день включительно.</p>
+          <p class="field__error" data-error-for="endsOn" hidden></p>
+        </div>
+      </div>
+
+      <div data-schedule hidden>
+        <div class="field">
+          <label class="field__label" for="request-valid-from">Новый график действует с</label>
+          <input class="input" id="request-valid-from" type="date" data-valid-from>
+          <p class="field__error" data-error-for="validFrom" hidden></p>
+        </div>
+        <fieldset class="admin-panel">
+          <legend class="admin-panel__title">Рабочие дни и часы</legend>
+          <div class="week-days" data-days></div>
+          <p class="field__error" data-error-for="days" hidden></p>
+        </fieldset>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="request-comment">Пояснение для администратора</label>
+        <textarea class="input" id="request-comment" maxlength="1000" data-comment></textarea>
+        <p class="field__hint" data-comment-hint>Необязательно.</p>
+        <p class="field__error" data-error-for="comment" hidden></p>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn btn--outline" type="button" data-close-dialog>Отмена</button>
+        <button class="btn btn--primary" type="submit">Отправить заявку</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

@@ -457,3 +457,64 @@ export function getNotifications(filter = {}) {
 /** Отметить уведомление прочитанным. Ответ — новый `{ unreadCount }`. 404 — чужое или несуществующее. */
 export const markNotificationRead = (id) =>
   request('POST', `/api/notifications/${encodeURIComponent(String(id))}/read`);
+
+// ---------- Раздел мастера: свое расписание и свои заявки ----------
+
+/**
+ * Свое расписание мастера на период (до 31 дня, по умолчанию неделя): по дням — рабочее окно или причина
+ * закрытого дня, записи (время, услуги, комментарий, имя клиента и его «Важно») и блокировки.
+ * Цен и контактов клиентов мастеру не отдают. 403 MASTER_NOT_LINKED — учетная запись не связана с профилем.
+ * @param {{ from?: string, to?: string }} [range] даты студии
+ */
+export function getMasterSchedule(range = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(range)) if (value !== undefined) query.set(key, String(value));
+  const qs = query.toString();
+  return request('GET', '/api/master/schedule' + (qs ? '?' + qs : ''));
+}
+
+/** Свои заявки мастера, новые сверху: тип, период или график, состояние и решение администратора. */
+export async function getMyRequests() {
+  return (await request('GET', '/api/master/requests')).requests;
+}
+
+/**
+ * Новая заявка. Отпуск, отгул и больничный — `{ type, startsOn, endsOn }`; новый график —
+ * `{ type: 'schedule', validFrom, days: [{ weekday, start, end }] }`; свободная просьба — `{ type: 'other', comment }`.
+ * 400 DATE_IN_PAST — дата уже прошла; 400 VALIDATION_ERROR — ошибки полей.
+ */
+export async function createMyRequest(body) {
+  return (await request('POST', '/api/master/requests', body)).request;
+}
+
+/** Отозвать свою заявку, пока она на рассмотрении. 409 REQUEST_ALREADY_DECIDED — ее уже рассмотрели. */
+export async function cancelMyRequest(id) {
+  return (await request('POST', `/api/master/requests/${encodeURIComponent(String(id))}/cancel`)).request;
+}
+
+// ---------- Заявки мастеров у администратора ----------
+
+/** Все заявки и число новых одним ответом: `{ pendingCount, requests }`. `status` — фильтр по состоянию. */
+export function getRequests(filter = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filter)) if (value) query.set(key, String(value));
+  const qs = query.toString();
+  return request('GET', '/api/admin/requests' + (qs ? '?' + qs : ''));
+}
+
+/** Записи, которые заденет одобрение заявки: их показывают до нажатия «Одобрить». */
+export async function getRequestAffected(id) {
+  return (await request('GET', `/api/admin/requests/${encodeURIComponent(String(id))}/affected`)).affectedBookings;
+}
+
+/**
+ * Одобрить заявку: отпуск, отгул и больничный станут блокировкой времени, график — новым недельным графиком.
+ * В ответе `affectedBookings` — записи, которые не помещаются в изменение: база их не трогает.
+ * `dryRun: true` — только показать их, ничего не меняя. 409 REQUEST_ALREADY_DECIDED.
+ */
+export const approveRequest = (id, body = {}) =>
+  request('POST', `/api/admin/requests/${encodeURIComponent(String(id))}/approve`, body);
+
+/** Отклонить заявку с причиной — мастер увидит ее в своих заявках. Расписание не меняется. */
+export const rejectRequest = (id, body) =>
+  request('POST', `/api/admin/requests/${encodeURIComponent(String(id))}/reject`, body);

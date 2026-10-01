@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Страницу отдает сервер API по адресу /master только мастеру (server/src/web/admin-pages.ts).
+       Все относительные адреса — от корня сайта: страница открывается не из корня. -->
+  <base href="/">
+  <title>Мое расписание — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/master-shell.js"></script>
+  <script type="module" src="js/master-schedule.js"></script>
+</head>
+<body class="admin-body">
+  <a class="skip-link" href="/master#main">К содержимому</a>
+
+  <!-- Общая шапка сервиса: логотип и меню аккаунта — js/header.js -->
+  <client-header></client-header>
+
+  <div class="admin">
+    <!-- Меню раздела: появляется после проверки роли -->
+    <master-nav></master-nav>
+
+    <!-- Расписание мастера (паспорт, функция 1 мастера; сценарий 19) -->
+    <main class="admin__main" id="main" data-theme="admin" data-admin-main>
+      <div class="admin__loading" data-view="loading" aria-busy="true">
+        <span class="skeleton skeleton--heading" aria-hidden="true"></span>
+        <span class="visually-hidden">Загружаем раздел…</span>
+      </div>
+
+      <div class="admin-state" role="alert" data-view="error" hidden>
+        <p class="admin-state__title">Не удалось открыть раздел</p>
+        <p class="admin-state__text" data-error-text></p>
+        <div class="admin-state__actions">
+          <button class="btn btn--primary btn--small" type="button" data-retry>Повторить</button>
+        </div>
+      </div>
+
+      <div data-view="content" hidden>
+        <p class="alert admin-flash" role="status" data-flash hidden></p>
+
+        <div class="admin-head">
+          <div>
+            <p class="admin__eyebrow">Мастер</p>
+            <h1 class="admin__title">Мое расписание</h1>
+          </div>
+          <div class="admin-head__actions">
+            <a class="btn btn--primary btn--small" href="/master/requests">Мои заявки</a>
+          </div>
+        </div>
+
+        <div class="day-bar">
+          <div class="day-bar__dates">
+            <button class="day-bar__arrow" type="button" data-prev aria-label="Предыдущая неделя">‹</button>
+            <label class="visually-hidden" for="week-date">Неделя</label>
+            <input class="input day-bar__date" id="week-date" type="date" data-date>
+            <button class="day-bar__arrow" type="button" data-next aria-label="Следующая неделя">›</button>
+            <button class="btn btn--outline btn--small" type="button" data-today>Эта неделя</button>
+          </div>
+        </div>
+
+        <p class="day-bar__caption" data-caption></p>
+        <p class="admin-head__summary" data-summary></p>
+
+        <div data-page-loading aria-busy="true">
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем данные…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <!-- Дни недели с записями и блокировками — js/master-schedule.js -->
+        <div data-list></div>
+      </div>
+    </main>
+  </div>
+
+</body>
+</html>

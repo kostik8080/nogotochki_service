@@ -10,6 +10,8 @@
 //
 // Пункты меню — экраны карты (docs/ui-map.md, «Раздел администратора»): «Записи» — шахматка A-01,
 // «Услуги» — A-23 и форма услуги A-24, «Мастера» — A-19 и карточка мастера A-22.
+// «Заявки» — заявки мастеров на отпуск, отгул, больничный и новый график: в прототипе их нет,
+// это решение заказчика от 30.09.2026. У пункта меню — счетчик новых заявок.
 // Страница раздела ждет adminReady: он дает пользователя, когда роль администратора подтверждена, иначе null.
 import * as api from './api.js';
 import { hasRole } from './roles.js';
@@ -18,6 +20,8 @@ import { routes } from './routes.js';
 const ICONS = {
   // Календарь с днями — «Расписание» в меню прототипа (lucide calendar-days)
   bookings: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/>',
+  // Лист с галочкой — «Заявки» мастеров (lucide clipboard-check)
+  requests: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
   // Искры — «Услуги» (lucide sparkles)
   services: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 3v4M17 5h4M5 17v4M3 19h4"/>',
   // Человек — «Мастера» (lucide user-round)
@@ -28,6 +32,7 @@ export const LOCK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3
 
 const ITEMS = [
   { href: routes.admin, label: 'Записи', icon: ICONS.bookings },
+  { href: routes.adminRequests, label: 'Заявки', icon: ICONS.requests },
   { href: routes.adminServices, label: 'Услуги', icon: ICONS.services },
   { href: routes.adminMasters, label: 'Мастера', icon: ICONS.masters },
 ];
@@ -51,6 +56,23 @@ class AdminNav extends HTMLElement {
             <span>${item.label}</span>
           </a>`).join('')}
       </nav>`;
+    this.showPending();
+  }
+
+  /** Счетчик новых заявок у пункта «Заявки»: число приходит вместе со списком заявок, отдельного запроса нет. */
+  async showPending() {
+    try {
+      const { pendingCount } = await api.getRequests({ status: 'pending' });
+      const link = this.querySelector(`a[href="${routes.adminRequests}"]`);
+      if (!pendingCount || !link) return;
+      const badge = document.createElement('span');
+      badge.className = 'admin-nav__count';
+      badge.textContent = String(pendingCount);
+      badge.title = `Новых заявок: ${pendingCount}`;
+      link.append(badge);
+    } catch {
+      // Счетчик необязателен: без него меню работает
+    }
   }
 }
 

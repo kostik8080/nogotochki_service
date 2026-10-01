@@ -1093,3 +1093,85 @@ admin-nav {
   color: var(--color-text-muted);
   font-size: var(--text-caption-size);
 }
+
+/* ---------- Заявки мастеров и раздел мастера ---------- */
+
+/* Счетчик новых заявок у пункта меню */
+.admin-nav__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-4);
+  height: var(--space-4);
+  margin-left: var(--space-1);
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-button-bg);
+  color: var(--color-button-text);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-button-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Заголовок дня в расписании мастера: тот же вид, что в неделе администратора */
+.day-group__name::first-letter {
+  text-transform: uppercase;
+}
+
+.day-group__empty {
+  padding: var(--space-3) 0;
+}
+
+/* Поле «Важно» из карточки клиента: аллергии и особенности — мастер должен их заметить */
+.important-note {
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+/* Дни недели в заявке на новый график: флажок дня и его часы */
+.week-days {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.week-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-body-s-size);
+}
+
+.week-day input[type='checkbox'] {
+  width: var(--text-body-l-size);
+  height: var(--text-body-l-size);
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--color-button-bg);
+  cursor: pointer;
+}
+
+.week-day__name {
+  min-width: calc(var(--space-24) - var(--space-4));
+}
+
+.week-day__name::first-letter {
+  text-transform: uppercase;
+}
+
+.week-day__hours {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.week-day__hours .input {
+  width: auto;
+  padding: var(--space-2);
+}

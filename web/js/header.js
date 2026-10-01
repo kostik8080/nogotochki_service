@@ -37,7 +37,7 @@ const BURGER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 1
 /**
  * Меню аккаунта: аватар, имя и выпадающий список. Клиенту — «Мои записи» и «Профиль»; администратору —
  * «Раздел администратора» (клиент этого пункта не видит, но и без него раздел закрыт на сервере);
- * мастеру — только «Выйти». Роли — список `roles`, проверка — hasRole. Закрывается кликом мимо и клавишей Escape.
+ * мастеру — «Мое расписание». Роли — список `roles`, проверка — hasRole. Закрывается кликом мимо и клавишей Escape.
  * @param {HTMLElement} container куда нарисовать
  * @param {{ name: string, roles: string[] }} user
  * @param {{ onLoggedOut: () => void, bookOnPhone?: boolean }} options onLoggedOut — что сделать после выхода;
@@ -48,6 +48,7 @@ export function mountAccountMenu(container, user, { onLoggedOut, bookOnPhone = f
   const links = [
     ...(hasRole(user, 'client') ? [{ href: routes.account, label: 'Мои записи' }, { href: routes.profile, label: 'Профиль' }] : []),
     ...(hasRole(user, 'admin') ? [{ href: routes.admin, label: 'Раздел администратора' }] : []),
+    ...(hasRole(user, 'master') ? [{ href: routes.master, label: 'Мое расписание' }] : []),
   ];
   const page = currentPage();
   const book = bookOnPhone && hasRole(user, 'client')

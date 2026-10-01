@@ -208,14 +208,14 @@ export function bindPasswordToggle(input, button) {
 // ---------- Адрес возврата после входа ----------
 
 /**
- * Куда вернуть после входа: ?next=account.html или страница раздела администратора (?next=/admin/services —
- * туда сервер отправляет гостя). Только своя страница — иначе по чужой ссылке человек после входа попал бы
- * на чужой сайт.
+ * Куда вернуть после входа: ?next=account.html или страница раздела сотрудника (?next=/admin/services,
+ * ?next=/master — туда сервер отправляет гостя). Только своя страница — иначе по чужой ссылке человек
+ * после входа попал бы на чужой сайт.
  */
 export function safeNext(fallback) {
   const next = new URLSearchParams(window.location.search).get('next');
-  return next && (/^[a-z0-9-]+\.html(\?[\w=&%.-]*)?$/.test(next) || isAdminPath(next)) ? next : fallback;
+  return next && (/^[a-z0-9-]+\.html(\?[\w=&%.-]*)?$/.test(next) || isStaffPath(next)) ? next : fallback;
 }
 
-/** Адрес раздела администратора: /admin, /admin/services, /admin/services/form?id=5. */
-export const isAdminPath = (path) => /^\/admin(\/[a-z-]+){0,2}(\?[\w=&%.-]*)?$/.test(path);
+/** Адрес раздела сотрудника: /admin, /admin/services/form?id=5, /master, /master/requests. */
+export const isStaffPath = (path) => /^\/(admin|master)(\/[a-z-]+){0,2}(\?[\w=&%.-]*)?$/.test(path);

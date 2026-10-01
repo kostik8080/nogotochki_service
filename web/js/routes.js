@@ -24,6 +24,15 @@ export const routes = {
   adminServiceForm: (id) => '/admin/services/form' + (id ? '?id=' + encodeURIComponent(String(id)) : ''),
   /** A-22 Карточка мастера: без id — новый мастер. */
   adminMasterCard: (id) => '/admin/masters/form' + (id ? '?id=' + encodeURIComponent(String(id)) : ''),
+  /** Заявки мастеров у администратора */
+  adminRequests: '/admin/requests',
+
+  /**
+   * Раздел мастера: свое расписание и свои заявки. Страницы отдает сервер API после проверки роли
+   * (server/src/web/admin-pages.ts). Записи мастер не ведет — это делает администратор.
+   */
+  master: '/master',
+  masterRequests: '/master/requests',
   /** CAB-01 Мои записи */
   account: 'account.html',
   /** CAB-02 История */

@@ -1,6 +1,6 @@
 // Локальный сервер для верстки из папки web/: отдает файлы как есть и проксирует /api на сервер API.
-// Раздел администратора /admin тоже идет на сервер API: страницы раздела он отдает только администратору,
-// остальным — 403 (server/src/web/admin-pages.ts). Файлы web/admin/ отсюда напрямую не отдаются.
+// Разделы сотрудников /admin и /master тоже идут на сервер API: их страницы он отдает только нужной роли,
+// остальным — 403 (server/src/web/admin-pages.ts). Файлы web/admin/ и web/master/ отсюда напрямую не отдаются.
 // Для браузера страница и API — один адрес, поэтому cookie сессии (HttpOnly, SameSite=Lax) работает без CORS.
 // Это не сборщик: файлы не меняются. Зависимостей нет.
 //
@@ -29,10 +29,10 @@ const TYPES = {
   '.ico': 'image/x-icon',
 };
 
-/** /admin и все под ним — раздел администратора: доступ проверяет сервер API. */
-function isAdminPage(url) {
+/** /admin и /master и все под ними — разделы сотрудников: доступ проверяет сервер API. */
+function isStaffPage(url) {
   const pathname = new URL(url ?? '/', 'http://localhost').pathname;
-  return pathname === '/admin' || pathname.startsWith('/admin/');
+  return ['/admin', '/master'].some((root) => pathname === root || pathname.startsWith(root + '/'));
 }
 
 function proxy(req, res) {
@@ -56,9 +56,9 @@ async function serveFile(req, res) {
   let file = path.join(ROOT, decodeURIComponent(url.pathname));
   // Только файлы внутри web/: адрес с «..» наружу не выпускаем.
   if (file !== ROOT && !file.startsWith(ROOT + path.sep)) return notFound(res);
-  // Файлы раздела администратора — только через сервер API: /Admin/…, /%61dmin/… и прочие написания
-  // того же пути (на Windows регистр в именах файлов не важен) сюда не проходят.
-  if (path.relative(ROOT, file).split(path.sep)[0].toLowerCase() === 'admin') return notFound(res);
+  // Файлы разделов сотрудников — только через сервер API: /Admin/…, /%61dmin/…, /Master/… и прочие
+  // написания тех же путей (на Windows регистр в именах файлов не важен) сюда не проходят.
+  if (['admin', 'master'].includes(path.relative(ROOT, file).split(path.sep)[0].toLowerCase())) return notFound(res);
   try {
     // Адрес без расширения — страница: письмо ведет на /reset-password?token=…, а файл — reset-password.html
     if (!path.extname(file) && !(await stat(file).catch(() => null))) file += '.html';
@@ -86,7 +86,7 @@ function notFound(res) {
 
 http
   .createServer((req, res) => {
-    if (req.url?.startsWith('/api/') || isAdminPage(req.url)) return proxy(req, res);
+    if (req.url?.startsWith('/api/') || isStaffPage(req.url)) return proxy(req, res);
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.writeHead(405);
       return res.end();

@@ -1,9 +1,9 @@
 // AUTH-01 Вход (docs/ui-map.md). POST /api/auth/login { login, password }.
 // Сессию сервер ставит сам — cookie HttpOnly; страница ее не читает и ничего не сохраняет.
-// Успех → по ролям: клиент — CAB-01 «Мои записи», администратор — раздел /admin (или страница из ?next=).
+// Успех → по ролям: клиент — CAB-01 «Мои записи», администратор — /admin, мастер — /master (или страница из ?next=).
 import * as api from './api.js';
 import {
-  bindPasswordToggle, clearErrors, clearOnInput, isAdminPath, isEmail, normalizePhone, retryText, safeNext, setBusy,
+  bindPasswordToggle, clearErrors, clearOnInput, isEmail, isStaffPath, normalizePhone, retryText, safeNext, setBusy,
   showAlert, showErrors, showServerError,
 } from './form.js';
 import { hasRole } from './roles.js';
@@ -44,8 +44,9 @@ try {
  */
 function homeAfterLogin(user) {
   const next = safeNext(null);
-  if (hasRole(user, 'admin')) return next && isAdminPath(next) ? next : routes.admin;
-  if (hasRole(user, 'client')) return next && !isAdminPath(next) ? next : routes.account;
+  if (hasRole(user, 'admin')) return next && next.startsWith('/admin') ? next : routes.admin;
+  if (hasRole(user, 'master')) return next && next.startsWith('/master') ? next : routes.master;
+  if (hasRole(user, 'client')) return next && !isStaffPath(next) ? next : routes.account;
   return routes.home;
 }
 

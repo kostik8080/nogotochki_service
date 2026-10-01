@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Страницу отдает сервер API по адресу /admin/requests только администратору (server/src/web/admin-pages.ts).
+       Все относительные адреса — от корня сайта: страница открывается не из корня. -->
+  <base href="/">
+  <title>Заявки — раздел администратора — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/admin-requests.js"></script>
+</head>
+<body class="admin-body">
+  <a class="skip-link" href="/admin/requests#main">К содержимому</a>
+
+  <!-- Общая шапка сервиса: логотип и меню аккаунта — js/header.js -->
+  <client-header></client-header>
+
+  <div class="admin">
+    <!-- Меню раздела: появляется после проверки роли -->
+    <admin-nav></admin-nav>
+
+    <!-- Заявки мастеров: одобрение и отклонение -->
+    <main class="admin__main" id="main" data-theme="admin" data-admin-main>
+      <div class="admin__loading" data-view="loading" aria-busy="true">
+        <span class="skeleton skeleton--heading" aria-hidden="true"></span>
+        <span class="visually-hidden">Загружаем раздел…</span>
+      </div>
+
+      <div class="admin-state" role="alert" data-view="error" hidden>
+        <p class="admin-state__title">Не удалось открыть раздел</p>
+        <p class="admin-state__text" data-error-text></p>
+        <div class="admin-state__actions">
+          <button class="btn btn--primary btn--small" type="button" data-retry>Повторить</button>
+        </div>
+      </div>
+
+      <div data-view="content" hidden>
+        <p class="alert admin-flash" role="status" data-flash hidden></p>
+
+        <div class="admin-head">
+          <div>
+            <p class="admin__eyebrow">Раздел администратора</p>
+            <h1 class="admin__title">Заявки</h1>
+          </div>
+          <div class="field day-bar__master">
+            <label class="field__label" for="requests-status">Показать</label>
+            <select class="input" id="requests-status" data-status-filter>
+              <option value="pending">На рассмотрении</option>
+              <option value="">Все заявки</option>
+              <option value="approved">Одобренные</option>
+              <option value="rejected">Отклоненные</option>
+              <option value="cancelled">Отозванные</option>
+            </select>
+          </div>
+          <p class="admin-head__summary" data-summary></p>
+        </div>
+
+        <div data-page-loading aria-busy="true">
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем данные…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <!-- Заявки мастеров — js/admin-requests.js -->
+        <div data-list></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Одобрение: показываем записи, которые заденет изменение -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="approve-title" data-approve-dialog>
+    <form class="form" data-approve-form novalidate>
+      <p class="modal__title modal__title--display" id="approve-title">Одобрить заявку</p>
+      <p class="modal__text" data-approve-summary></p>
+      <div class="alert" role="alert" data-approve-alert hidden></div>
+      <div class="alert alert--warning" data-approve-affected hidden></div>
+      <p class="modal__text" data-approve-note></p>
+      <div class="field">
+        <label class="field__label" for="approve-comment">Комментарий мастеру</label>
+        <input class="input" id="approve-comment" maxlength="500" data-approve-reason>
+        <p class="field__hint">Необязательно. Мастер увидит его в своих заявках.</p>
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--outline" type="button" data-close-dialog>Отмена</button>
+        <button class="btn btn--primary" type="submit" data-approve-submit>Одобрить</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Отклонение: причина обязательна, ее увидит мастер -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="reject-title" data-reject-dialog>
+    <form class="form" data-reject-form novalidate>
+      <p class="modal__title modal__title--display" id="reject-title">Отклонить заявку</p>
+      <p class="modal__text" data-reject-summary></p>
+      <div class="alert" role="alert" data-reject-alert hidden></div>
+      <div class="field">
+        <label class="field__label" for="reject-reason">Причина отказа</label>
+        <input class="input" id="reject-reason" maxlength="500" data-reject-reason placeholder="Например: горячий сезон, перенесем на ноябрь">
+        <p class="field__hint">Мастер увидит причину в своих заявках.</p>
+        <p class="field__error" data-error-for="reason" hidden></p>
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--outline" type="button" data-close-dialog>Отмена</button>
+        <button class="btn btn--danger" type="submit">Отклонить</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
