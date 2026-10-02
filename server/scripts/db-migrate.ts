@@ -2,20 +2,14 @@
 // В production перед применением делается резервная копия, если в базе уже есть данные:
 // миграция откатывается при ошибке сама, а копия защищает от миграции, которая прошла, но сделала не то.
 import { config } from '../src/config.js';
-import { createBackup } from '../src/db/backup.js';
+import { applyMigrations } from '../src/db/auto-migrate.js';
 import { openDatabase } from '../src/db/connection.js';
-import { pendingMigrations, runMigrations } from '../src/db/migrator.js';
 
 const db = openDatabase();
 try {
-  const pending = pendingMigrations(db);
-  const hasData = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'").get();
-  if (config.isProduction && pending.length > 0 && hasData) {
-    const backup = createBackup(db, config.backup.dir, 'pre-migrate');
-    console.log(`Резервная копия перед миграциями: ${backup.file}`);
-  }
-
-  const applied = runMigrations(db);
+  // Та же функция, что применяет миграции при запуске сервера (src/db/auto-migrate.ts):
+  // команда и автоматическое применение не могут разойтись.
+  const applied = applyMigrations(db);
   console.log(applied.length > 0 ? `Применены миграции: ${applied.join(', ')}` : 'Новых миграций нет');
   console.log(`База: ${config.databasePath}`);
 } finally {

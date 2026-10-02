@@ -1,20 +1,27 @@
-// npm start — HTTP-сервер API. Открывает базу, проверяет, что все миграции применены, и слушает PORT.
+// npm start — HTTP-сервер API. Открывает базу, применяет новые миграции и слушает PORT.
 // Раз в минуту удаляет истекшие брони времени и сессии (docs/db-schema.md, раздел 8, шаг 4).
 import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { cleanupExpired } from './booking/cleanup.js';
 import { config } from './config.js';
+import { applyMigrations } from './db/auto-migrate.js';
 import { openDatabase } from './db/connection.js';
-import { pendingMigrations } from './db/migrator.js';
 import { ConsoleMailer, type Mailer, SmtpMailer } from './notify/mailer.js';
 
 const CLEANUP_INTERVAL_MS = 60_000;
 
+// Папку базы создает openDatabase, если ее еще нет: на чистом сервере первый запуск не должен падать.
 const db = openDatabase();
-const pending = pendingMigrations(db);
-if (pending.length > 0) {
-  // Код ждет схему, которой в базе еще нет: запросы падали бы на отсутствующих полях.
-  console.error(`В базе не применены миграции: ${pending.join(', ')}. Выполните npm run db:migrate (на сервере — npm run prod:migrate).`);
+
+// Схему базы сервер приводит в порядок сам, до того как начнет отвечать: код ждет схему, которой
+// в базе может еще не быть, а на сервере команду миграций набирать некому. Уже примененные миграции
+// второй раз не применяются.
+try {
+  const applied = applyMigrations(db);
+  console.log(applied.length > 0 ? `Применены миграции: ${applied.join(', ')}` : 'Новых миграций нет');
+} catch (error) {
+  // Без нужной схемы запросы падали бы на отсутствующих полях — лучше не начинать отвечать вовсе.
+  console.error('Не удалось применить миграции, сервер не запущен:', error);
   db.close();
   process.exit(1);
 }
