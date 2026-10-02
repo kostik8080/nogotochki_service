@@ -1,9 +1,10 @@
 // Регистрация, вход и выход (паспорт, функция 1 клиента и функция 1 администратора).
 // Вход — по телефону или e-mail и паролю, один для всех ролей; права определяет роль учетной записи.
+import { randomBytes } from 'node:crypto';
 import { CODE_TTL_MIN, consumeCode, issueCode, lastCodeAt, RESEND_INTERVAL_MS } from '../auth/codes.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { clearSessionCookie, createSession, revokeSession, sessionCookie } from '../auth/sessions.js';
-import { YANDEX_PROVIDER } from '../auth/yandex.js';
+import { YANDEX_PROVIDER, yandexAuthorizeUrl } from '../auth/yandex.js';
 import { config } from '../config.js';
 import { transaction } from '../db/connection.js';
 import { badRequest, conflict, forbidden, HttpError, unauthorized } from '../http/errors.js';
@@ -192,6 +193,18 @@ export function authRoutes(router: Router, options: { secureCookies: boolean }):
       startSession(ctx, user.id);
     });
     return { status: 200, body: { user: selfView(ctx.db, user.id) } };
+  });
+
+  /**
+   * Куда отправить человека на страницу согласия Яндекса. Секрет приложения сюда не попадает:
+   * в адресе только идентификатор (он не секретный), адрес возврата и случайная строка state.
+   * State браузер запоминает у себя и сверяет, когда Яндекс вернет человека обратно: так видно,
+   * что человек вернулся со своего же входа, а не пришел по чужой ссылке.
+   */
+  router.get('/api/auth/yandex/start', (ctx): Result => {
+    ctx.limit('login', ctx.ip);
+    const state = randomBytes(16).toString('base64url');
+    return { status: 200, body: { url: yandexAuthorizeUrl(state), state } };
   });
 
   /**

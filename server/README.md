@@ -159,7 +159,7 @@ docker compose exec app node --import ./scripts/node-version.mjs dist/scripts/ad
 | `WEB_DIR` | нет | `../web` рядом с папкой сервера |
 | `BACKUP_KEEP` | нет | `14` копий |
 | `PD_POLICY_VERSION` | нет | `2026-09-01` |
-| `YANDEX_LOGIN_STUB` | нет и **не включать** | выключена; с ней сервер в production не запускается |
+| `YANDEX_CLIENT_ID`, `YANDEX_CLIENT_SECRET` | да, если нужен вход через Яндекс | нет; без них кнопка отвечает «вход недоступен». Адрес возврата в приложении Яндекса — `APP_URL` + `/login.html` |
 | `SEED_ADMIN_PASSWORD`, `SEED_MASTER_PASSWORD`, `SEED_CLIENT_PASSWORD` | нет, только для тестовых данных | нет; в production сервер с ними не запускается |
 
 ## Резервные копии

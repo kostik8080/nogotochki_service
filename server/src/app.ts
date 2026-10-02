@@ -18,7 +18,7 @@ import { photoRoutes } from './api/photos.js';
 import { requestRoutes } from './api/requests.js';
 import { profileRoutes } from './api/profile.js';
 import { clearSessionCookie, findSession, SESSION_COOKIE, type SessionUser } from './auth/sessions.js';
-import { type ExternalLogin, yandexLoginFromConfig } from './auth/yandex.js';
+import { type ExternalLogin, fetchYandexProfile } from './auth/yandex.js';
 import { config } from './config.js';
 import type { Db } from './db/connection.js';
 import { fromDatabaseError, HttpError } from './http/errors.js';
@@ -68,7 +68,7 @@ export function createApp(db: Db, options: AppOptions): App {
     appUrl: options.appUrl ?? 'http://localhost:3000',
     uploadsDir: options.uploadsDir,
     secureCookies,
-    yandexLogin: options.yandexLogin ?? yandexLoginFromConfig(),
+    yandexLogin: options.yandexLogin ?? fetchYandexProfile,
   };
 
   // Вход — 20 попыток в минуту с одного IP; регистрация — 10 в час; бронь — 30 в минуту на пользователя;

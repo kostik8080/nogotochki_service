@@ -4,7 +4,8 @@
 // у аккаунта без пароля.
 import assert from 'node:assert/strict';
 import { after, before, it } from 'node:test';
-import { fetchYandexProfile, stubYandexLogin } from '../src/auth/yandex.js';
+import type { ExternalLogin } from '../src/auth/yandex.js';
+import { fetchYandexProfile } from '../src/auth/yandex.js';
 import type { Db } from '../src/db/connection.js';
 import { PASSWORDS, startApi, type TestApi } from './helpers/api.js';
 
@@ -14,15 +15,25 @@ const count = (db: Db, sql: string, ...params: (string | number)[]) =>
 
 const NEW_EMAIL = 'yandex-new@example.com';
 
+/**
+ * Поддельный Яндекс для тестов: вместо похода на oauth.yandex.ru сразу отдает профиль.
+ * Так проверяется наша часть входа — поиск по e-mail, привязка, роль и сессия, — а не сеть.
+ * Настоящий поход за профилем (fetchYandexProfile) в тестах не вызывается: он ходит в интернет.
+ */
+const fakeYandex = (profile: { email: string; name: string }): ExternalLogin => {
+  const email = profile.email.toLowerCase();
+  return async () => ({ providerId: `test-${email}`, email, name: profile.name });
+};
+
 let api: TestApi;
 let withMaria: TestApi;
 let withAdmin: TestApi;
 
 before(async () => {
   // Три приложения: у каждого своя заглушка с одним профилем — один «аккаунт Яндекса» на сервис.
-  api = await startApi({ yandexLogin: stubYandexLogin({ email: NEW_EMAIL, name: 'Яна Тестовая' }) });
-  withMaria = await startApi({ yandexLogin: stubYandexLogin({ email: 'maria@example.com', name: 'Мария из Яндекса' }) });
-  withAdmin = await startApi({ yandexLogin: stubYandexLogin({ email: 'admin@example.com', name: 'Админ из Яндекса' }) });
+  api = await startApi({ yandexLogin: fakeYandex({ email: NEW_EMAIL, name: 'Яна Тестовая' }) });
+  withMaria = await startApi({ yandexLogin: fakeYandex({ email: 'maria@example.com', name: 'Мария из Яндекса' }) });
+  withAdmin = await startApi({ yandexLogin: fakeYandex({ email: 'admin@example.com', name: 'Админ из Яндекса' }) });
 });
 after(() => {
   api.close();
@@ -30,9 +41,9 @@ after(() => {
   withAdmin.close();
 });
 
-it('без заглушки и без приложения в Яндексе вход отвечает «пока не подключен», аккаунт не создается', async () => {
-  // Настоящий Яндекс передается явно: по настройкам (YANDEX_LOGIN_STUB в server/.env) у разработчика
-  // может быть включена заглушка, а тест проверяет поведение сервера без подключенного Яндекса.
+it('без настроенного приложения в Яндексе вход отвечает «недоступен», аккаунт не создается', async () => {
+  // Настоящий поход в Яндекс передается явно: без YANDEX_CLIENT_ID и YANDEX_CLIENT_SECRET он отвечает
+  // «вход недоступен», не обращаясь в сеть, — это и проверяется.
   const plain = await startApi({ yandexLogin: fetchYandexProfile });
   try {
     const res = await plain.client().post('/api/auth/yandex');
@@ -68,7 +79,7 @@ it('новый e-mail: создается аккаунт клиента без �
   assert.equal(row.role, 'client');
   assert.equal(row.password_hash, null);
   assert.equal(row.provider, 'yandex');
-  assert.equal(row.provider_id, `stub-${NEW_EMAIL}`);
+  assert.equal(row.provider_id, `test-${NEW_EMAIL}`);
   assert.ok(row.pd_consent_version, 'записана редакция политики, на которую дано согласие');
 
   // Второй вход тем же профилем: второго аккаунта нет, ответ 200 вместо 201.
@@ -113,32 +124,32 @@ it('e-mail сотрудника: внешний вход прав админис
 });
 
 it('«Забыли пароль?» у аккаунта без пароля: письма нет, сервис объясняет, что вход через Яндекс', async () => {
-  const stub = await startApi({ yandexLogin: stubYandexLogin({ email: NEW_EMAIL, name: 'Яна Тестовая' }) });
+  const app = await startApi({ yandexLogin: fakeYandex({ email: NEW_EMAIL, name: 'Яна Тестовая' }) });
   try {
-    assert.equal((await stub.client().post('/api/auth/yandex')).status, 201);
-    stub.mailer.sent.length = 0;
+    assert.equal((await app.client().post('/api/auth/yandex')).status, 201);
+    app.mailer.sent.length = 0;
 
-    const res = await stub.client().post('/api/auth/password-reset/request', { login: NEW_EMAIL });
+    const res = await app.client().post('/api/auth/password-reset/request', { login: NEW_EMAIL });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.equal(res.body.provider, 'yandex');
     assert.match(res.body.message, /Войти через Яндекс/);
-    assert.equal(stub.mailer.sent.length, 0, 'письмо для сброса пароля не отправляется');
-    assert.equal(count(stub.db, "SELECT count(*) AS n FROM auth_codes WHERE purpose = 'reset_password'"), 0);
+    assert.equal(app.mailer.sent.length, 0, 'письмо для сброса пароля не отправляется');
+    assert.equal(count(app.db, "SELECT count(*) AS n FROM auth_codes WHERE purpose = 'reset_password'"), 0);
 
     // У аккаунта с паролем ответ прежний: одинаковый, есть такой аккаунт или нет.
-    const usual = await stub.client().post('/api/auth/password-reset/request', { login: 'maria@example.com' });
+    const usual = await app.client().post('/api/auth/password-reset/request', { login: 'maria@example.com' });
     assert.equal(usual.status, 202);
     assert.equal(usual.body.provider, undefined);
-    assert.equal(stub.mailer.sent.length, 1);
+    assert.equal(app.mailer.sent.length, 1);
   } finally {
-    stub.close();
+    app.close();
   }
 });
 
 it('аккаунт с внешним входом: смена пароля объясняет, что пароля нет, а удаление доступно без пароля', async () => {
-  const stub = await startApi({ yandexLogin: stubYandexLogin({ email: NEW_EMAIL, name: 'Яна Тестовая' }) });
+  const app = await startApi({ yandexLogin: fakeYandex({ email: NEW_EMAIL, name: 'Яна Тестовая' }) });
   try {
-    const client = stub.client();
+    const client = app.client();
     const login = await client.post('/api/auth/yandex');
     assert.equal(login.status, 201);
 
@@ -148,7 +159,7 @@ it('аккаунт с внешним входом: смена пароля об�
 
     const removed = await client.delete('/api/profile');
     assert.equal(removed.status, 204, JSON.stringify(removed.body));
-    const row = stub.db.prepare('SELECT name, email, provider, provider_id, deleted_at FROM users WHERE id = ?').get(login.body.user.id) as
+    const row = app.db.prepare('SELECT name, email, provider, provider_id, deleted_at FROM users WHERE id = ?').get(login.body.user.id) as
       { name: string; email: string | null; provider: string | null; provider_id: string | null; deleted_at: string | null };
     assert.equal(row.email, null);
     assert.equal(row.provider, null, 'после удаления аккаунт нельзя снова открыть тем же входом Яндекса');
@@ -156,29 +167,29 @@ it('аккаунт с внешним входом: смена пароля об�
     assert.ok(row.deleted_at);
 
     // Повторный вход тем же профилем создает новый пустой аккаунт, а не поднимает удаленный.
-    const again = await stub.client().post('/api/auth/yandex');
+    const again = await app.client().post('/api/auth/yandex');
     assert.equal(again.status, 201);
     assert.notEqual(again.body.user.id, login.body.user.id);
   } finally {
-    stub.close();
+    app.close();
   }
 });
 
 it('регистрация по телефону не считает аккаунт с внешним входом карточкой из студии', async () => {
-  const stub = await startApi({ yandexLogin: stubYandexLogin({ email: NEW_EMAIL, name: 'Яна Тестовая' }) });
+  const app = await startApi({ yandexLogin: fakeYandex({ email: NEW_EMAIL, name: 'Яна Тестовая' }) });
   try {
-    const client = stub.client();
+    const client = app.client();
     assert.equal((await client.post('/api/auth/yandex')).status, 201);
     // Администратор внес номер в аккаунт (как при звонке), пароля у аккаунта по-прежнему нет.
-    stub.db.prepare("UPDATE users SET phone = '+79990001122' WHERE email = ?").run(NEW_EMAIL);
+    app.db.prepare("UPDATE users SET phone = '+79990001122' WHERE email = ?").run(NEW_EMAIL);
 
-    const res = await stub.client().post('/api/auth/register', {
+    const res = await app.client().post('/api/auth/register', {
       name: 'Чужой человек', phone: '+79990001122', password: 'other-password-1', pdConsent: true, marketingConsent: false,
     });
     assert.equal(res.status, 409, JSON.stringify(res.body));
     assert.equal(res.body.error.code, 'PHONE_TAKEN');
-    assert.equal((stub.db.prepare('SELECT password_hash FROM users WHERE email = ?').get(NEW_EMAIL) as { password_hash: string | null }).password_hash, null);
+    assert.equal((app.db.prepare('SELECT password_hash FROM users WHERE email = ?').get(NEW_EMAIL) as { password_hash: string | null }).password_hash, null);
   } finally {
-    stub.close();
+    app.close();
   }
 });

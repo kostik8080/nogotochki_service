@@ -173,15 +173,21 @@ export async function logout() {
 export const login = (body) => request('POST', '/api/auth/login', body);
 
 /**
- * Вход через Яндекс в один клик. Браузер только нажимает кнопку: e-mail и имя сервер берет у Яндекса сам
- * (пока приложение в Яндексе не зарегистрировано — у заглушки, server/src/auth/yandex.ts), поэтому в теле
- * запроса их нет и быть не должно. 201 — аккаунт создан, 200 — вход в существующий; оба раза сервер
+ * Вход через Яндекс: в теле только одноразовый код с адреса возврата. E-mail и имя сервер забирает
+ * у Яндекса сам по этому коду (server/src/auth/yandex.ts), поэтому в запросе их нет и быть не должно. 201 — аккаунт создан, 200 — вход в существующий; оба раза сервер
  * ставит свою cookie сессии, как при входе по паролю. 503 YANDEX_LOGIN_UNAVAILABLE — вход через Яндекс
  * не подключен; 403 STAFF_PASSWORD_LOGIN_ONLY — это учетная запись сотрудника, ей нужен пароль;
  * 403 ACCOUNT_BLOCKED — доступ закрыт студией.
  * @returns {Promise<{ user: object, provider: string, registered: boolean }>}
  */
-export const loginWithYandex = () => request('POST', '/api/auth/yandex');
+export const loginWithYandex = (body) => request('POST', '/api/auth/yandex', body);
+
+/**
+ * Куда отправить человека на страницу согласия Яндекса: `{ url, state }`. Секрета приложения в адресе
+ * нет, строку `state` страница запоминает и сверяет, когда Яндекс вернет человека обратно.
+ * 503 `YANDEX_LOGIN_UNAVAILABLE` — вход через Яндекс не настроен.
+ */
+export const startYandexLogin = () => request('GET', '/api/auth/yandex/start');
 
 /**
  * Регистрация клиента. 201 — { user } и вход выполнен; 202 — номер уже в карточке клиента, нужен код
