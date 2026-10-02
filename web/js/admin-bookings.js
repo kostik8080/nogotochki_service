@@ -193,7 +193,7 @@ function render() {
   if (!bookings.length && !blocks.length) {
     const what = state.view === 'day' ? 'На этот день' : state.view === 'week' ? 'На эту неделю' : 'На этот месяц';
     list.innerHTML = `
-      <div class="admin-state">
+      <div class="admin-state admin-state--wide">
         <p class="admin-state__title">${what} записей нет</p>
         <p class="admin-state__text">Выберите другой период или создайте запись за клиента.</p>
       </div>`;

@@ -196,6 +196,11 @@ admin-nav {
   text-align: center;
 }
 
+/* Сообщение «записей нет» в списке дня: во всю ширину, как строки записей рядом */
+.admin-state--wide {
+  max-width: none;
+}
+
 .admin-state__icon {
   display: flex;
   align-items: center;
@@ -782,6 +787,24 @@ admin-nav {
   align-items: flex-end;
   gap: var(--space-4);
   margin-bottom: var(--space-3);
+}
+
+/*
+ * Все органы управления строки — одной высоты. Она задана стрелками «‹ ›», а поле даты, список
+ * мастеров, «Сегодня» и переключатель периода считают высоту от своих отступов и шрифта и получаются
+ * разными: без этого в одном ряду стоят четыре контрола разной высоты, а «Сегодня» висит выше соседей.
+ */
+.day-bar .input,
+.day-bar .btn,
+.day-bar .view-switch label {
+  height: calc(var(--space-8) + var(--space-2));
+  padding-block: 0;
+}
+
+.day-bar .btn,
+.day-bar .view-switch label {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* На узком экране «Сегодня» переносится под поле даты: строка не должна вылезать за край */
