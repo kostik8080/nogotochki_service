@@ -13,6 +13,7 @@
     "db:migrate": "tsx --import ./scripts/node-version.mjs scripts/db-migrate.ts",
     "db:fresh": "tsx --import ./scripts/node-version.mjs scripts/db-fresh.ts",
     "db:seed": "tsx --import ./scripts/node-version.mjs scripts/db-seed.ts",
+    "setup:catalog": "tsx --import ./scripts/node-version.mjs scripts/setup-catalog.ts",
     "db:reset": "tsx --import ./scripts/node-version.mjs scripts/db-reset.ts",
     "db:backup": "tsx --import ./scripts/node-version.mjs scripts/db-backup.ts",
     "db:check-schema": "tsx --import ./scripts/node-version.mjs scripts/db-check-schema.ts",
@@ -22,6 +23,7 @@
     "prod:migrate": "node --import ./scripts/node-version.mjs dist/scripts/db-migrate.js",
     "prod:backup": "node --import ./scripts/node-version.mjs dist/scripts/db-backup.js",
     "prod:admin:create": "node --import ./scripts/node-version.mjs dist/scripts/admin-create.js",
+    "prod:setup:catalog": "node --import ./scripts/node-version.mjs dist/scripts/setup-catalog.js",
     "test": "tsx --import ./scripts/node-version.mjs --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
