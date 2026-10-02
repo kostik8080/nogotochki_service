@@ -1225,3 +1225,67 @@ admin-nav {
   color: var(--color-text-muted);
   cursor: not-allowed;
 }
+
+/* ---------- Режим работы студии: строка на день недели ---------- */
+
+.admin-hours {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.admin-hours__row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.admin-hours__day {
+  min-width: calc(var(--space-24) + var(--space-4));
+}
+
+.admin-hours__time {
+  width: auto;
+}
+
+.admin-hours__time:disabled {
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+}
+
+/* ---------- A-20d Особые дни студии ---------- */
+
+.admin-days {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.admin-days__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  padding-block: var(--space-2);
+  border-top: 1px solid var(--color-divider);
+  font-size: var(--text-body-s-size);
+}
+
+.admin-days__item:first-child {
+  border-top: 0;
+}
+
+.admin-days__date {
+  min-width: calc(var(--space-24) + var(--space-8));
+  font-weight: var(--text-label-weight);
+}
+
+.admin-days__reason {
+  color: var(--color-text-muted);
+}
+
+/* «Удалить» — в конце строки */
+.admin-days__item .text-link {
+  margin-left: auto;
+}

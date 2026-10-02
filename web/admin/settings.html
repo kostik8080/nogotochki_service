@@ -167,11 +167,80 @@
             </div>
           </section>
 
+          <!-- Режим работы студии: действует на всех мастеров и важнее их графика -->
           <section class="admin-panel" aria-labelledby="settings-hours">
             <h2 class="admin-panel__title" id="settings-hours">Режим работы студии</h2>
-            <div data-hours></div>
-            <p class="admin-panel__hint">Режим работы и особые дни студии этот экран пока не меняет: график мастера
-              задается в его карточке, а дни работы студии — через API.</p>
+            <p class="admin-panel__hint">В день, когда студия закрыта, свободного времени нет ни у кого — даже если
+              у мастера этот день рабочий.</p>
+            <div class="admin-hours" data-hours></div>
+            <div class="alert" role="alert" data-hours-alert hidden></div>
+            <div data-hours-affected hidden></div>
+            <div class="admin-form__actions">
+              <button class="btn btn--outline btn--small" type="button" data-hours-save>Сохранить режим работы</button>
+            </div>
+          </section>
+
+          <!-- A-20d Особые дни студии: праздники, санитарные и дополнительные рабочие дни -->
+          <section class="admin-panel" aria-labelledby="settings-days">
+            <h2 class="admin-panel__title" id="settings-days">Особые дни студии</h2>
+            <p class="admin-panel__hint">Праздник, санитарный день, сокращенный или дополнительный рабочий день.
+              Особый день действует на всех мастеров и важнее и режима работы, и графика мастера. Причину видят клиенты
+              в календаре записи.</p>
+            <div data-days></div>
+
+            <div class="admin-subform" data-day-form hidden>
+              <div class="alert" role="alert" data-day-alert hidden></div>
+
+              <div class="admin-fields">
+                <div class="field">
+                  <label class="field__label" for="day-date">Дата</label>
+                  <input class="input" id="day-date" name="dayDate" type="date">
+                  <p class="field__error" data-error-for="dayDate" hidden></p>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="day-reason">Причина</label>
+                  <input class="input" id="day-reason" name="dayReason" maxlength="200" autocomplete="off"
+                         placeholder="Санитарный день">
+                  <p class="field__hint">Ее видят клиенты.</p>
+                  <p class="field__error" data-error-for="dayReason" hidden></p>
+                </div>
+              </div>
+
+              <div class="check">
+                <label class="check__label">
+                  <input type="radio" name="dayKind" value="closed" checked>
+                  <span>Закрыта весь день</span>
+                </label>
+                <label class="check__label">
+                  <input type="radio" name="dayKind" value="open">
+                  <span>Работает в особые часы</span>
+                </label>
+              </div>
+
+              <div class="admin-fields" data-day-hours hidden>
+                <div class="field">
+                  <label class="field__label" for="day-open">Открытие</label>
+                  <input class="input" id="day-open" name="dayOpen" type="time" step="300" value="10:00">
+                  <p class="field__error" data-error-for="dayOpen" hidden></p>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="day-close">Закрытие</label>
+                  <input class="input" id="day-close" name="dayClose" type="time" step="300" value="16:00">
+                  <p class="field__error" data-error-for="dayClose" hidden></p>
+                </div>
+              </div>
+
+              <div data-day-affected hidden></div>
+
+              <div class="admin-form__actions">
+                <button class="btn btn--primary btn--small" type="button" data-day-save>Добавить день</button>
+                <button class="btn btn--outline btn--small" type="button" data-day-cancel>Отмена</button>
+              </div>
+            </div>
+
+            <div class="admin-form__actions" data-day-actions>
+              <button class="btn btn--outline btn--small" type="button" data-day-open>Добавить особый день</button>
+            </div>
           </section>
 
           <div class="admin-form__actions">

@@ -383,6 +383,38 @@ export const getAdminSettings = () => request('GET', '/api/admin/settings');
  */
 export const updateAdminSettings = (body) => request('PATCH', '/api/admin/settings', body);
 
+/**
+ * Режим работы студии по дням недели: дня нет в списке — студия в этот день закрыта.
+ * `dryRun: true` — только предпросмотр: в ответе `affectedBookings` — предстоящие записи вне нового режима.
+ * @param {{ days: { weekday: number, open: string, close: string }[], dryRun?: boolean }} body
+ */
+export const setStudioHours = (body) => request('PUT', '/api/admin/studio-hours', body);
+
+/**
+ * Особые дни студии с автором: закрытые дни, особые часы и дополнительные рабочие дни (A-20d).
+ * По умолчанию — от сегодня на горизонт записи.
+ * @param {{ from?: string, to?: string }} [range]
+ */
+export function getAdminStudioDays(range = {}) {
+  const query = new URLSearchParams();
+  if (range.from) query.set('from', range.from);
+  if (range.to) query.set('to', range.to);
+  const qs = query.toString();
+  return request('GET', '/api/admin/studio-days' + (qs ? '?' + qs : ''));
+}
+
+/**
+ * Особый день студии: `isOpen: false` — закрыта весь день, `isOpen: true` с часами — особые часы.
+ * Действует на всех мастеров и важнее их графика. `dryRun: true` — предпросмотр задетых записей.
+ * 400 `DATE_IN_PAST` — прошедший день изменить нельзя.
+ * @param {string} date дата студии, ГГГГ-ММ-ДД
+ * @param {{ isOpen: boolean, open?: string, close?: string, reason: string, dryRun?: boolean }} body
+ */
+export const setStudioDay = (date, body) => request('PUT', `/api/admin/studio-days/${encodeURIComponent(date)}`, body);
+
+/** Убрать особый день: студия снова работает по обычному режиму. В ответе — задетые записи. */
+export const deleteStudioDay = (date) => request('DELETE', `/api/admin/studio-days/${encodeURIComponent(date)}`);
+
 // ---------- Раздел администратора: записи, блокировки времени ----------
 
 /**
