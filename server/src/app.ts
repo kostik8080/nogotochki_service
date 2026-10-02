@@ -27,6 +27,7 @@ import { RateLimiter } from './http/rate-limit.js';
 import { type Context, type LimitBucket, Router, type Services } from './http/router.js';
 import type { Mailer } from './notify/mailer.js';
 import { isStaffPagePath, staffPage } from './web/admin-pages.js';
+import { staticFile } from './web/static-files.js';
 
 export interface AppOptions {
   /** Текущий момент; тесты подставляют свой. */
@@ -106,6 +107,18 @@ export function createApp(db: Db, options: AppOptions): App {
         res.writeHead(page.status, { ...page.headers, ...(cookies.length ? { 'Set-Cookie': cookies } : {}) });
         res.end(method === 'HEAD' ? undefined : page.body);
         return;
+      }
+
+      // Клиентский интерфейс: страницы и файлы из web/ отдает сам сервер, поэтому сервису не нужен
+      // отдельный статический сервер — перед ним на сервере остается только HTTPS. Адреса /api/…
+      // сюда не попадают, а разделы сотрудников разобраны выше: файлами они не отдаются (web/static-files.ts).
+      if (!url.pathname.startsWith('/api/')) {
+        const file = await staticFile({ method, pathname: url.pathname, webDir });
+        if (file) {
+          res.writeHead(file.status, { ...file.headers, ...(cookies.length ? { 'Set-Cookie': cookies } : {}) });
+          res.end(method === 'HEAD' ? undefined : file.body);
+          return;
+        }
       }
 
       // /api/admin/*: до поиска маршрута. Новый эндпоинт под /api/admin защищен без строчки в обработчике,
