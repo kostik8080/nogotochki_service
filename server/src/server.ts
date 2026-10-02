@@ -5,6 +5,7 @@ import { createApp } from './app.js';
 import { cleanupExpired } from './booking/cleanup.js';
 import { config } from './config.js';
 import { applyMigrations } from './db/auto-migrate.js';
+import { bootstrapAdmin } from './db/bootstrap-admin.js';
 import { openDatabase } from './db/connection.js';
 import { ConsoleMailer, type Mailer, SmtpMailer } from './notify/mailer.js';
 
@@ -24,6 +25,24 @@ try {
   console.error('Не удалось применить миграции, сервер не запущен:', error);
   db.close();
   process.exit(1);
+}
+
+// Первый администратор: заводится, только если администраторов в базе еще нет. Сбой здесь сервис
+// не останавливает — клиенты должны видеть витрину, даже если учетную запись завести не удалось.
+try {
+  const admin = bootstrapAdmin(db, { email: config.admin.email, password: config.admin.password });
+  if (admin.status === 'created') {
+    console.log(`Создана учетная запись администратора: ${admin.email}`);
+    if (admin.generatedPassword) {
+      console.log(`Пароль (показывается один раз, смените его в профиле после входа): ${admin.generatedPassword}`);
+    }
+  } else if (admin.status === 'invalid') {
+    console.error(`Администратор не создан. ${admin.message}`);
+  } else if (admin.status === 'skipped') {
+    console.log('Администраторов в базе нет. Задайте ADMIN_EMAIL и перезапустите сервер либо заведите учетную запись командой admin:create');
+  }
+} catch (error) {
+  console.error('Не удалось завести учетную запись администратора:', error);
 }
 
 // Почта: SMTP, если он настроен; при разработке без него письма печатаются в консоль.

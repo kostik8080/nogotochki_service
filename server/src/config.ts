@@ -113,6 +113,15 @@ export const config = {
     stubEmail: yandexStubEmail,
     stubName: yandexStubName,
   },
+  /**
+   * Первый администратор на новом сервере (src/db/bootstrap-admin.ts). Учетная запись создается
+   * при запуске, только если администраторов в базе еще нет. Без пароля он придумывается случайным
+   * и печатается в журнал сервера один раз — чтобы не держать пароль в настройках и в репозитории.
+   */
+  admin: {
+    email: env('ADMIN_EMAIL'),
+    password: env('ADMIN_PASSWORD'),
+  },
   seed: {
     adminPassword: env('SEED_ADMIN_PASSWORD'),
     masterPassword: env('SEED_MASTER_PASSWORD'),
