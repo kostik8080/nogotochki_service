@@ -20,6 +20,7 @@ const ADMIN_PAGES: Record<string, string> = {
   '/admin/services/form': 'admin/service-form.html',
   '/admin/masters': 'admin/masters.html',
   '/admin/masters/form': 'admin/master-card.html',
+  '/admin/settings': 'admin/settings.html',
 };
 
 /** Раздел мастера: свое расписание и свои заявки. Записи мастер не ведет (паспорт). */

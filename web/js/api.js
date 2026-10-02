@@ -362,6 +362,27 @@ export const updateMaster = (id, body) => request('PATCH', adminPath('/api/admin
  */
 export const deleteMaster = (id) => request('DELETE', adminPath('/api/admin/masters', id));
 
+/**
+ * Новый недельный график мастера с даты (A-22p): прежний закрывается днем накануне, новая запись
+ * графика не создается у каждого дня отдельно. `dryRun: true` — только предпросмотр, график не сохраняется.
+ * В ответе `master` и `affectedBookings` — действующие записи с этой даты, которые в новый график не попадают.
+ * 400 `DATE_IN_PAST` — дата раньше сегодняшнего дня студии.
+ * @param {number} id
+ * @param {{ validFrom: string, days: { weekday: number, start: string, end: string }[], dryRun?: boolean }} body
+ */
+export const setMasterSchedule = (id, body) => request('PUT', adminPath('/api/admin/masters', id) + '/schedule', body);
+
+/** Настройки студии и режим работы по дням недели (A-26). */
+export const getAdminSettings = () => request('GET', '/api/admin/settings');
+
+/**
+ * Изменить настройки студии: передаются только те поля, которые меняются.
+ * @param {{ studioName?: string, address?: string, phone?: string, mapUrl?: string | null, vkUrl?: string | null,
+ *           telegramUrl?: string | null, timezone?: string, slotStepMin?: number, bookingHorizonDays?: number,
+ *           minLeadMin?: number, clientChangeDeadlineHours?: number, slotHoldMin?: number, isMaintenance?: boolean }} body
+ */
+export const updateAdminSettings = (body) => request('PATCH', '/api/admin/settings', body);
+
 // ---------- Раздел администратора: записи, блокировки времени ----------
 
 /**

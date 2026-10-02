@@ -26,6 +26,8 @@ export const routes = {
   adminMasterCard: (id) => '/admin/masters/form' + (id ? '?id=' + encodeURIComponent(String(id)) : ''),
   /** Заявки мастеров у администратора */
   adminRequests: '/admin/requests',
+  /** A-26 Настройки студии: контакты, правила записи, режим технических работ */
+  adminSettings: '/admin/settings',
 
   /**
    * Раздел мастера: свое расписание и свои заявки. Страницы отдает сервер API после проверки роли

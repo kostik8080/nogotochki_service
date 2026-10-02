@@ -114,6 +114,50 @@
           <section class="admin-panel" aria-labelledby="master-schedule">
             <h2 class="admin-panel__title" id="master-schedule">График работы</h2>
             <div data-schedule></div>
+
+            <!-- A-22p Новый график с даты. Прежний график закрывается днем накануне (сценарий 14) -->
+            <div class="admin-form__actions" data-schedule-actions hidden>
+              <button class="btn btn--outline btn--small" type="button" data-schedule-open>Новый график с даты</button>
+            </div>
+
+            <div class="admin-subform" data-schedule-form hidden>
+              <div class="alert" role="alert" data-schedule-alert hidden></div>
+
+              <div class="field">
+                <label class="field__label" for="schedule-from">Действует с</label>
+                <input class="input" id="schedule-from" name="scheduleFrom" type="date">
+                <p class="field__hint">Записи до этой даты считаются по прежнему графику.</p>
+                <p class="field__error" data-error-for="scheduleFrom" hidden></p>
+              </div>
+
+              <fieldset class="field">
+                <legend class="field__label">Рабочие дни</legend>
+                <div class="admin-weekdays" data-schedule-days></div>
+                <p class="field__hint" data-schedule-studio></p>
+                <p class="field__error" data-error-for="scheduleDays" hidden></p>
+              </fieldset>
+
+              <div class="admin-fields">
+                <div class="field">
+                  <label class="field__label" for="schedule-start">Начало смены</label>
+                  <input class="input" id="schedule-start" name="scheduleStart" type="time" step="300">
+                  <p class="field__error" data-error-for="scheduleStart" hidden></p>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="schedule-end">Конец смены</label>
+                  <input class="input" id="schedule-end" name="scheduleEnd" type="time" step="300">
+                  <p class="field__error" data-error-for="scheduleEnd" hidden></p>
+                </div>
+              </div>
+
+              <!-- Записи, которые в новый график не попадают: сервер их не трогает, разбирает администратор -->
+              <div data-schedule-affected hidden></div>
+
+              <div class="admin-form__actions">
+                <button class="btn btn--primary btn--small" type="button" data-schedule-save>Сохранить график</button>
+                <button class="btn btn--outline btn--small" type="button" data-schedule-cancel>Отмена</button>
+              </div>
+            </div>
           </section>
 
           <section class="admin-panel" aria-labelledby="master-status">

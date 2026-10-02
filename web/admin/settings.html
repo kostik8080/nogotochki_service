@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Страницу отдает сервер API по адресу /admin/settings только администратору (server/src/web/admin-pages.ts).
+       Все относительные адреса — от корня сайта: страница открывается не из корня. -->
+  <base href="/">
+  <title>Настройки студии — раздел администратора — Ноготочки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/admin-settings.js"></script>
+</head>
+<body class="admin-body">
+  <a class="skip-link" href="/admin/settings#main">К содержимому</a>
+
+  <!-- Общая шапка сервиса: логотип и меню аккаунта — js/header.js -->
+  <client-header></client-header>
+
+  <div class="admin">
+    <!-- Меню раздела: появляется после проверки роли — js/admin.js -->
+    <admin-nav></admin-nav>
+
+    <!-- A-26 Настройки студии. Экрана в прототипе нет: раньше эти настройки менялись только через API
+         (docs/ui-map.md, список 2, пункт 8) -->
+    <main class="admin__main" id="main" data-theme="admin" data-admin-main>
+      <div class="admin__loading" data-view="loading" aria-busy="true">
+        <span class="skeleton skeleton--heading" aria-hidden="true"></span>
+        <span class="visually-hidden">Загружаем раздел…</span>
+      </div>
+
+      <div class="admin-state" role="alert" data-view="error" hidden>
+        <p class="admin-state__title">Не удалось открыть раздел</p>
+        <p class="admin-state__text" data-error-text></p>
+        <div class="admin-state__actions">
+          <button class="btn btn--primary btn--small" type="button" data-retry>Повторить</button>
+        </div>
+      </div>
+
+      <div data-view="content" hidden>
+        <p class="alert admin-flash" role="status" data-flash hidden></p>
+
+        <div class="admin-head">
+          <div>
+            <p class="admin__eyebrow">Раздел администратора</p>
+            <h1 class="admin__title">Настройки студии</h1>
+          </div>
+          <span data-status></span>
+        </div>
+
+        <div data-page-loading aria-busy="true">
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем настройки…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <form class="admin-form" data-form hidden novalidate>
+          <div class="alert" role="alert" data-alert hidden></div>
+
+          <!-- Режим технических работ наверху: пока он включен, клиенты записаться не могут -->
+          <section class="admin-panel" aria-labelledby="settings-maintenance">
+            <h2 class="admin-panel__title" id="settings-maintenance">Прием записей</h2>
+            <div class="check">
+              <label class="check__label">
+                <input type="checkbox" name="isMaintenance" data-maintenance>
+                <span>Режим технических работ — запись закрыта</span>
+              </label>
+            </div>
+            <p class="admin-panel__hint">Пока режим включен, клиент видит сайт, но записаться не может: шаги записи
+              и создание брони отвечают «Студия временно не принимает записи». Новая база включает режим сама —
+              выключите его, когда заведете услуги, мастеров и их график.</p>
+          </section>
+
+          <section class="admin-panel" aria-labelledby="settings-studio">
+            <h2 class="admin-panel__title" id="settings-studio">Студия</h2>
+            <div class="field">
+              <label class="field__label" for="studio-name">Название</label>
+              <input class="input" id="studio-name" name="studioName" maxlength="100" autocomplete="off">
+              <p class="field__error" data-error-for="studioName" hidden></p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="studio-address">Адрес</label>
+              <input class="input" id="studio-address" name="address" maxlength="300" autocomplete="off">
+              <p class="field__hint">Показывается на лендинге и в карточке записи.</p>
+              <p class="field__error" data-error-for="address" hidden></p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="studio-phone">Телефон</label>
+              <input class="input" id="studio-phone" name="phone" type="tel" inputmode="tel" autocomplete="off"
+                     placeholder="+7 (___) ___-__-__">
+              <p class="field__hint">По нему клиент звонит, когда до визита меньше суток и запись уже не изменить.</p>
+              <p class="field__error" data-error-for="phone" hidden></p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="studio-timezone">Часовой пояс</label>
+              <input class="input" id="studio-timezone" name="timezone" maxlength="60" autocomplete="off"
+                     placeholder="Europe/Moscow" spellcheck="false">
+              <p class="field__hint">Название пояса, например Europe/Moscow или Asia/Yekaterinburg. В нем показывается
+                все время сервиса: расписание, слоты и записи.</p>
+              <p class="field__error" data-error-for="timezone" hidden></p>
+            </div>
+          </section>
+
+          <section class="admin-panel" aria-labelledby="settings-links">
+            <h2 class="admin-panel__title" id="settings-links">Ссылки</h2>
+            <p class="admin-panel__hint">Показываются в контактах на лендинге. Пустое поле убирает ссылку.
+              Адрес начинается с https://</p>
+            <div class="field">
+              <label class="field__label" for="studio-map">Карта</label>
+              <input class="input" id="studio-map" name="mapUrl" type="url" maxlength="500" autocomplete="off" spellcheck="false">
+              <p class="field__error" data-error-for="mapUrl" hidden></p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="studio-vk">ВКонтакте</label>
+              <input class="input" id="studio-vk" name="vkUrl" type="url" maxlength="500" autocomplete="off" spellcheck="false">
+              <p class="field__error" data-error-for="vkUrl" hidden></p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="studio-telegram">Telegram</label>
+              <input class="input" id="studio-telegram" name="telegramUrl" type="url" maxlength="500" autocomplete="off" spellcheck="false">
+              <p class="field__error" data-error-for="telegramUrl" hidden></p>
+            </div>
+          </section>
+
+          <section class="admin-panel" aria-labelledby="settings-rules">
+            <h2 class="admin-panel__title" id="settings-rules">Правила записи</h2>
+            <div class="admin-fields">
+              <div class="field">
+                <label class="field__label" for="rule-step">Шаг времени, минут</label>
+                <input class="input" id="rule-step" name="slotStepMin" type="number" min="5" max="240" step="5" inputmode="numeric">
+                <p class="field__hint">Через сколько минут идут свободные окна: 30 — это 10:00, 10:30, 11:00.</p>
+                <p class="field__error" data-error-for="slotStepMin" hidden></p>
+              </div>
+              <div class="field">
+                <label class="field__label" for="rule-horizon">Горизонт записи, дней</label>
+                <input class="input" id="rule-horizon" name="bookingHorizonDays" type="number" min="1" max="365" inputmode="numeric">
+                <p class="field__hint">На сколько дней вперед клиент видит свободное время.</p>
+                <p class="field__error" data-error-for="bookingHorizonDays" hidden></p>
+              </div>
+              <div class="field">
+                <label class="field__label" for="rule-lead">Минимум до визита, минут</label>
+                <input class="input" id="rule-lead" name="minLeadMin" type="number" min="0" max="10080" inputmode="numeric">
+                <p class="field__hint">За сколько минут закрывается запись на ближайшее время: 120 — за два часа.</p>
+                <p class="field__error" data-error-for="minLeadMin" hidden></p>
+              </div>
+              <div class="field">
+                <label class="field__label" for="rule-deadline">Изменение записи, часов</label>
+                <input class="input" id="rule-deadline" name="clientChangeDeadlineHours" type="number" min="0" max="168" inputmode="numeric">
+                <p class="field__hint">За сколько часов до визита клиент еще может перенести или отменить запись сам.</p>
+                <p class="field__error" data-error-for="clientChangeDeadlineHours" hidden></p>
+              </div>
+              <div class="field">
+                <label class="field__label" for="rule-hold">Бронь времени, минут</label>
+                <input class="input" id="rule-hold" name="slotHoldMin" type="number" min="1" max="60" inputmode="numeric">
+                <p class="field__hint">Сколько времени выбранное окно держится за клиентом, пока он подтверждает запись.</p>
+                <p class="field__error" data-error-for="slotHoldMin" hidden></p>
+              </div>
+            </div>
+          </section>
+
+          <section class="admin-panel" aria-labelledby="settings-hours">
+            <h2 class="admin-panel__title" id="settings-hours">Режим работы студии</h2>
+            <div data-hours></div>
+            <p class="admin-panel__hint">Режим работы и особые дни студии этот экран пока не меняет: график мастера
+              задается в его карточке, а дни работы студии — через API.</p>
+          </section>
+
+          <div class="admin-form__actions">
+            <button class="btn btn--primary" type="submit">Сохранить</button>
+            <button class="btn btn--outline" type="button" data-reset>Отменить изменения</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

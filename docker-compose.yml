@@ -24,7 +24,7 @@ services:
 
     environment:
       # --- Адрес сервиса: из него строятся ссылки в письмах, в production нужен https ---
-      APP_URL: https://topbrohuman.ru
+      APP_URL: https://buty.topbrohuman.ru
 
       # --- Данные: все лежит в томе nogotochki-data, подключенном как /data (см. volumes ниже) ---
       # Файл базы. Образ задает тот же путь, здесь он написан явно, чтобы было видно связь с томом.

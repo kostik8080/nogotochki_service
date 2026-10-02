@@ -1,9 +1,11 @@
 // A-22 Карточка мастера (docs/ui-map.md, «Раздел администратора»): /admin/masters/form — новый мастер,
 // ?id=3 — изменение. Имя, специализация, опыт, рассказ; уровень «Мастер / Топ-мастер»; отметки услуг, которые
-// он выполняет (цена — по уровню); недельный график — только просмотр; «Активен»; «Удалить».
+// он выполняет (цена — по уровню); недельный график с формой «Новый график с даты» (A-22p); «Активен»; «Удалить».
 // Данные: GET /api/admin/masters, GET /api/admin/services, GET /api/studio (часовой пояс).
 // Кнопки: «Сохранить» — POST /api/admin/masters или PATCH /api/admin/masters/:id (при отключении в ответе —
-// предстоящие записи мастера); «Удалить» — DELETE /api/admin/masters/:id: удалить или только отключить, решает сервер.
+// предстоящие записи мастера); «Удалить» — DELETE /api/admin/masters/:id: удалить или только отключить, решает сервер;
+// «Сохранить график» — PUT /api/admin/masters/:id/schedule, сначала с dryRun: true, чтобы показать записи,
+// которые в новый график не попадают.
 // Клиентский выбор мастера (BOOK-02) показывает только активных мастеров, у которых отмечены все услуги визита.
 import { adminReady, handleAccessError, schedulePeriods, setFlash, studioToday } from './admin.js';
 import * as api from './api.js';
@@ -27,6 +29,8 @@ const masterId = idParam && /^\d+$/.test(idParam) ? Number(idParam) : null;
 let master = null;
 let catalog = { categories: [], services: [] };
 let timezone = 'Europe/Moscow';
+/** Режим работы студии по дням недели: в закрытый день график мастеру не задать. */
+let studioHours = [];
 
 const level = () => /** @type {HTMLInputElement | null} */ (form.querySelector('input[name="level"]:checked'))?.value ?? 'master';
 
@@ -115,6 +119,7 @@ function fill(today) {
   levelInput.checked = true;
   renderServices();
   renderSchedule(today);
+  /** @type {HTMLElement} */ (form.querySelector('[data-schedule-actions]')).hidden = !master;
   showStatus();
 }
 
@@ -201,12 +206,153 @@ deleteButton.addEventListener('click', async () => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// A-22p Новый график с даты
+// ---------------------------------------------------------------------------
+
+const scheduleBox = /** @type {HTMLElement} */ (form.querySelector('[data-schedule-form]'));
+const scheduleActions = /** @type {HTMLElement} */ (form.querySelector('[data-schedule-actions]'));
+const scheduleAlert = /** @type {HTMLElement} */ (form.querySelector('[data-schedule-alert]'));
+const scheduleDays = /** @type {HTMLElement} */ (form.querySelector('[data-schedule-days]'));
+const scheduleAffected = /** @type {HTMLElement} */ (form.querySelector('[data-schedule-affected]'));
+const scheduleSave = /** @type {HTMLButtonElement} */ (form.querySelector('[data-schedule-save]'));
+
+const WEEKDAY_SHORT = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+/** Показаны ли записи, которые не попадают в новый график: второе нажатие сохраняет график вместе с ними. */
+let affectedConfirmed = false;
+
+/** Действующий (последний) период графика мастера: его дни и часы подставляются в форму. */
+function currentPeriod() {
+  const rows = master?.schedule ?? [];
+  if (!rows.length) return null;
+  const validFrom = rows.map((r) => r.validFrom).sort().at(-1);
+  const days = rows.filter((r) => r.validFrom === validFrom);
+  return { weekdays: days.map((d) => d.weekday), start: days[0].start, end: days[0].end };
+}
+
+/** Флажки дней недели. День, в который студия закрыта, выбрать нельзя: слотов в нем все равно не будет. */
+function renderWeekdays(checked) {
+  const open = new Set(studioHours.map((h) => h.weekday));
+  scheduleDays.innerHTML = [1, 2, 3, 4, 5, 6, 7].map((weekday) => {
+    const isOpen = open.has(weekday);
+    const mark = checked.includes(weekday) && isOpen ? ' checked' : '';
+    return `<label class="admin-weekday${isOpen ? '' : ' is-off'}">
+      <input type="checkbox" name="scheduleWeekday" value="${weekday}"${mark}${isOpen ? '' : ' disabled'}>
+      <span>${WEEKDAY_SHORT[weekday]}</span>
+    </label>`;
+  }).join('');
+  const closed = [1, 2, 3, 4, 5, 6, 7].filter((d) => !open.has(d)).map((d) => WEEKDAY_SHORT[d]);
+  /** @type {HTMLElement} */ (form.querySelector('[data-schedule-studio]')).textContent = closed.length
+    ? `Студия закрыта: ${closed.join(', ')} — эти дни выбрать нельзя. Режим работы студии меняется отдельно.`
+    : 'Студия работает все дни недели.';
+}
+
+const checkedWeekdays = () => [...form.querySelectorAll('input[name="scheduleWeekday"]:checked')]
+  .map((i) => Number(/** @type {HTMLInputElement} */ (i).value));
+
+function openScheduleForm() {
+  const period = currentPeriod();
+  const today = studioToday(timezone);
+  // По прототипу новый график начинается с завтрашнего дня: сегодняшние слоты клиенты уже видели.
+  const tomorrow = new Date(`${today}T12:00:00Z`);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+
+  field('scheduleFrom').value = tomorrow.toISOString().slice(0, 10);
+  field('scheduleFrom').min = today;
+  field('scheduleStart').value = period?.start ?? studioHours[0]?.open ?? '10:00';
+  field('scheduleEnd').value = period?.end ?? studioHours[0]?.close ?? '20:00';
+  renderWeekdays(period?.weekdays ?? []);
+
+  affectedConfirmed = false;
+  scheduleAffected.hidden = true;
+  scheduleAffected.replaceChildren();
+  scheduleSave.textContent = 'Сохранить график';
+  scheduleAlert.hidden = true;
+  scheduleActions.hidden = true;
+  scheduleBox.hidden = false;
+  field('scheduleFrom').focus();
+}
+
+function closeScheduleForm() {
+  clearErrors(form, scheduleAlert);
+  scheduleBox.hidden = true;
+  scheduleActions.hidden = false;
+}
+
+/** Записи, которые в новый график не попадают: сервер их не трогает, разбирает администратор. */
+function showAffected(bookings) {
+  const intro = document.createElement('p');
+  intro.className = 'admin-panel__hint';
+  intro.textContent = `В новый график не попадают записи (${bookings.length}). Сами они не отменяются — перенесите или отмените их в разделе «Записи». Если график все равно нужен, нажмите «Сохранить всё равно»:`;
+  const list = document.createElement('ul');
+  list.className = 'admin-list';
+  for (const b of bookings) {
+    const item = document.createElement('li');
+    item.textContent = `${dateLabel(b.startsAt, timezone)}, ${timeLabel(b.startsAt, timezone)} · ${b.client?.name ?? ''} · ${b.items.map((i) => i.name).join(', ')}`;
+    list.append(item);
+  }
+  scheduleAffected.replaceChildren(intro, list);
+  scheduleAffected.hidden = false;
+  scheduleSave.textContent = 'Сохранить всё равно';
+  affectedConfirmed = true;
+}
+
+/** Проверка до отправки — для удобства; настоящая проверка на сервере. */
+function validateSchedule(validFrom, days, start, end) {
+  const today = studioToday(timezone);
+  return showErrors(form, {
+    scheduleFrom: !validFrom ? 'Укажите дату' : validFrom < today ? 'График может начаться не раньше сегодняшнего дня' : null,
+    scheduleDays: days.length ? null : 'Отметьте хотя бы один рабочий день',
+    scheduleStart: start ? null : 'Укажите начало смены',
+    scheduleEnd: !end ? 'Укажите конец смены' : start && end <= start ? 'Конец смены должен быть позже начала' : null,
+  });
+}
+
+/** @type {HTMLButtonElement} */ (form.querySelector('[data-schedule-open]')).addEventListener('click', openScheduleForm);
+/** @type {HTMLButtonElement} */ (form.querySelector('[data-schedule-cancel]')).addEventListener('click', closeScheduleForm);
+
+scheduleSave.addEventListener('click', async () => {
+  clearErrors(form, scheduleAlert);
+  const validFrom = field('scheduleFrom').value;
+  const start = field('scheduleStart').value;
+  const end = field('scheduleEnd').value;
+  const weekdays = checkedWeekdays();
+  if (!validateSchedule(validFrom, weekdays, start, end)) return;
+
+  // Часы у всех выбранных дней одинаковые: API принимает их для каждого дня отдельно (docs/ui-map.md, A-22p).
+  const days = weekdays.map((weekday) => ({ weekday, start, end }));
+  const done = setBusy(scheduleSave, affectedConfirmed ? 'Сохраняем…' : 'Проверяем…');
+  try {
+    // Сначала предпросмотр: показываем записи, которые выпадают из нового графика, и только потом сохраняем.
+    if (!affectedConfirmed) {
+      const preview = await api.setMasterSchedule(master.id, { validFrom, days, dryRun: true });
+      if (preview.affectedBookings?.length) {
+        done();
+        showAffected(preview.affectedBookings);
+        return;
+      }
+    }
+    const saved = await api.setMasterSchedule(master.id, { validFrom, days });
+    master = saved.master;
+    done();
+    renderSchedule(studioToday(timezone));
+    closeScheduleForm();
+    showAlert(alert, 'success', `График с ${dateLabel(validFrom + 'T12:00:00Z', timezone)} сохранен. Прежний действует по день накануне.`);
+  } catch (error) {
+    done();
+    if (handleAccessError(error)) return;
+    showServerError(form, scheduleAlert, error);
+  }
+});
+
 clearOnInput(form);
 
 async function load() {
   try {
     const [studio, masters, services] = await Promise.all([api.getStudio(), api.getAdminMasters(), api.getAdminServices()]);
     timezone = studio.timezone;
+    studioHours = studio.hours ?? [];
     catalog = services;
     if (masterId !== null) {
       master = masters.find((m) => m.id === masterId) ?? null;

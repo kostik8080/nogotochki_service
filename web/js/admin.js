@@ -26,6 +26,8 @@ const ICONS = {
   services: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 3v4M17 5h4M5 17v4M3 19h4"/>',
   // Человек — «Мастера» (lucide user-round)
   masters: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+  // Ползунки — «Настройки» студии (lucide sliders-horizontal)
+  settings: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
 };
 
 export const LOCK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
@@ -35,6 +37,7 @@ const ITEMS = [
   { href: routes.adminRequests, label: 'Заявки', icon: ICONS.requests },
   { href: routes.adminServices, label: 'Услуги', icon: ICONS.services },
   { href: routes.adminMasters, label: 'Мастера', icon: ICONS.masters },
+  { href: routes.adminSettings, label: 'Настройки', icon: ICONS.settings },
 ];
 
 /** Адрес текущей страницы раздела без «/» на конце: /admin, /admin/services. */
