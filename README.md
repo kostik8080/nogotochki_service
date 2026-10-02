@@ -241,7 +241,8 @@ npm run dev
 | [docs/pasport-produkta.md](docs/pasport-produkta.md) | Паспорт продукта: цель, роли, функции, сценарии, ограничения |
 | [docs/api.md](docs/api.md) | REST API: эндпоинты, коды ответов, время в UTC, деньги в копейках |
 | [docs/db-schema.md](docs/db-schema.md) | Схема базы данных |
-| [docs/database.md](docs/database.md) | Как устроена база в коде, почему так, правила изменений и журнал разработки |
+| [docs/database.md](docs/database.md) | Как устроена база в коде, почему так, правила изменений |
+| [docs/development-log.md](docs/development-log.md) | Журнал разработки и настройки, которые задаются на сервере |
 | [docs/karta-svyazey-prototipa.xlsx](docs/karta-svyazey-prototipa.xlsx) | Карта связей прототипа: экраны, переходы, сценарии |
 | [server/README.md](server/README.md) | Команды сервера, выкладка на хостинг, резервные копии |
 | [docs/ui-map.md](docs/ui-map.md) | Карта клиентских экранов: данные, кнопки и переходы каждого экрана |
