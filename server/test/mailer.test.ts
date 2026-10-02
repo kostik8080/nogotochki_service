@@ -9,6 +9,8 @@ let server: Server;
 let port: number;
 const commands: string[] = [];
 let data = '';
+/** Что учебный сервер объявляет в ответ на EHLO: так проверяются оба способа входа. */
+let authMechanism = 'PLAIN';
 
 before(async () => {
   server = createServer((socket) => {
@@ -31,8 +33,12 @@ before(async () => {
           continue;
         }
         commands.push(line);
-        if (line.startsWith('EHLO')) socket.write('250-test\r\n250 AUTH PLAIN\r\n');
+        if (line.startsWith('EHLO')) socket.write(`250-test\r\n250 AUTH ${authMechanism}\r\n`);
         else if (line.startsWith('AUTH PLAIN')) socket.write('235 ok\r\n');
+        // AUTH LOGIN идет в три шага: сервер дважды просит очередную часть ответом 334.
+        else if (line === 'AUTH LOGIN') socket.write('334 VXNlcm5hbWU6\r\n');
+        else if (commands.at(-2) === 'AUTH LOGIN') socket.write('334 UGFzc3dvcmQ6\r\n');
+        else if (commands.at(-3) === 'AUTH LOGIN') socket.write('235 ok\r\n');
         else if (line === 'DATA') {
           inData = true;
           socket.write('354 go\r\n');
@@ -60,6 +66,24 @@ it('отправляет письмо: вход, отправитель, пол�
   assert.equal(Buffer.from(subject, 'base64').toString(), 'Восстановление пароля');
   const body = data.split('\n\n')[1]!.replace(/\n/g, '');
   assert.equal(Buffer.from(body, 'base64').toString(), 'Ссылка: https://nogotochki.test/x');
+});
+
+it('входит по AUTH LOGIN, если сервер не предлагает PLAIN: так отвечает почта Beget', async () => {
+  authMechanism = 'LOGIN';
+  commands.length = 0;
+  try {
+    const mailer = new SmtpMailer({ host: '127.0.0.2', port, user: 'noreply@topbrohuman.ru', password: 'secret', from: 'Ноготочки <noreply@topbrohuman.ru>', allowInsecure: true });
+    await mailer.send({ to: 'maria@example.com', subject: 'Тема', text: 'Текст' });
+
+    // Ищем по месту команды AUTH LOGIN: в списке может оказаться QUIT предыдущего соединения.
+    const i = commands.indexOf('AUTH LOGIN');
+    assert.ok(i > 0, 'команда AUTH LOGIN не отправлена');
+    assert.equal(commands[i + 1], Buffer.from('noreply@topbrohuman.ru').toString('base64'));
+    assert.equal(commands[i + 2], Buffer.from('secret').toString('base64'));
+    assert.equal(commands[i + 3], 'MAIL FROM:<noreply@topbrohuman.ru>');
+  } finally {
+    authMechanism = 'PLAIN';
+  }
 });
 
 it('не передает пароль открытым текстом на удаленный сервер без STARTTLS', async () => {

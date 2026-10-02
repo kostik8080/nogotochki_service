@@ -1,6 +1,6 @@
 // Отправка писем с одноразовыми кодами и ссылками (паспорт: e-mail — только для кодов; SMS в сервисе нет).
 // SMTP-клиент написан на встроенных node:net и node:tls: у серверной сборки нет зависимостей.
-// Умеет ровно то, что нужно для писем с кодами: TLS сразу (порт 465) или STARTTLS, вход AUTH PLAIN,
+// Умеет ровно то, что нужно для писем с кодами: TLS сразу (порт 465) или STARTTLS, вход AUTH PLAIN или AUTH LOGIN,
 // одно письмо текстом в UTF-8 за соединение.
 import { Socket, connect as connectTcp } from 'node:net';
 import { connect as connectTls, type TLSSocket } from 'node:tls';
@@ -71,10 +71,7 @@ export class SmtpMailer implements Mailer {
         }
       }
 
-      if (o.user) {
-        const token = Buffer.from(`\0${o.user}\0${o.password ?? ''}`).toString('base64');
-        await command(socket, reader, `AUTH PLAIN ${token}`, 235);
-      }
+      if (o.user) await authenticate(socket, reader, features, o.user, o.password ?? '');
       await command(socket, reader, `MAIL FROM:<${address(o.from)}>`, 250);
       await command(socket, reader, `RCPT TO:<${address(mail.to)}>`, [250, 251]);
       await command(socket, reader, 'DATA', 354);
@@ -85,6 +82,30 @@ export class SmtpMailer implements Mailer {
       socket.end();
     }
   }
+}
+
+/**
+ * Вход на почтовый сервер. Способ выбирается по тому, что сервер объявил в ответе на EHLO:
+ * PLAIN — одной командой, LOGIN — в три шага, логин и пароль отдельными строками.
+ * Так нужно потому, что серверы объявляют разное: Яндекс — PLAIN, Beget — только LOGIN.
+ * Оба способа передают пароль открытым текстом, поэтому работают только поверх TLS: порт 465 или STARTTLS выше.
+ */
+async function authenticate(socket: Socket, reader: ReplyReader, features: string, user: string, password: string): Promise<void> {
+  const auth = /^250[- ]AUTH[ \t]+(.+)$/im.exec(features)?.[1]?.toUpperCase() ?? '';
+  const base64 = (value: string) => Buffer.from(value, 'utf8').toString('base64');
+
+  if (auth.includes('PLAIN')) {
+    await command(socket, reader, `AUTH PLAIN ${base64(`\0${user}\0${password}`)}`, 235);
+    return;
+  }
+  if (auth.includes('LOGIN')) {
+    // 334 — сервер просит очередную часть: сначала логин, потом пароль, оба в base64.
+    await command(socket, reader, 'AUTH LOGIN', 334);
+    await command(socket, reader, base64(user), 334);
+    await command(socket, reader, base64(password), 235);
+    return;
+  }
+  throw new Error('SMTP: сервер не предлагает вход по паролю — в ответе на EHLO нет ни AUTH PLAIN, ни AUTH LOGIN');
 }
 
 /** Адрес из «Имя <адрес>» или сам адрес. Переводы строк запрещены: иначе в команду можно подставить свою. */
