@@ -1,8 +1,8 @@
 /*
  * Экраны входа: AUTH-01 Вход, AUTH-03 Регистрация (с шагом AUTH-02 «код из письма»), AUTH-06 Восстановление
  * пароля, AUTH-08 Новый пароль. Карточка формы — как в Prototype/Прототип - Ноготочки.dc.html;
- * кнопки «Войти через Яндекс» в прототипе нет — она собрана из кнопки с рамкой дизайн-системы
- * (docs/ui-map.md, список 2, пункт 7);
+ * кнопки «Войти с Яндекс ID» в прототипе нет — она оформлена по требованиям Яндекса, а не по
+ * токенам проекта (docs/ui-map.md, список 2, пункт 7);
  * шапка и подвал — общие (base.css), поле страницы — светлая пудровая тема.
  */
 
@@ -97,22 +97,67 @@
   background: var(--color-divider);
 }
 
-/* Значок сервиса в кнопке: круг цвета blush с акцентным текстом — значений вне tokens.css нет */
-.provider-mark {
-  display: inline-flex;
+/* ---------- Кнопка «Войти с Яндекс ID» ----------
+ * Единственное место в клиентской части, где значения взяты не из tokens.css. Яндекс запрещает
+ * менять цвет кнопки, толщину обводки и ее содержимое — текст, иконку и отступы между элементами
+ * внутри кнопки (yandex.ru/dev/id/doc/ru/codes/buttons-design). Менять можно тип, цветовую тему,
+ * скругление и размер с сохранением пропорций, поэтому значения ниже — ровно те, что выдает
+ * конструктор кнопок Яндекса (yandex.ru/dev/id/doc/ru/suggest/but-const) для выбранного варианта:
+ *   тип        — дополнительная версия (белая кнопка с черной обводкой): основная версия сплошь
+ *                черная и перебивала бы розовую кнопку «Войти» — главное действие экрана;
+ *   тема       — светлая: карточка входа белая (тема powder);
+ *   размер     — L, высота 48 px: ближе всего к кнопке формы (у нее 48 px);
+ *   скругление — 4 px, как у полей и кнопок прототипа (единственное значение из tokens.css:
+ *                скругление Яндекс менять разрешает).
+ * Токены отвечают за то, что вокруг кнопки: ширину колонки и отступы до соседних элементов.
+ */
+
+.ya-id-button {
+  box-sizing: border-box;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--space-6);
-  height: var(--space-6);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-accent);
-  color: var(--color-text-accent);
-  font-family: var(--font-display);
-  font-size: var(--text-body-s-size);
-  font-weight: var(--text-h1-weight);
-  line-height: 1;
-  letter-spacing: 0;
-  text-transform: none;
+  width: 100%;
+  min-width: 176px;
+  height: 48px;
+  margin: 0;
+  padding: 11px 13px;
+  background-color: #FFFFFF;
+  color: #000000;
+  border: 1px solid #000000;
+  border-radius: var(--radius-control);
+  font-family: 'YS Text', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Логотип Яндекса: красный квадрат из web/img/yandex-id-logo.svg, скругленный в круг */
+.ya-id-button__logo {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-image: url('../img/yandex-id-logo.svg');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+/* 16 px между иконкой и текстом — отступ самой кнопки Яндекса, менять его нельзя */
+.ya-id-button__text {
+  margin-left: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Пока браузер уходит в Яндекс и возвращается: цвета не трогаем, кнопка только гаснет */
+.ya-id-button[disabled] {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .auth__note {

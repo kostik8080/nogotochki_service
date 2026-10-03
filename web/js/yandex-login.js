@@ -1,4 +1,4 @@
-// Кнопка «Войти через Яндекс» на AUTH-01 Вход и AUTH-03 Регистрация (docs/ui-map.md).
+// Кнопка «Войти с Яндекс ID» на AUTH-01 Вход и AUTH-03 Регистрация (docs/ui-map.md).
 // В прототипе этой кнопки нет: функция появилась после него (docs/ui-map.md, список 2, пункт 7).
 //
 // Как идет вход:
@@ -42,6 +42,19 @@ const store = {
   },
 };
 
+/**
+ * Кнопка Яндекса на время запроса только выключается: менять ее содержимое — текст и иконку —
+ * Яндекс запрещает (css/auth.css), поэтому о ходе входа говорит плашка сообщений карточки.
+ * @param {HTMLButtonElement | null} button
+ * @param {boolean} busy
+ */
+function setBusy(button, busy) {
+  if (!button) return;
+  button.disabled = busy;
+  if (busy) button.setAttribute('aria-busy', 'true');
+  else button.removeAttribute('aria-busy');
+}
+
 /** Убрать code, state и error из адреса: при обновлении страницы они уже не нужны и сбивают с толку. */
 function cleanUrl() {
   window.history.replaceState(null, '', window.location.pathname);
@@ -50,7 +63,7 @@ function cleanUrl() {
 /**
  * Кнопка внешнего входа и возвращение из Яндекса.
  * @param {object} options
- * @param {HTMLButtonElement | null} options.button кнопка «Войти через Яндекс»
+ * @param {HTMLButtonElement | null} options.button кнопка «Войти с Яндекс ID»
  * @param {HTMLElement | null} options.alert плашка сообщений той же карточки
  * @param {(user: { roles: string[] }) => string} options.after куда перейти после входа
  */
@@ -59,10 +72,8 @@ export function bindYandexLogin({ button, alert, after }) {
 
   if (!button) return;
   button.addEventListener('click', async () => {
-    const label = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Открываем Яндекс…';
-    if (alert) alert.hidden = true;
+    setBusy(button, true);
+    if (alert) showAlert(alert, 'warning', 'Открываем Яндекс…');
     try {
       const { url, state } = await api.startYandexLogin();
       store.set(STATE_KEY, state);
@@ -71,8 +82,7 @@ export function bindYandexLogin({ button, alert, after }) {
       if (next) store.set(NEXT_KEY, next);
       window.location.assign(url);
     } catch (error) {
-      button.disabled = false;
-      button.textContent = label;
+      setBusy(button, false);
       // Ошибку показываем текстом на экране, а не только в консоли (docs/frontend-rules.md, правило 7)
       const message = error instanceof api.ApiError ? error.message : 'Не удалось открыть вход через Яндекс. Попробуйте еще раз.';
       if (alert) showAlert(alert, 'error', message);
@@ -103,14 +113,11 @@ async function finishLogin({ button, alert, after }) {
 
   // Код пришел не с нашего входа: так бывает по чужой ссылке. Вход не начинаем.
   if (savedState && params.get('state') !== savedState) {
-    if (alert) showAlert(alert, 'error', 'Вход через Яндекс не завершен: ссылка не совпадает с начатым входом. Нажмите «Войти через Яндекс» еще раз.');
+    if (alert) showAlert(alert, 'error', 'Вход через Яндекс не завершен: ссылка не совпадает с начатым входом. Нажмите «Войти с Яндекс ID» еще раз.');
     return;
   }
 
-  if (button) {
-    button.disabled = true;
-    button.textContent = 'Завершаем вход…';
-  }
+  setBusy(button, true);
   if (alert) showAlert(alert, 'warning', 'Завершаем вход через Яндекс…');
   try {
     const { user } = await api.loginWithYandex({ code });
@@ -118,10 +125,7 @@ async function finishLogin({ button, alert, after }) {
     if (savedNext) window.history.replaceState(null, '', `${window.location.pathname}?next=${encodeURIComponent(savedNext)}`);
     window.location.assign(after(user));
   } catch (failure) {
-    if (button) {
-      button.disabled = false;
-      button.textContent = 'Войти через Яндекс';
-    }
+    setBusy(button, false);
     const message = failure instanceof api.ApiError ? failure.message : 'Не удалось завершить вход через Яндекс. Попробуйте еще раз.';
     if (alert) showAlert(alert, 'error', message);
   }

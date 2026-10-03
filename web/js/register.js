@@ -39,7 +39,7 @@ bindPasswordHints(input(form, 'password'), form.querySelector('[data-password-ru
 clearOnInput(form);
 clearOnInput(codeForm);
 
-// Кнопка «Войти через Яндекс»: аккаунт создается без пароля и кода, дальше — как после регистрации
+// Кнопка «Войти с Яндекс ID»: аккаунт создается без пароля и кода, дальше — как после регистрации
 bindYandexLogin({ button: document.querySelector('[data-yandex-login]'), alert, after: afterRegister });
 
 /** Тело запроса, отправленное последним: на шаге кода оно повторяется с полем code. */

@@ -205,7 +205,7 @@ export async function register(body) {
 /**
  * Ссылка для нового пароля на e-mail аккаунта. Ответ всегда одинаковый (202), есть такой аккаунт или нет.
  * Исключение — аккаунт без пароля: ответ 200 с `provider: 'yandex'`, письма нет, в такой аккаунт входят
- * кнопкой «Войти через Яндекс».
+ * кнопкой «Войти с Яндекс ID».
  * @param {{ login: string }} body
  * @returns {Promise<{ message: string, provider?: string }>}
  */

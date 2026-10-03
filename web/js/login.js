@@ -27,7 +27,7 @@ if (safeNext('') === routes.bookingTimeStep) {
 bindPasswordToggle(passwordInput, form.querySelector('[data-password-toggle]'));
 clearOnInput(form);
 
-// Кнопка «Войти через Яндекс» рядом с формой: ведет туда же, куда вход по паролю
+// Кнопка «Войти с Яндекс ID» рядом с формой: ведет туда же, куда вход по паролю
 bindYandexLogin({ button: document.querySelector('[data-yandex-login]'), alert, after: homeAfterLogin });
 
 try {
