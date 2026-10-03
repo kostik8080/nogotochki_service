@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Страницу отдает сервер API по адресу /admin/clients только администратору (server/src/web/admin-pages.ts).
+       Все относительные адреса — от корня сайта: страница открывается не из корня. -->
+  <base href="/">
+  <title>Клиенты — раздел администратора — Ноготочки</title>
+  <!-- Значок вкладки: эмблема студии (favicon.svg), крупная иконка — для закладок и телефона -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="img/app-icon.png" type="image/png" sizes="512x512">
+  <link rel="apple-touch-icon" href="img/app-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/admin-clients.js"></script>
+</head>
+<body class="admin-body">
+  <a class="skip-link" href="/admin/clients#main">К содержимому</a>
+
+  <!-- Общая шапка сервиса: логотип и меню аккаунта — js/header.js -->
+  <client-header></client-header>
+
+  <div class="admin">
+    <!-- Меню раздела: появляется после проверки роли — js/admin.js -->
+    <admin-nav></admin-nav>
+
+    <!-- A-07 Клиенты (docs/ui-map.md, «Раздел администратора») -->
+    <main class="admin__main" id="main" data-theme="admin" data-admin-main>
+      <div class="admin__loading" data-view="loading" aria-busy="true">
+        <span class="skeleton skeleton--heading" aria-hidden="true"></span>
+        <span class="visually-hidden">Загружаем раздел…</span>
+      </div>
+
+      <div class="admin-state" role="alert" data-view="error" hidden>
+        <p class="admin-state__title">Не удалось открыть раздел</p>
+        <p class="admin-state__text" data-error-text></p>
+        <div class="admin-state__actions">
+          <button class="btn btn--primary btn--small" type="button" data-retry>Повторить</button>
+        </div>
+      </div>
+
+      <div data-view="content" hidden>
+        <p class="alert admin-flash" role="status" data-flash hidden></p>
+
+        <div class="admin-head">
+          <div>
+            <p class="admin__eyebrow">Раздел администратора</p>
+            <h1 class="admin__title">Клиенты</h1>
+          </div>
+          <p class="admin-head__summary" data-summary></p>
+        </div>
+
+        <!-- Поиск и фильтры: список перезапрашивается на сервере — js/admin-clients.js -->
+        <form class="admin-toolbar" role="search" data-search-form novalidate>
+          <div class="field">
+            <label class="field__label" for="client-search">Поиск</label>
+            <input class="input" id="client-search" name="search" type="search" maxlength="100"
+              placeholder="Имя, телефон или e-mail" autocomplete="off">
+            <p class="field__hint">Телефон можно вводить как угодно: «916 555» найдет +7 916 555-…</p>
+          </div>
+          <button class="btn btn--outline btn--small" type="submit">Найти</button>
+        </form>
+
+        <div class="view-switch view-switch--wrap" role="radiogroup" aria-label="Кого показывать">
+          <input type="radio" id="filter-all" name="filter" value="" checked>
+          <label for="filter-all">Все</label>
+          <input type="radio" id="filter-new" name="filter" value="new">
+          <label for="filter-new">Новые</label>
+          <input type="radio" id="filter-regular" name="filter" value="regular">
+          <label for="filter-regular">Постоянные</label>
+          <input type="radio" id="filter-lapsed" name="filter" value="lapsed">
+          <label for="filter-lapsed">Давно не приходили</label>
+          <input type="radio" id="filter-blacklist" name="filter" value="blacklist">
+          <label for="filter-blacklist">В черном списке</label>
+        </div>
+
+        <p class="alert" role="status" data-action-alert hidden></p>
+
+        <div data-page-loading aria-busy="true">
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем клиентов…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <!-- Список клиентов с доступом к учетной записи — js/admin-clients.js -->
+        <div data-list></div>
+
+        <div class="admin-pager" data-pager hidden>
+          <button class="btn btn--outline btn--small" type="button" data-prev>‹ Назад</button>
+          <span class="admin-pager__status" data-pager-status></span>
+          <button class="btn btn--outline btn--small" type="button" data-next>Вперед ›</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Подтверждение: закрытие доступа обрывает чужую работу, поэтому спрашиваем -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="block-title" data-block-dialog>
+    <p class="modal__title modal__title--display" id="block-title">Закрыть доступ к учетной записи?</p>
+    <p class="modal__meta" data-block-who></p>
+    <p class="modal__text">Все сессии этой учетной записи закроются сразу, а удержанное время освободится.
+      Войти снова человек не сможет, пока вы не откроете доступ. Записи, история визитов и карточка остаются
+      на месте.</p>
+    <div class="alert alert--error" role="alert" data-block-error hidden></div>
+    <div class="modal__actions">
+      <button class="btn btn--outline" type="button" data-block-cancel>Отмена</button>
+      <button class="btn btn--danger" type="button" data-block-confirm>Закрыть доступ</button>
+    </div>
+  </dialog>
+</body>
+</html>

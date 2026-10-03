@@ -510,6 +510,35 @@ export async function findAdminClients(search, limit = 8) {
   return (await request('GET', '/api/admin/clients?' + query.toString())).clients;
 }
 
+// ---------- Клиентская база и доступ к учетным записям ----------
+
+/**
+ * Клиенты студии (A-07): `{ total, limit, offset, clients }`. У клиента — `name`, `phone`, `email`,
+ * `hasAccount`, `visits` (завершенные визиты), `lastVisit`, `totalSpentKop`, `favoriteMaster`,
+ * `tags` (`new`, `regular`, `lapsed`), `isBlacklisted`, `isBlocked` (доступ закрыт администратором).
+ * @param {{ search?: string, filter?: 'new' | 'regular' | 'lapsed' | 'blacklist',
+ *   sort?: 'name' | 'lastVisit' | 'visits', limit?: number, offset?: number }} [params]
+ */
+export function getAdminClients(params = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  }
+  const qs = query.toString();
+  return request('GET', '/api/admin/clients' + (qs ? '?' + qs : ''));
+}
+
+/**
+ * Закрыть доступ учетной записи (паспорт, функция 1 администратора): все ее сессии закрываются сразу,
+ * бронь времени снимается, записи и история остаются. 403 — свою учетную запись закрыть нельзя;
+ * 404 — такой учетной записи нет.
+ * @param {number} userId номер пользователя, а не клиента в карточке: у мастера это `account.userId`
+ */
+export const blockUser = (userId) => request('PUT', adminPath('/api/admin/users', userId) + '/block');
+
+/** Открыть доступ обратно: 200. Прежние сессии не возвращаются — человек входит заново. */
+export const unblockUser = (userId) => request('DELETE', adminPath('/api/admin/users', userId) + '/block');
+
 // ---------- Уведомления клиента в кабинете ----------
 
 /**

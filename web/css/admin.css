@@ -516,6 +516,82 @@ admin-nav {
   }
 }
 
+/* ---------- A-07 Клиенты: поиск, фильтры, доли столбцов и страницы ---------- */
+
+/* Доли столбцов у клиентов свои: у таблицы услуг другие колонки */
+@media (min-width: 768px) {
+  .admin-table--clients th:nth-child(1) {
+    width: 26%;
+  }
+
+  .admin-table--clients th:nth-child(2) {
+    width: 20%;
+  }
+
+  .admin-table--clients th:nth-child(3) {
+    width: 14%;
+  }
+
+  .admin-table--clients th:nth-child(4) {
+    width: 16%;
+  }
+
+  .admin-table--clients th:nth-child(5) {
+    width: 24%;
+  }
+}
+
+/* Инициалы в строке клиента: меньше, чем в шапке, и не растягивают строку */
+.admin-table--clients .avatar {
+  width: var(--space-6);
+  height: var(--space-6);
+  margin-right: var(--space-2);
+  font-size: var(--text-caption-size);
+  vertical-align: middle;
+}
+
+/* Кнопка доступа под бейджем: на узком столбце в одну строку они не помещаются */
+.admin-table__action {
+  display: block;
+  margin-top: var(--space-2);
+}
+
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  max-width: calc(var(--space-24) * 5);
+  margin-bottom: var(--space-4);
+}
+
+.admin-toolbar .field {
+  flex: 1;
+  min-width: calc(var(--space-24) * 2);
+  margin-bottom: 0;
+}
+
+/* Пять фильтров в строку не влезают на телефоне */
+.view-switch--wrap {
+  flex-wrap: wrap;
+  align-self: flex-start;
+  margin-bottom: var(--space-5);
+}
+
+.admin-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.admin-pager__status {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Форма новой категории над списком */
 .admin-inline-form {
   display: flex;

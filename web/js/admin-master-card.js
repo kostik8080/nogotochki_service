@@ -6,6 +6,8 @@
 // предстоящие записи мастера); «Удалить» — DELETE /api/admin/masters/:id: удалить или только отключить, решает сервер;
 // «Сохранить график» — PUT /api/admin/masters/:id/schedule, сначала с dryRun: true, чтобы показать записи,
 // которые в новый график не попадают.
+// Блок «Учетная запись»: вход мастера и доступ к нему — PUT и DELETE /api/admin/users/:id/block
+// (паспорт, функция 1 администратора). Номер пользователя берется из `account.userId` мастера.
 // Клиентский выбор мастера (BOOK-02) показывает только активных мастеров, у которых отмечены все услуги визита.
 import { adminReady, handleAccessError, schedulePeriods, setFlash, studioToday } from './admin.js';
 import * as api from './api.js';
@@ -23,6 +25,14 @@ const servicesSlot = /** @type {HTMLElement} */ (form.querySelector('[data-servi
 const deleteButton = /** @type {HTMLButtonElement} */ (form.querySelector('[data-delete]'));
 const field = (name) => /** @type {HTMLInputElement} */ (form.elements.namedItem(name));
 
+// Блок «Учетная запись»: доступ мастера к разделу /master закрывает и открывает администратор
+const accountPanel = /** @type {HTMLElement} */ (form.querySelector('[data-account-panel]'));
+const accountText = /** @type {HTMLElement} */ (form.querySelector('[data-account-text]'));
+const accountAlert = /** @type {HTMLElement} */ (form.querySelector('[data-account-alert]'));
+const accountActions = /** @type {HTMLElement} */ (form.querySelector('[data-account-actions]'));
+const blockButton = /** @type {HTMLButtonElement} */ (form.querySelector('[data-account-block]'));
+const unblockButton = /** @type {HTMLButtonElement} */ (form.querySelector('[data-account-unblock]'));
+
 const idParam = new URLSearchParams(window.location.search).get('id');
 const masterId = idParam && /^\d+$/.test(idParam) ? Number(idParam) : null;
 /** Мастер, каким его отдал сервер; null — новый. */
@@ -39,6 +49,57 @@ function showStatus() {
     ? `<span class="admin-badge admin-badge--${master.isActive ? 'on' : 'off'}">${master.isActive ? 'Активен' : 'Отключен'}</span>`
     : '';
 }
+
+/**
+ * Учетная запись мастера: есть ли она и закрыт ли доступ. Доступ и «Активен» — разные вещи:
+ * отключенный мастер пропадает у клиентов, но в свое расписание входит, а закрытый доступ рвет его сессии
+ * и не пускает в сервис, при этом в записях и в расписании он остается.
+ */
+function showAccount() {
+  accountPanel.hidden = !master;
+  if (!master) return;
+  const account = master.account ?? null;
+  if (!account) {
+    accountText.textContent = 'Учетной записи нет: мастер не может войти и посмотреть свое расписание. '
+      + 'Ее заводит администратор — пока только запросом к API.';
+    accountActions.hidden = true;
+    return;
+  }
+  const login = [account.email, account.phone].filter(Boolean).join(' · ');
+  accountText.textContent = account.isBlocked
+    ? `Вход: ${login}. Доступ закрыт — мастер в сервис не войдет, в записях и расписании он остается.`
+    : `Вход: ${login}. Доступ открыт — мастер видит свое расписание и подает заявки.`;
+  accountActions.hidden = false;
+  blockButton.hidden = account.isBlocked;
+  unblockButton.hidden = !account.isBlocked;
+}
+
+/** Закрыть или открыть доступ к учетной записи мастера и перечитать карточку. */
+async function setAccess(button, blocked) {
+  const done = setBusy(button, blocked ? 'Закрываем…' : 'Открываем…');
+  accountAlert.hidden = true;
+  try {
+    const userId = master.account.userId;
+    if (blocked) await api.blockUser(userId);
+    else await api.unblockUser(userId);
+    const masters = await api.getAdminMasters();
+    master = masters.find((m) => m.id === master.id) ?? master;
+    done();
+    showAccount();
+    showAlert(accountAlert, 'success', blocked
+      ? `Доступ закрыт: ${master.name} больше не сможет войти, пока вы не откроете доступ. Сессии этой учетной записи уже закрыты.`
+      : `Доступ открыт: ${master.name} снова может войти прежним паролем.`);
+  } catch (error) {
+    done();
+    if (handleAccessError(error)) return;
+    showAlert(accountAlert, 'error', error instanceof api.ApiError
+      ? error.message
+      : 'Не удалось изменить доступ. Попробуйте еще раз.');
+  }
+}
+
+blockButton.addEventListener('click', () => setAccess(blockButton, true));
+unblockButton.addEventListener('click', () => setAccess(unblockButton, false));
 
 /** Отметки услуг по категориям; цена — по выбранному уровню. Отмеченные сохраняются при перерисовке. */
 function renderServices() {
@@ -121,6 +182,7 @@ function fill(today) {
   renderSchedule(today);
   /** @type {HTMLElement} */ (form.querySelector('[data-schedule-actions]')).hidden = !master;
   showStatus();
+  showAccount();
 }
 
 function values() {

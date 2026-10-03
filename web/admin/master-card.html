@@ -176,6 +176,17 @@
               Его предстоящие записи не отменяются сами: после отключения появится их список.</p>
           </section>
 
+          <!-- Учетная запись мастера: вход в раздел /master и доступ к нему. Видна только у заведенного мастера -->
+          <section class="admin-panel" aria-labelledby="master-account" data-account-panel hidden>
+            <h2 class="admin-panel__title" id="master-account">Учетная запись</h2>
+            <p class="admin-panel__hint" data-account-text></p>
+            <div class="alert" role="status" data-account-alert hidden></div>
+            <div class="admin-form__actions" data-account-actions hidden>
+              <button class="btn btn--danger btn--small" type="button" data-account-block>Закрыть доступ</button>
+              <button class="btn btn--outline btn--small" type="button" data-account-unblock hidden>Открыть доступ</button>
+            </div>
+          </section>
+
           <div class="admin-form__actions">
             <button class="btn btn--primary" type="submit">Сохранить</button>
             <a class="btn btn--outline" href="/admin/masters">Отмена</a>
