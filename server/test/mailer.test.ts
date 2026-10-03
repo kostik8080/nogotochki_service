@@ -62,6 +62,8 @@ it('отправляет письмо: вход, отправитель, пол�
   assert.equal(commands[2], 'MAIL FROM:<noreply@nogotochki.test>');
   assert.equal(commands[3], 'RCPT TO:<maria@example.com>');
   assert.match(data, /Subject: =\?UTF-8\?B\?/);
+  // Номер письма ставим мы сами: без него принимающий сервер придумывает свой, а фильтры это не любят.
+  assert.match(data, /Message-ID: <[^<>@\s]+@nogotochki\.test>/);
   const subject = /Subject: =\?UTF-8\?B\?([^?]+)\?=/.exec(data)![1]!;
   assert.equal(Buffer.from(subject, 'base64').toString(), 'Восстановление пароля');
   const body = data.split('\n\n')[1]!.replace(/\n/g, '');

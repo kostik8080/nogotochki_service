@@ -2,6 +2,7 @@
 // SMTP-клиент написан на встроенных node:net и node:tls: у серверной сборки нет зависимостей.
 // Умеет ровно то, что нужно для писем с кодами: TLS сразу (порт 465) или STARTTLS, вход AUTH PLAIN или AUTH LOGIN,
 // одно письмо текстом в UTF-8 за соединение.
+import { randomUUID } from 'node:crypto';
 import { Socket, connect as connectTcp } from 'node:net';
 import { connect as connectTls, type TLSSocket } from 'node:tls';
 
@@ -118,6 +119,11 @@ function address(value: string): string {
 
 const ehloName = () => 'nogotochki.local';
 
+/** Домен отправителя для Message-ID: часть адреса после «@». Без адреса — имя, которым мы представляемся. */
+function domainOf(from: string): string {
+  return address(from).split('@')[1] ?? ehloName();
+}
+
 /** Заголовок в UTF-8 по RFC 2047: тема письма на русском. */
 const encodeHeader = (value: string) => `=?UTF-8?B?${Buffer.from(value).toString('base64')}?=`;
 
@@ -128,6 +134,10 @@ function message(from: string, mail: Mail): string {
     `To: <${address(mail.to)}>`,
     `Subject: ${encodeHeader(mail.subject)}`,
     `Date: ${new Date().toUTCString()}`,
+    // Опознавательный номер письма. Он обязателен по стандарту (RFC 5322), и без него принимающий сервер
+    // придумывает его сам, а часть фильтров считает письмо без номера подозрительным. Домен берется
+    // из адреса отправителя: по номеру видно, кто письмо отправил.
+    `Message-ID: <${randomUUID()}@${domainOf(from)}>`,
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8',
     'Content-Transfer-Encoding: base64',
