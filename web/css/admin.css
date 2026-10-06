@@ -592,6 +592,53 @@ admin-nav {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- A-09 Карточка клиента: сводка по визитам и заметки ---------- */
+
+.client-stats {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 768px) {
+  .client-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.client-stat dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+}
+
+.client-stat dd {
+  margin: 0;
+  font-weight: var(--text-label-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.client-notes {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.client-note {
+  padding: var(--space-4);
+  background: var(--color-surface-accent);
+  border-radius: var(--radius-card);
+}
+
+.client-note__text {
+  white-space: pre-wrap;
+}
+
+.client-note__meta {
+  margin: var(--space-2) 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+}
+
 /* Форма новой категории над списком */
 .admin-inline-form {
   display: flex;

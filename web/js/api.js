@@ -540,6 +540,61 @@ export function getAdminClients(params = {}) {
 }
 
 /**
+ * Карточка клиента (A-09): контакты и подтверждены ли они, `profile` (дата рождения, источник, «Важно»),
+ * `blacklist` (причина, дата, автор), `stats` (визиты, отмены, неявки, первый и последний визит, средний чек),
+ * `bookings` — все записи клиента, `notes` — заметки, у заметки со слов мастера заполнен `master`.
+ * 404 — такого клиента нет.
+ * @param {number} id
+ */
+export async function getAdminClient(id) {
+  return (await request('GET', adminPath('/api/admin/clients', id))).client;
+}
+
+/**
+ * Новый клиент без учетной записи (A-02, сценарий 16): имя и телефон, e-mail по желанию.
+ * 409 PHONE_TAKEN — такой номер уже есть.
+ * @param {{ name: string, phone?: string, email?: string }} body
+ */
+export async function createAdminClient(body) {
+  return (await request('POST', '/api/admin/clients', body)).client;
+}
+
+/**
+ * Изменить карточку: `name`, `phone`, `email`, `birthDate`, `acquisitionSource`, `importantNote`.
+ * Новый контакт считается неподтвержденным. В ответе — обновленная карточка.
+ * @param {number} id
+ * @param {Record<string, unknown>} body только измененные поля
+ */
+export async function updateAdminClient(id, body) {
+  return (await request('PATCH', adminPath('/api/admin/clients', id), body)).client;
+}
+
+/**
+ * Внести в черный список. `reason` обязательна — ее видит администратор в карточке.
+ * @param {number} id
+ * @param {string} reason
+ */
+export async function blacklistClient(id, reason) {
+  return (await request('PUT', adminPath('/api/admin/clients', id) + '/blacklist', { reason })).client;
+}
+
+/** Убрать из черного списка. */
+export async function unblacklistClient(id) {
+  return (await request('DELETE', adminPath('/api/admin/clients', id) + '/blacklist')).client;
+}
+
+/**
+ * Заметка о клиенте. `masterId` — заметка «со слов мастера»: вносит ее все равно администратор.
+ * @param {number} id
+ * @param {{ text: string, masterId?: number }} body
+ */
+export const addClientNote = (id, body) => request('POST', adminPath('/api/admin/clients', id) + '/notes', body);
+
+/** Удалить заметку: 204. */
+export const deleteClientNote = (id, noteId) =>
+  request('DELETE', `${adminPath('/api/admin/clients', id)}/notes/${encodeURIComponent(String(noteId))}`);
+
+/**
  * Закрыть доступ учетной записи (паспорт, функция 1 администратора): все ее сессии закрываются сразу,
  * бронь времени снимается, записи и история остаются. 403 — свою учетную запись закрыть нельзя;
  * 404 — такой учетной записи нет.

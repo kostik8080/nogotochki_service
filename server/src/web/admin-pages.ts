@@ -17,6 +17,7 @@ const ADMIN_PAGES: Record<string, string> = {
   '/admin': 'admin/bookings.html',
   '/admin/requests': 'admin/requests.html',
   '/admin/clients': 'admin/clients.html',
+  '/admin/clients/card': 'admin/client-card.html',
   '/admin/services': 'admin/services.html',
   '/admin/services/form': 'admin/service-form.html',
   '/admin/masters': 'admin/masters.html',

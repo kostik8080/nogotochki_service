@@ -11,11 +11,13 @@
 // Кнопки: «Закрыть доступ» — PUT /api/admin/users/:id/block (с подтверждением: у человека сразу закроются
 // все сессии), «Открыть доступ» — DELETE того же адреса.
 //
-// Чего на экране пока нет: карточки клиента A-09 с историей визитов, заметками и «Важно», быстрого
-// просмотра A-08, добавления клиента и черного списка A-11 — это отдельная задача, здесь только список.
+// Имя клиента ведет в карточку A-09 (js/admin-client-card.js): там «Важно», заметки, черный список,
+// сводка по визитам и история записей. Чего на экране нет: быстрого просмотра A-08 из прототипа —
+// карточка открывается сразу, отдельная панель не понадобилась.
 import { adminReady, handleAccessError } from './admin.js';
 import * as api from './api.js';
 import { dateLabel, escapeHtml as esc, initials, money, phone as formatPhone, plural } from './format.js';
+import { routes } from './routes.js';
 
 const $ = (selector, root = document) => /** @type {HTMLElement} */ (root.querySelector(selector));
 
@@ -67,7 +69,7 @@ function row(c) {
     <tr${c.isBlocked ? ' class="is-off"' : ''}>
       <td class="admin-table__name" data-label="Клиент">
         <span class="avatar" aria-hidden="true">${esc(initials(c.name))}</span>
-        ${esc(c.name)}
+        <a href="${esc(routes.adminClientCard(c.id))}">${esc(c.name)}</a>
         ${c.isBlacklisted ? badge('off', 'Черный список') : ''}
         ${tag ? badge(tag.cls, tag.label) : ''}
       </td>

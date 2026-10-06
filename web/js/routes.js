@@ -28,6 +28,8 @@ export const routes = {
   adminRequests: '/admin/requests',
   /** A-07 Клиенты: список, поиск и доступ к учетным записям */
   adminClients: '/admin/clients',
+  /** A-09 Карточка клиента: контакты, «Важно», заметки, черный список, история визитов */
+  adminClientCard: (id) => '/admin/clients/card?id=' + encodeURIComponent(String(id)),
   /** A-26 Настройки студии: контакты, правила записи, режим технических работ */
   adminSettings: '/admin/settings',
 

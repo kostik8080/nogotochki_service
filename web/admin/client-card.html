@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Страницу отдает сервер API по адресу /admin/clients/card только администратору
+       (server/src/web/admin-pages.ts). Все относительные адреса — от корня сайта. -->
+  <base href="/">
+  <title>Карточка клиента — раздел администратора — Ноготочки</title>
+  <!-- Значок вкладки: эмблема студии (favicon.svg), крупная иконка — для закладок и телефона -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="img/app-icon.png" type="image/png" sizes="512x512">
+  <link rel="apple-touch-icon" href="img/app-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/admin-client-card.js"></script>
+</head>
+<body class="admin-body">
+  <a class="skip-link" href="/admin/clients/card#main">К содержимому</a>
+
+  <!-- Общая шапка сервиса: логотип и меню аккаунта — js/header.js -->
+  <client-header></client-header>
+
+  <div class="admin">
+    <!-- Меню раздела: появляется после проверки роли — js/admin.js -->
+    <admin-nav></admin-nav>
+
+    <!-- A-09 Карточка клиента (docs/ui-map.md, «Раздел администратора») -->
+    <main class="admin__main" id="main" data-theme="admin" data-admin-main>
+      <div class="admin__loading" data-view="loading" aria-busy="true">
+        <span class="skeleton skeleton--heading" aria-hidden="true"></span>
+        <span class="visually-hidden">Загружаем раздел…</span>
+      </div>
+
+      <div class="admin-state" role="alert" data-view="error" hidden>
+        <p class="admin-state__title">Не удалось открыть раздел</p>
+        <p class="admin-state__text" data-error-text></p>
+        <div class="admin-state__actions">
+          <button class="btn btn--primary btn--small" type="button" data-retry>Повторить</button>
+        </div>
+      </div>
+
+      <div data-view="content" hidden>
+        <a class="admin-back" href="/admin/clients">← Клиенты</a>
+
+        <div data-page-loading aria-busy="true">
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем карточку…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <div data-card hidden>
+          <div class="admin-head">
+            <div>
+              <p class="admin__eyebrow">Карточка клиента</p>
+              <h1 class="admin__title" data-title>Клиент</h1>
+              <p class="admin-head__summary" data-contacts></p>
+            </div>
+            <div class="admin-head__actions" data-badges></div>
+          </div>
+
+          <p class="alert" role="status" data-flash-inline hidden></p>
+
+          <!-- Поле «Важно»: аллергии и особенности. Его видит мастер в своем расписании -->
+          <section class="admin-panel" aria-labelledby="important-title">
+            <h2 class="admin-panel__title" id="important-title">Важно</h2>
+            <p class="admin-panel__hint">Аллергии и особенности, из-за которых визит может навредить.
+              Это единственное поле карточки, которое видит мастер в своем расписании.</p>
+            <form class="admin-subform" data-important-form novalidate>
+              <div class="alert" role="alert" data-important-alert hidden></div>
+              <div class="field">
+                <label class="field__label" for="important-note">Что учесть мастеру</label>
+                <textarea class="input" id="important-note" name="importantNote" rows="2" maxlength="500"
+                  placeholder="Например: аллергия на акрил"></textarea>
+                <p class="field__error" data-error-for="importantNote" hidden></p>
+              </div>
+              <div class="admin-form__actions">
+                <button class="btn btn--primary btn--small" type="submit">Сохранить</button>
+              </div>
+            </form>
+          </section>
+
+          <!-- Контакты и данные карточки -->
+          <section class="admin-panel" aria-labelledby="profile-title">
+            <h2 class="admin-panel__title" id="profile-title">Данные клиента</h2>
+            <form class="admin-form" data-profile-form novalidate>
+              <div class="alert" role="alert" data-profile-alert hidden></div>
+              <div class="admin-fields">
+                <div class="field">
+                  <label class="field__label" for="client-name">Имя</label>
+                  <input class="input" id="client-name" name="name" maxlength="100" autocomplete="off">
+                  <p class="field__error" data-error-for="name" hidden></p>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="client-phone">Телефон</label>
+                  <input class="input" id="client-phone" name="phone" autocomplete="off" placeholder="+7 911 222-33-44">
+                  <p class="field__hint" data-phone-hint></p>
+                  <p class="field__error" data-error-for="phone" hidden></p>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="client-email">E-mail</label>
+                  <input class="input" id="client-email" name="email" type="email" autocomplete="off">
+                  <p class="field__hint">На этот адрес уходит код, если клиент регистрируется на свой номер
+                    из карточки (сценарий 16). Вносите его, только убедившись по звонку, что это сам человек.</p>
+                  <p class="field__error" data-error-for="email" hidden></p>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="client-birth">Дата рождения</label>
+                  <input class="input" id="client-birth" name="birthDate" type="date">
+                  <p class="field__error" data-error-for="birthDate" hidden></p>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="client-source">Откуда узнал о студии</label>
+                  <input class="input" id="client-source" name="acquisitionSource" maxlength="100" autocomplete="off">
+                  <p class="field__error" data-error-for="acquisitionSource" hidden></p>
+                </div>
+              </div>
+              <div class="admin-form__actions">
+                <button class="btn btn--primary btn--small" type="submit">Сохранить</button>
+              </div>
+            </form>
+          </section>
+
+          <!-- Сводка по визитам: считается по записям при каждом запросе -->
+          <section class="admin-panel" aria-labelledby="stats-title">
+            <h2 class="admin-panel__title" id="stats-title">Визиты</h2>
+            <dl class="client-stats" data-stats></dl>
+          </section>
+
+          <!-- Заметки, в том числе со слов мастера -->
+          <section class="admin-panel" aria-labelledby="notes-title">
+            <h2 class="admin-panel__title" id="notes-title">Заметки</h2>
+            <div class="client-notes" data-notes></div>
+            <form class="admin-subform" data-note-form novalidate>
+              <div class="alert" role="alert" data-note-alert hidden></div>
+              <div class="field">
+                <label class="field__label" for="note-text">Новая заметка</label>
+                <textarea class="input" id="note-text" name="text" rows="2" maxlength="1000"
+                  placeholder="Например: просила не подпиливать углы"></textarea>
+                <p class="field__error" data-error-for="text" hidden></p>
+              </div>
+              <div class="field">
+                <label class="field__label" for="note-master">Со слов мастера</label>
+                <select class="input" id="note-master" name="masterId" data-note-master>
+                  <option value="">Записал администратор</option>
+                </select>
+                <p class="field__hint">Мастер заметки не вносит — их записывает администратор с его слов.</p>
+              </div>
+              <div class="admin-form__actions">
+                <button class="btn btn--primary btn--small" type="submit">Добавить заметку</button>
+              </div>
+            </form>
+          </section>
+
+          <!-- Черный список: причина обязательна -->
+          <section class="admin-panel" aria-labelledby="blacklist-title">
+            <h2 class="admin-panel__title" id="blacklist-title">Черный список</h2>
+            <p class="admin-panel__hint" data-blacklist-state></p>
+            <form class="admin-subform" data-blacklist-form novalidate>
+              <div class="alert" role="alert" data-blacklist-alert hidden></div>
+              <div class="field" data-blacklist-reason-field>
+                <label class="field__label" for="blacklist-reason">Причина</label>
+                <input class="input" id="blacklist-reason" name="reason" maxlength="300" autocomplete="off">
+                <p class="field__hint">Обязательна: по ней видно, почему клиент в списке и кто его внес.</p>
+                <p class="field__error" data-error-for="reason" hidden></p>
+              </div>
+              <div class="admin-form__actions">
+                <button class="btn btn--danger btn--small" type="submit" data-blacklist-add>В черный список</button>
+                <button class="btn btn--outline btn--small" type="button" data-blacklist-remove hidden>Убрать из черного списка</button>
+              </div>
+            </form>
+          </section>
+
+          <!-- История визитов и предстоящие записи -->
+          <section class="admin-panel" aria-labelledby="bookings-title">
+            <h2 class="admin-panel__title" id="bookings-title">Записи клиента</h2>
+            <div data-bookings></div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
