@@ -14,7 +14,7 @@ import { hasRole, type Role } from '../auth/sessions.js';
 import { type Db, transaction } from '../db/connection.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../http/errors.js';
 import { notifyCancelled, notifyOverbooked, notifyRescheduled } from '../notify/notifications.js';
-import { readSettings } from '../studio/settings.js';
+import { formatPhone, readSettings } from '../studio/settings.js';
 import { checkSlot, isSlotConflict, nearestFreeSlots, SlotUnavailable, slotTaken } from './availability.js';
 import { type ExistingBooking, loadBooking, pricesAtLevel } from './existing.js';
 import { type Level, requireMasterForVisit, resolveVisit, unitPrice, type VisitItemInput } from './visit.js';
@@ -67,7 +67,7 @@ export function assertCanChange(
   if (now.getTime() >= deadline) {
     throw forbidden(
       `Перенести или отменить запись можно не позднее чем за ${settings.client_change_deadline_hours} ч до визита. ` +
-        `Позже — только через студию: ${settings.phone}`,
+        `Позже — только через студию: ${formatPhone(settings.phone)}`,
       'CHANGE_DEADLINE_PASSED',
     );
   }
@@ -78,7 +78,7 @@ export function assertNotMaintenance(db: Db, actor: Actor): void {
   if (hasRole(actor, 'admin')) return;
   const settings = readSettings(db);
   if (settings.is_maintenance) {
-    throw new HttpError(503, 'MAINTENANCE', `Запись временно недоступна. Записаться можно по телефону ${settings.phone}`);
+    throw new HttpError(503, 'MAINTENANCE', `Запись временно недоступна. Записаться можно по телефону ${formatPhone(settings.phone)}`);
   }
 }
 

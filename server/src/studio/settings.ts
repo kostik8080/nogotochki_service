@@ -26,3 +26,14 @@ export function readSettings(db: Db): StudioSettings {
   if (!row) throw new Error('Нет строки настроек студии: примените миграции (npm run db:migrate)');
   return row;
 }
+
+/**
+ * Телефон студии для текста, который читает человек: «+7 (999) 123-45-67» вместо «+79991234567».
+ * Такой же формат показывает интерфейс (web/js/format.js), и в сообщениях сервера он должен совпадать.
+ * Непохожий на российский номер возвращается как есть: придумывать за студию формат незачем.
+ */
+export function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length !== 11 || !/^[78]/.test(digits)) return value;
+  return `+7 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 9)}-${digits.slice(9)}`;
+}

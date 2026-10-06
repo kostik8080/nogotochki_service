@@ -503,7 +503,7 @@ newForm.addEventListener('submit', async (event) => {
       // Предупреждение и подтверждение: запись поверх занятого времени создается только по явному согласию
       overbookingBox.hidden = false;
       overbookingConfirm.checked = false;
-      $('[data-overbooking-text]', newForm).textContent = `${error.message} Выберите другое время или подтвердите наложение.`;
+      $('[data-overbooking-text]', newForm).textContent = `${error.message}. Или подтвердите наложение.`;
       renderAlternatives($('[data-alternatives]', newForm), error.details?.alternatives, (at) => {
         newTime.value = timeLabel(at, state.timezone);
         newDate.value = studioDate(at, state.timezone);
@@ -581,7 +581,7 @@ moveForm.addEventListener('submit', async (event) => {
     if (error instanceof api.ApiError && error.code === 'SLOT_TAKEN') {
       moveOverbooking.hidden = false;
       moveConfirm.checked = false;
-      $('[data-move-overbooking-text]', moveForm).textContent = `${error.message} Выберите другое время или подтвердите наложение.`;
+      $('[data-move-overbooking-text]', moveForm).textContent = `${error.message}. Или подтвердите наложение.`;
       renderAlternatives($('[data-move-alternatives]', moveForm), error.details?.alternatives, (at) => {
         moveTime.value = timeLabel(at, state.timezone);
         moveDate.value = studioDate(at, state.timezone);

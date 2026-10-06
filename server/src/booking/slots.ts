@@ -315,3 +315,20 @@ export function getSlotsAnyMaster(
   }
   return [...byStart.values()].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }
+
+/**
+ * Весь рабочий день мастера перекрыт блокировками — отпуском, выходным, больничным.
+ *
+ * Для клиента это такой же нерабочий день, как день вне графика: записаться нельзя. Но режим дня
+ * (`getMasterDay`) блокировки не смотрит и отдает `open`, поэтому календарь подписывал такой день
+ * «мест нет» вместо «выходной» (находки прогона, № 7). Причину блокировки клиенту не показываем —
+ * обед и личное время мастера его не касаются.
+ */
+export function isDayFullyBlocked(db: Db, masterId: number, date: string, now: Date): boolean {
+  const day = getMasterDay(db, masterId, date);
+  if (day.status !== 'open') return false;
+  const busy = loadBusy(db, masterId, day.window.start, day.window.end, {
+    now, viewerId: null, excludeBookingId: null, overbooking: false,
+  });
+  return busy.blocks.length > 0 && subtract(day.window, busy.blocks).length === 0;
+}

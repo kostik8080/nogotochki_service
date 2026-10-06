@@ -1,7 +1,7 @@
 // Публичная часть: студия, каталог услуг, мастера и свободное время. Вход не нужен.
 import { hasRole } from '../auth/sessions.js';
 import { loadBooking, pricesAtLevel } from '../booking/existing.js';
-import { findMastersForServices, getMasterDay, getSlots, getSlotsAnyMaster } from '../booking/slots.js';
+import { findMastersForServices, getMasterDay, getSlots, getSlotsAnyMaster, isDayFullyBlocked } from '../booking/slots.js';
 import { readVisitItemsQuery, requireMasterForVisit, resolveVisit, visitPrice, type Level, type Visit } from '../booking/visit.js';
 import type { Db } from '../db/connection.js';
 import { notFound } from '../http/errors.js';
@@ -191,7 +191,11 @@ export function catalogRoutes(router: Router): void {
         date,
         timezone,
         masterId,
-        day: { status: day.status, reason: day.status === 'studio_closed' ? day.reason : null },
+        // День, целиком перекрытый блокировками, для клиента такой же нерабочий, как день вне графика
+        day: {
+          status: day.status === 'open' && isDayFullyBlocked(ctx.db, masterId, date, ctx.now) ? 'master_off' : day.status,
+          reason: day.status === 'studio_closed' ? day.reason : null,
+        },
         durationMin: timing.durationMin,
         priceKop: timing.priceKop,
         slots: slots.map((s) => ({ startsAt: s.startsAt, endsAt: s.endsAt })),

@@ -8,6 +8,8 @@
 // Сценарные данные — история визитов, будущие записи, отпуск и выходной Елены — добавляются
 // один раз, пока у тестовой клиентки нет записей: они привязаны к дате первого запуска,
 // и повторный запуск в другой день сдвинул бы их и наложил на прежние.
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import type { SQLInputValue } from 'node:sqlite';
 import { hashPassword } from '../../auth/password.js';
 import { insertBookingRows, writeCancellation, writeReschedule, writeStatusChange } from '../../booking/booking-service.js';
@@ -15,11 +17,17 @@ import { loadBooking } from '../../booking/existing.js';
 import { addDays, isoWeekday, zonedDate, zonedTimeToUtc } from '../../lib/studio-time.js';
 import { DESIGN_ID, masters, seedCatalog, services } from '../catalog.js';
 import { type Db, transaction } from '../connection.js';
+import { solidPng } from './placeholder-photo.js';
 
 export interface SeedOptions {
   adminPassword: string;
   masterPassword: string;
   clientPassword: string;
+  /**
+   * Папка фото работ. Если задана, рядом со строками фото создаются файлы-заглушки: без них
+   * в «Наших работах» на лендинге получались битые изображения (находки прогона, № 12).
+   */
+  uploadsDir?: string;
   /** Текущий момент; параметр нужен, чтобы тесты могли зафиксировать дату. */
   now?: Date;
 }
@@ -64,6 +72,28 @@ function findWeekday(from: string, weekday: number, minDays: number, step: 1 | -
   return date;
 }
 
+/**
+ * Фото работ тестовых данных: путь в базе и цвет заглушки. Файлы кладутся на диск вместе со строками,
+ * иначе в галерее получаются битые изображения. Расширение важно: тип файла сервис берет из него.
+ */
+const SEED_PHOTOS = {
+  manicure: { path: 'photos/seed/nude-manicure.png', color: '#E8C9C2' },
+  brows: { path: 'photos/seed/brows-lamination.png', color: '#C9B7AE' },
+};
+
+/** Положить рядом со строками фото файлы-заглушки. Уже лежащие файлы не трогаем. */
+function writeSeedPhotos(uploadsDir: string): void {
+  for (const { path: relative, color } of Object.values(SEED_PHOTOS)) {
+    const file = path.join(path.resolve(uploadsDir), relative);
+    mkdirSync(path.dirname(file), { recursive: true });
+    try {
+      writeFileSync(file, solidPng(640, 480, color), { flag:'wx' });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  }
+}
+
 const iso = (d: Date) => d.toISOString();
 const addMinutes = (d: Date, min: number) => new Date(d.getTime() + min * 60_000);
 
@@ -73,6 +103,7 @@ const addMinutes = (d: Date, min: number) => new Date(d.getTime() + min * 60_000
 
 export function seedDevData(db: Db, options: SeedOptions): SeedReport {
   const now = options.now ?? new Date();
+  if (options.uploadsDir) writeSeedPhotos(options.uploadsDir);
   const today = studioDate(now);
   const report: SeedReport = { tables: new Map(), scenarioCreated: false };
 
@@ -168,9 +199,9 @@ export function seedDevData(db: Db, options: SeedOptions): SeedReport {
 
     // Заметка со слов мастера: вносит администратор, мастер указывается отдельно.
     ensure('client_notes', { client_id: mariaId, author_id: adminId, master_id: 1, text: 'Любит нюдовые оттенки' }, ['client_id', 'text']);
-    // Фото в галерею без визита. Файлов на диске нет, в базе только пути.
+    // Фото в галерею без визита. Файл-заглушку кладет writeSeedPhotos, в базе — только путь.
     ensure('work_photos', {
-      master_id: 1, service_id: 1, file_path: 'photos/seed/nude-manicure.jpg',
+      master_id: 1, service_id: 1, file_path: SEED_PHOTOS.manicure.path,
       title: 'Нюдовый маникюр', is_published: 1, sort_order: 2, uploaded_by: adminId,
     }, ['file_path']);
 
@@ -306,7 +337,7 @@ export function seedDevData(db: Db, options: SeedOptions): SeedReport {
 
     // Фото с визита (сценарий 13), клиентка разрешила публикацию.
     insert('work_photos', {
-      booking_item_id: lamination.itemIds[0]!, file_path: 'photos/seed/brows-lamination.jpg',
+      booking_item_id: lamination.itemIds[0]!, file_path: SEED_PHOTOS.brows.path,
       title: 'Ламинирование бровей', is_published: 1, publish_consent_at: iso(now), sort_order: 1, uploaded_by: adminId,
     });
   });

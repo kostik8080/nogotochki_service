@@ -17,7 +17,7 @@ if (missing.length > 0 || !adminPassword || !masterPassword || !clientPassword) 
 const db = openDatabase();
 try {
   runMigrations(db);
-  const report = seedDevData(db, { adminPassword, masterPassword, clientPassword });
+  const report = seedDevData(db, { adminPassword, masterPassword, clientPassword, uploadsDir: config.uploadsDir });
 
   console.log(`Тестовые данные: ${config.databasePath}\n`);
   console.log(`${'Таблица'.padEnd(28)}${'добавлено'.padStart(10)}${'уже было'.padStart(10)}`);
