@@ -1,0 +1,52 @@
+/* SYS-01 Страница не найдена (not-found.html). Значения — из tokens.css. */
+
+/* Подвал прижат к низу даже на коротком экране — как на страницах входа (.auth-body) */
+.not-found-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+/* Тема задает только значения токенов, фон и цвет элемент берет сам (как .auth в css/auth.css) */
+.not-found {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: var(--space-12) 0 var(--space-16);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.not-found__inner {
+  max-width: calc(var(--space-24) * 6);
+  text-align: center;
+}
+
+.not-found__code {
+  color: var(--color-text-accent);
+  font-size: var(--text-display-size);
+  line-height: var(--text-display-line);
+  font-weight: var(--text-display-weight);
+}
+
+.not-found__title {
+  margin-top: var(--space-2);
+  font-size: var(--text-h1-size);
+  line-height: var(--text-h1-line);
+  font-weight: var(--text-h1-weight);
+}
+
+.not-found__text {
+  margin-top: var(--space-4);
+  color: var(--color-text-secondary);
+  line-height: var(--text-body-m-line);
+}
+
+.not-found__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-8);
+}

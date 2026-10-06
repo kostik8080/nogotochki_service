@@ -143,7 +143,7 @@ REST API поверх базы из [`docs/db-schema.md`](db-schema.md). Код 
 | `POST /api/admin/time-blocks` | Блокировка: `masterId`, `type` (`lunch`, `personal`, `day_off`, `vacation`, `sick_leave`, `other` — для него обязателен `comment`), `startsAt`, `endsAt` в UTC. Слоты на это время пропадают сразу (сценарий 8) |
 | `DELETE /api/admin/time-blocks/:id` | Удалить блокировку |
 | `GET /api/admin/masters/:id/days?from=&to=` | Изменения смены мастера на даты |
-| `PUT /api/admin/masters/:id/days/:date` | Рабочий день вне графика (`isWorking: true`, `start`, `end`) или выходной (`isWorking: false`). Открыть день, когда закрыта студия, нельзя — студия важнее мастера |
+| `PUT /api/admin/masters/:id/days/:date` | Рабочий день вне графика (`isWorking: true`, `start`, `end`) или выходной (`isWorking: false`). Открыть день, когда закрыта студия, нельзя — студия важнее мастера: 400 `STUDIO_CLOSED` с причиной особого дня в тексте. Выходной (`isWorking: false`) можно поставить и в закрытый день |
 | `DELETE /api/admin/masters/:id/days/:date` | Убрать изменение: день снова по недельному графику |
 | `GET /api/admin/studio-days?from=&to=` | Особые дни студии с автором |
 | `PUT /api/admin/studio-days/:date` | Особый день для всех мастеров: закрыта (`isOpen: false`) или особые часы (`isOpen: true`, `open`, `close`), `reason` видна клиентам. Прошедший день — 400 |

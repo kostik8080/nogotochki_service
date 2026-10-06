@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Профиль мастера — Ноготочки</title>
+  <!-- Значок вкладки: эмблема студии (favicon.svg), крупная иконка — для закладок и телефона -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="img/app-icon.png" type="image/png" sizes="512x512">
+  <link rel="apple-touch-icon" href="img/app-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <!-- Сетка, заголовки секций и карточки работ — те же, что на лендинге: это та же витрина -->
+  <link rel="stylesheet" href="css/landing.css">
+  <link rel="stylesheet" href="css/master-profile.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/master-profile.js"></script>
+</head>
+<body class="master-profile-body">
+  <a class="skip-link" href="#main">К содержимому</a>
+
+  <!-- Общая шапка клиента: разметка и данные — js/header.js -->
+  <client-header></client-header>
+
+  <!-- PUB-05 Профиль мастера (docs/ui-map.md) -->
+  <main class="master-profile" id="main" data-theme="powder">
+    <div class="container">
+      <a class="master-profile__back" href="index.html#masters" data-back>← Назад</a>
+
+      <div data-view="loading" aria-busy="true">
+        <span class="skeleton skeleton--heading" aria-hidden="true"></span>
+        <span class="visually-hidden">Загружаем профиль мастера…</span>
+      </div>
+
+      <div data-view="error" role="alert" hidden>
+        <h1 class="master-hero__name" data-error-title>Мастер не найден</h1>
+        <p class="master-hero__meta" data-error-text></p>
+        <p class="master-hero__actions">
+          <a class="btn btn--primary" href="index.html#masters">Ко всем мастерам</a>
+        </p>
+      </div>
+
+      <div data-view="content" hidden>
+        <!-- Шапка: фото или инициалы, имя, уровень, специализация, опыт, рассказ, «Записаться» -->
+        <section class="master-hero" aria-labelledby="master-name">
+          <div class="master-hero__photo" data-photo></div>
+          <div>
+            <h1 class="master-hero__name" id="master-name" data-name></h1>
+            <p class="master-hero__meta" data-meta></p>
+            <p class="master-hero__bio" data-bio hidden></p>
+            <p class="master-hero__actions">
+              <a class="btn btn--primary" href="#" data-book>Записаться к мастеру</a>
+            </p>
+          </div>
+        </section>
+
+        <!-- Услуги мастера: цена уже по его уровню — ее считает сервер -->
+        <section class="section" aria-labelledby="services-title">
+          <h2 class="section__title" id="services-title">Услуги мастера</h2>
+          <div class="master-services" data-services></div>
+        </section>
+
+        <!-- Работы мастера: опубликованные фото из галереи -->
+        <section class="section" aria-labelledby="works-title">
+          <h2 class="section__title" id="works-title">Работы мастера</h2>
+          <div class="grid grid--3 gallery" data-works></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="page-footer">
+    <div class="container page-footer__inner">
+      <span>© Ноготочки, бьюти-студия</span>
+      <span class="page-footer__links">
+        <a href="privacy.html">Политика обработки персональных данных</a>
+        <a href="login.html">Вход для сотрудников</a>
+      </span>
+    </div>
+  </footer>
+</body>
+</html>

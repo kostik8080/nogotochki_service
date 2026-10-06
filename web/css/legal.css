@@ -1,0 +1,96 @@
+/* Страница документа: политика обработки персональных данных (privacy.html).
+   Длинный текст, который человек читает подряд, — колонка ограниченной ширины, заголовки и списки
+   возвращают себе вид, который сбросил base.css. Значения — только из tokens.css. */
+
+/* Подвал прижат к низу даже на коротком экране — как на страницах входа (.auth-body) */
+.legal-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+/* Тема задает только значения токенов, фон и цвет текста элемент берет сам (как .auth в auth.css):
+   иначе страница осталась бы на темной теме :root, и светлая врезка оказалась бы со светлым текстом. */
+.legal {
+  flex: 1;
+  padding: var(--space-8) 0 var(--space-16);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.legal__head {
+  margin-bottom: var(--space-8);
+}
+
+.legal__title {
+  font-size: var(--text-h1-size);
+  line-height: var(--text-h1-line);
+  font-weight: var(--text-h1-weight);
+}
+
+.legal__meta {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+/* Колонка текста: примерно 70 знаков в строке — так документ читается, а не сканируется */
+.legal__doc {
+  max-width: calc(var(--space-24) * 9);
+  font-size: var(--text-body-m-size);
+  line-height: var(--text-body-m-line);
+}
+
+.legal__doc h2 {
+  margin-top: var(--space-8);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-h3-size);
+  font-weight: var(--text-h1-weight);
+}
+
+.legal__doc p,
+.legal__doc ul,
+.legal__doc ol {
+  margin-bottom: var(--space-4);
+}
+
+.legal__doc ul,
+.legal__doc ol {
+  padding-left: var(--space-6);
+  list-style: disc;
+}
+
+.legal__doc ol {
+  list-style: decimal;
+}
+
+.legal__doc li {
+  margin-bottom: var(--space-2);
+}
+
+.legal__doc a {
+  color: var(--color-text-accent);
+  text-decoration: underline;
+}
+
+.legal__doc strong {
+  font-weight: var(--text-label-weight);
+}
+
+/* Врезка для того, что владельцу нужно заполнить или о чем важно знать до регистрации */
+.legal__note {
+  margin: var(--space-6) 0;
+  padding: var(--space-4);
+  background: var(--color-surface-accent);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+.legal__note p:last-child,
+.legal__doc p:last-child {
+  margin-bottom: 0;
+}

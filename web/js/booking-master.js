@@ -94,7 +94,7 @@ function masterOption(m, checked) {
         <span class="master-option__head"><span>${esc(m.name)}</span><span class="master-option__price">${esc(money(m.visit.priceKop))}</span></span>
         <span class="master-option__specialty">${esc([LEVELS[m.level], m.specialty].filter(Boolean).join(' · '))}</span>
         <span class="master-option__nearest" data-nearest="${m.id}"></span>
-        <a class="text-link master-option__more" href="${esc(routes.master(m.id))}">Подробнее</a>
+        <a class="text-link master-option__more" href="${esc(routes.masterProfile(m.id))}">Подробнее</a>
       </span>
     </label>`;
 }
@@ -107,7 +107,7 @@ function unavailableOption(m, missing) {
         <span class="master-option__head"><span>${esc(m.name)}</span></span>
         ${m.specialty ? `<span class="master-option__meta">${esc(m.specialty)}</span>` : ''}
         <span class="master-option__missing">Не выполняет: ${esc(missing.join(', '))}</span>
-        <a class="text-link master-option__more" href="${esc(routes.master(m.id))}">Подробнее</a>
+        <a class="text-link master-option__more" href="${esc(routes.masterProfile(m.id))}">Подробнее</a>
       </span>
     </div>`;
 }

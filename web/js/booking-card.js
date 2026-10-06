@@ -67,7 +67,7 @@ function render() {
   $('[data-when]').textContent = when(b);
   const master = /** @type {HTMLAnchorElement} */ ($('[data-master]'));
   master.textContent = b.master.name;
-  master.href = routes.master(b.master.id);
+  master.href = routes.masterProfile(b.master.id);
   $('[data-lines]').innerHTML = b.items.map((i) => `
     <li><span>${esc(i.name)}${i.quantity > 1 ? ` ×${i.quantity}` : ''}</span><span>${esc(money(i.priceKop))}</span></li>`).join('');
   $('[data-price]').textContent = `${money(b.totalPriceKop)}, оплата в студии`;

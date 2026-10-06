@@ -262,6 +262,29 @@ describe('расписание: блокировки, смены мастера,
     assert.equal((await admin.put('/api/admin/studio-days/2020-01-01', { isOpen: false, reason: 'Прошлое' })).status, 400);
     assert.equal((await fresh().put(`/api/admin/studio-days/${date}`, { isOpen: false, reason: 'x' })).status, 401);
   });
+
+  it('смену мастера нельзя открыть, когда студия в этот день не работает', async () => {
+    // Закрытый особый день: смену открыть нельзя, выходной поставить можно.
+    const closed = nextWeekday(4, 30);
+    assert.equal((await admin.put(`/api/admin/studio-days/${closed}`, { isOpen: false, reason: 'Санитарный день' })).status, 200);
+    const denied = await admin.put(`/api/admin/masters/${ANNA}/days/${closed}`, { isWorking: true, start: '10:00', end: '16:00' });
+    assert.equal(denied.status, 400);
+    assert.equal(denied.body.error.code, 'STUDIO_CLOSED');
+    assert.match(denied.body.error.message, /Санитарный день/);
+    assert.deepEqual((await admin.get(`/api/admin/masters/${ANNA}/days?from=${closed}&to=${closed}`)).body.days, []);
+    assert.equal((await admin.put(`/api/admin/masters/${ANNA}/days/${closed}`, { isWorking: false })).status, 200);
+
+    // Воскресенье: студия закрыта по режиму работы, особого дня нет.
+    const sunday = nextWeekday(7, 20);
+    const sundayDenied = await admin.put(`/api/admin/masters/${ANNA}/days/${sunday}`, { isWorking: true, start: '10:00', end: '16:00' });
+    assert.equal(sundayDenied.status, 400);
+    assert.equal(sundayDenied.body.error.code, 'STUDIO_CLOSED');
+
+    // Рабочий день студии: смена открывается как раньше.
+    const open = nextWeekday(3, 30);
+    assert.equal((await admin.put(`/api/admin/masters/${ANNA}/days/${open}`, { isWorking: true, start: '10:00', end: '16:00' })).status, 200);
+    assert.equal((await admin.delete(`/api/admin/masters/${ANNA}/days/${open}`)).status, 200);
+  });
 });
 
 describe('клиентская база', () => {

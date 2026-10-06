@@ -94,7 +94,7 @@ function renderMasters({ masters }) {
   }
 
   container.innerHTML = masters.map((m) => {
-    const profile = esc(routes.master(m.id));
+    const profile = esc(routes.masterProfile(m.id));
     const photo = m.photoUrl
       ? `<img src="${esc(m.photoUrl)}" alt="" loading="lazy">`
       : `<span class="avatar" aria-hidden="true">${esc(initials(m.name))}</span>`;
@@ -123,7 +123,7 @@ function renderGallery({ photos }) {
   container.innerHTML = photos.map((p) => {
     const title = p.title || p.service?.name || 'Работа мастера';
     return `
-      <a class="work" href="${esc(routes.master(p.master.id))}" title="Профиль мастера">
+      <a class="work" href="${esc(routes.masterProfile(p.master.id))}" title="Профиль мастера">
         <img src="${esc(p.url)}" alt="${esc(`${title} — ${p.master.name}`)}" loading="lazy">
         <span class="work__caption">
           <span class="work__title">${esc(title)}</span>

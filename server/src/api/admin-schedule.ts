@@ -10,7 +10,7 @@ import type { Db } from '../db/connection.js';
 import { badRequest, notFound } from '../http/errors.js';
 import { pathId, type Context, type Result, type Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
-import { addDays, zonedDate, zonedTimeToUtc } from '../lib/studio-time.js';
+import { addDays, isoWeekday, zonedDate, zonedTimeToUtc } from '../lib/studio-time.js';
 import { readSettings } from '../studio/settings.js';
 import { requireUser } from './guards.js';
 import { bookingViews } from './views.js';
@@ -55,6 +55,18 @@ function readHours(input: Input, open: boolean, startKey: string, endKey: string
   const end = input.time(endKey);
   if (input.valid && end <= start) input.fail(endKey, 'Конец должен быть позже начала');
   return { start, end };
+}
+
+/**
+ * Работает ли студия в этот день. Очередность та же, что при расчете слотов (`booking/slots.ts`,
+ * правило 1): особый день важнее режима по дню недели, а студия важнее мастера.
+ */
+function studioDay(db: Db, date: string): { open: boolean; reason: string | null } {
+  const special = db.prepare('SELECT is_open, reason FROM studio_day_overrides WHERE work_date = ?')
+    .get(date) as { is_open: number; reason: string | null } | undefined;
+  if (special) return { open: special.is_open === 1, reason: special.reason };
+  const hours = db.prepare('SELECT 1 FROM studio_hours WHERE weekday = ?').get(isoWeekday(date));
+  return { open: hours !== undefined, reason: null };
 }
 
 export function adminScheduleRoutes(router: Router): void {
@@ -165,6 +177,18 @@ export function adminScheduleRoutes(router: Router): void {
     const { start, end } = readHours(input, isWorking !== false, 'start', 'end');
     const dryRun = input.bool('dryRun', { optional: true }) ?? false;
     input.done();
+
+    // Студия важнее мастера: в закрытый день смену открыть нельзя. Свободного времени у клиента все равно
+    // не появится — режим студии перекрывает смену при расчете слотов, — а в карточке мастер выглядел бы
+    // работающим, и администратор рассчитывал бы на него. Выходной (isWorking: false) ставить можно всегда.
+    if (isWorking) {
+      const studio = studioDay(ctx.db, date);
+      if (!studio.open) {
+        throw badRequest('STUDIO_CLOSED', studio.reason
+          ? `Студия в этот день закрыта: ${studio.reason}. Сначала измените особый день студии`
+          : 'Студия в этот день не работает. Сначала измените режим работы студии или добавьте особый день');
+      }
+    }
 
     const affected = applyOrPreview(ctx.db, dryRun, () => {
       requireMaster(ctx.db, masterId);

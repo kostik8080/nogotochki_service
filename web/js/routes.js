@@ -82,8 +82,12 @@ export const routes = {
     return 'booking-time.html?' + query.toString();
   },
 
-  /** PUB-05 Профиль мастера */
-  master: (id) => 'master.html?id=' + encodeURIComponent(String(id)),
+  /**
+   * PUB-05 Профиль мастера. Имя не `master`: так зовется раздел мастера выше, а два одинаковых ключа
+   * в одном объекте молча оставляют только последний — раздел переставал открываться по ссылкам.
+   * @param {number} id
+   */
+  masterProfile: (id) => 'master.html?id=' + encodeURIComponent(String(id)),
 
   /**
    * CAB-03 Карточка записи. `cancel` — сразу открыть окно отмены (CAB-05 — модалка на карточке).

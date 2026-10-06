@@ -32,6 +32,8 @@ const MASTER_PAGES: Record<string, string> = {
 
 const FORBIDDEN_PAGE = 'forbidden.html';
 const FORBIDDEN_MASTER_PAGE = 'forbidden-master.html';
+/** SYS-01: тот же экран «Страница не найдена», что и на остальном сайте (web/static-files.ts). */
+const NOT_FOUND_PAGE = 'not-found.html';
 
 export interface PageResponse {
   status: number;
@@ -89,6 +91,8 @@ export async function staffPage(req: {
   }
 
   const file = pages[page];
-  if (!file) return text(404, 'Страница не найдена');
+  // Сотрудник ошибся в адресе внутри своего раздела — тот же экран SYS-01, что и на остальном сайте,
+  // а не голая строка текста. Файла нет — остается прежний короткий ответ.
+  if (!file) return html(404, NOT_FOUND_PAGE, req.webDir).catch(() => text(404, 'Страница не найдена'));
   return html(200, file, req.webDir);
 }

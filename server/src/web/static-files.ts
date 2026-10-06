@@ -29,6 +29,12 @@ const TYPES: Record<string, string> = {
 /** Папки, файлы которых отдает только сервер и только после проверки роли. */
 const STAFF_DIRS = ['admin', 'master'];
 
+/** SYS-01: человеческий экран вместо ответа API на неизвестный адрес сайта. */
+const NOT_FOUND_PAGE = 'not-found.html';
+
+/** Расширения файлов интерфейса: по ним видно, что просили не страницу, а картинку или стиль. */
+const ASSET_EXTENSIONS = new Set(Object.keys(TYPES).filter((ext) => ext !== '.html'));
+
 export interface FileResponse {
   status: number;
   headers: Record<string, string>;
@@ -88,3 +94,32 @@ export async function staticFile(req: { method: string; pathname: string; webDir
 }
 
 const exists = (file: string) => stat(file).then(() => true, () => false);
+
+/**
+ * Экран «Страница не найдена» (SYS-01) — ответ на неизвестный адрес сайта. Раньше такой адрес уходил
+ * в маршруты API и человек видел `{"error":{"code":"NOT_FOUND"…}}`.
+ *
+ * Отдается только там, где человек ждет страницу: на `GET` и `HEAD` и на адрес без расширения или
+ * с `.html`. Запрос к несуществующей картинке или стилю так и остается обычным 404 — страница в теге
+ * `<img>` или `<link>` все равно не покажется, а браузеру и поисковику незачем получать разметку.
+ */
+export async function notFoundPage(req: { method: string; pathname: string; webDir: string }): Promise<FileResponse | null> {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return null;
+  const ext = path.extname(req.pathname).toLowerCase();
+  if (ext && ext !== '.html') return null;
+  if (ASSET_EXTENSIONS.has(ext)) return null;
+
+  const file = path.join(path.resolve(req.webDir), NOT_FOUND_PAGE);
+  const body = await readFile(file).catch(() => null);
+  if (body === null) return null;
+  return {
+    status: 404,
+    headers: {
+      'Content-Type': TYPES['.html']!,
+      'Content-Length': String(body.length),
+      'Cache-Control': 'no-cache',
+      'X-Content-Type-Options': 'nosniff',
+    },
+    body: req.method === 'HEAD' ? '' : body,
+  };
+}

@@ -88,6 +88,13 @@ export function getMasterSlots(masterId, query) {
 }
 
 /**
+ * Профиль мастера (PUB-05): `{ master }` — уровень, специализация, опыт, рассказ и услуги
+ * с ценой уже по его уровню (`services[].priceKop`). 404 — такого мастера нет или он отключен.
+ * @param {number} id
+ */
+export const getMaster = (id) => request('GET', `/api/masters/${encodeURIComponent(String(id))}`);
+
+/**
  * Опубликованные фото работ.
  * @param {{ masterId?: number, limit?: number }} [options]
  */

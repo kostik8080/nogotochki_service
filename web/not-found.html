@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- SYS-01 Страница не найдена (docs/ui-map.md). Сервер отдает этот файл на любой неизвестный адрес
+       сайта, кроме /api/… (server/src/web/static-files.ts). Поэтому все ссылки здесь — от корня:
+       страница открывается под чужим адресом любой вложенности. -->
+  <base href="/">
+  <title>Страница не найдена — Ноготочки</title>
+  <!-- Значок вкладки: эмблема студии (favicon.svg), крупная иконка — для закладок и телефона -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="img/app-icon.png" type="image/png" sizes="512x512">
+  <link rel="apple-touch-icon" href="img/app-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/not-found.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/not-found.js"></script>
+</head>
+<body class="not-found-body">
+  <a class="skip-link" href="#main">К содержимому</a>
+
+  <!-- Общая шапка клиента: разметка и данные — js/header.js -->
+  <client-header></client-header>
+
+  <main class="not-found" id="main" data-theme="powder">
+    <div class="container not-found__inner">
+      <p class="not-found__code" aria-hidden="true">404</p>
+      <h1 class="not-found__title">Страница не найдена</h1>
+      <p class="not-found__text">Возможно, в адресе опечатка или страницу убрали.
+        Записаться и посмотреть свои записи можно с главной.</p>
+      <div class="not-found__actions">
+        <a class="btn btn--primary" href="index.html">На главную</a>
+        <!-- «Мои записи» показываются только вошедшему клиенту — js/not-found.js -->
+        <a class="btn btn--outline" href="account.html" data-account hidden>Мои записи</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="page-footer">
+    <div class="container page-footer__inner">
+      <span>© Ноготочки, бьюти-студия</span>
+      <span class="page-footer__links">
+        <a href="privacy.html">Политика обработки персональных данных</a>
+        <a href="login.html">Вход для сотрудников</a>
+      </span>
+    </div>
+  </footer>
+</body>
+</html>

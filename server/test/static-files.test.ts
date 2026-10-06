@@ -63,6 +63,28 @@ it('не выпускает за пределы папки web/', async () => {
   }
 });
 
+it('неизвестный адрес сайта — экран «Страница не найдена», а не ответ API', async () => {
+  const client = api.client();
+
+  for (const path of ['/takogo-net', '/takogo-net.html', '/kakaya-to/glubokaya/stranica']) {
+    const res = await client.get(path);
+    assert.equal(res.status, 404, `${path}: ожидали 404`);
+    assert.equal(res.headers.get('content-type'), 'text/html; charset=utf-8', `${path}: ожидали страницу`);
+    assert.match(String(res.body), /Страница не найдена/, `${path}: нет текста страницы`);
+    assert.doesNotMatch(String(res.body), /"error"/, `${path}: в ответе остался JSON API`);
+  }
+
+  // Картинка или стиль — обычный 404 без разметки: в теге <img> страница все равно не покажется.
+  const asset = await client.get('/img/takogo-net.png');
+  assert.equal(asset.status, 404);
+  assert.doesNotMatch(String(asset.body ?? ''), /Страница не найдена/);
+
+  // Адреса API остаются ответом API (проверка ниже), а выход за папку web/ — тоже 404 и без файла.
+  const outside = await client.get('/../server/.env');
+  assert.equal(outside.status, 404);
+  assert.doesNotMatch(String(outside.body ?? ''), /SMTP_/);
+});
+
 it('адреса API отдачей файлов не перехватываются', async () => {
   const client = api.client();
   const unknown = await client.get('/api/takogo-net');
