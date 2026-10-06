@@ -146,12 +146,16 @@ async function openCodeStep(result) {
     return;
   }
   const minutes = result.expiresInMin;
-  document.querySelector('[data-code-hint]').textContent =
-    `Код отправлен на ${result.sentTo}, действует ${minutes} ${plural(minutes, 'минуту', 'минуты', 'минут')}.`;
+  const ttl = `действует ${minutes} ${plural(minutes, 'минуту', 'минуты', 'минут')}`;
+  // `sent` говорит, ушло ли письмо именно сейчас: внутри минуты после прошлого запроса новый код
+  // не создается и письмо не уходит, а старый код еще действует. Обещать письмо в этом случае нельзя.
+  document.querySelector('[data-code-hint]').textContent = result.sent === false
+    ? `Новое письмо не отправляли: код запрашивали меньше минуты назад, он ${ttl}. Если письма на ${result.sentTo} нет, запросите код еще раз кнопкой ниже.`
+    : `Код отправлен на ${result.sentTo}, ${ttl}.`;
   input(codeForm, 'code').value = '';
   clearErrors(codeForm, codeAlert);
   showStep('code');
-  startResendTimer();
+  startResendTimer(result.retryAfterSec);
 }
 
 async function showStudioPhone() {
@@ -168,9 +172,14 @@ async function showStudioPhone() {
   }
 }
 
-function startResendTimer() {
+/**
+ * Обратный отсчет до повторной отправки. Сервер говорит, сколько ждать на самом деле (`retryAfterSec`):
+ * если код запрашивали только что, ждать меньше минуты, и кнопка не должна висеть выключенной дольше нужного.
+ * @param {number} [seconds] сколько осталось по времени сервера; без него — полная минута
+ */
+function startResendTimer(seconds) {
   clearInterval(resendTimer);
-  let left = RESEND_SECONDS;
+  let left = Number.isFinite(seconds) ? Math.max(0, Math.ceil(/** @type {number} */ (seconds))) : RESEND_SECONDS;
   const tick = () => {
     resendButton.disabled = left > 0;
     resendButton.textContent = left > 0 ? `Отправить код повторно через ${left} с` : 'Отправить код повторно';
@@ -222,7 +231,8 @@ resendButton.addEventListener('click', async () => {
       return;
     }
     await openCodeStep(result);
-    showAlert(codeAlert, 'success', 'Новый код отправлен.');
+    if (result.sent === false) showAlert(codeAlert, 'warning', 'Новый код пока не отправляли — подождите и попробуйте еще раз.');
+    else showAlert(codeAlert, 'success', 'Новый код отправлен.');
   } catch (error) {
     done();
     if (error instanceof api.ApiError && error.status === 429) {

@@ -78,30 +78,48 @@ export function authRoutes(router: Router, options: { secureCookies: boolean }):
       const cardEmail = (ctx.db.prepare('SELECT email FROM users WHERE id = ?').get(card.id) as { email: string | null }).email;
       const byEmail = mailer !== null && cardEmail !== null;
       const last = lastCodeAt(ctx.db, card.id, 'verify_phone');
-      if (last === null || ctx.now.getTime() - last >= RESEND_INTERVAL_MS) {
-        const sent = transaction(ctx.db, () => issueCode(ctx.db, card.id, 'verify_phone', phone!, ctx.now));
+      // Сколько ждать до следующего кода. Код этой цели создается не чаще раза в минуту, и письмо
+      // уходит только вместе с новым кодом: старый мы отправить не можем, в базе лежит лишь его хеш.
+      const waitMs = last === null ? 0 : Math.max(0, RESEND_INTERVAL_MS - (ctx.now.getTime() - last));
+      // Ушло ли письмо именно сейчас. Раньше ответ обещал письмо всегда, даже когда его не отправляли:
+      // внутри минуты после прошлого запроса и когда почтовый сервер не принял письмо. Человек ждал
+      // письма, которого не будет, — теперь ответ говорит, что произошло на самом деле.
+      let sent = false;
+      if (waitMs === 0) {
+        const code = transaction(ctx.db, () => issueCode(ctx.db, card.id, 'verify_phone', phone!, ctx.now));
         if (byEmail) {
           try {
             await mailer!.send({
               to: cardEmail!,
               subject: 'Код подтверждения — Ноготочки',
-              text: `Код для доступа к вашим записям в студии «Ноготочки»: ${sent}
+              text: `Код для доступа к вашим записям в студии «Ноготочки»: ${code}
 
 Код действует ${CODE_TTL_MIN} минут. Если вы не регистрировались на сайте, просто удалите это письмо.`,
             });
+            sent = true;
           } catch (error) {
             console.error('Не удалось отправить код подтверждения номера:', error);
           }
         }
       }
+      const masked = cardEmail === null ? null : maskEmail(cardEmail);
+      const retryAfterSec = Math.ceil(waitMs / 1000);
+      const emailMessage = sent
+        ? `Этот номер уже есть в базе студии: вас записывали по телефону. Мы отправили код на e-mail ${masked} — введите его, и прежние записи появятся в кабинете`
+        : waitMs > 0
+          // «Если письмо не пришло» — не вежливость: прошлый запрос мог прийтись на момент, когда e-mail
+          // в карточке еще не было, и тогда письма не было вовсе. Обещать, что оно уже в почте, нельзя.
+          ? `Этот номер уже есть в базе студии: вас записывали по телефону. Код запрашивали меньше минуты назад. Если письмо на ${masked} не пришло, запросите новый код через ${retryAfterSec} с`
+          : `Этот номер уже есть в базе студии, но письмо с кодом на ${masked} отправить не удалось. Попробуйте запросить код еще раз или позвоните в студию`;
       return {
         status: 202,
         body: {
           status: 'phone_verification_required',
           delivery: byEmail ? 'email' : 'studio',
-          ...(byEmail ? { sentTo: maskEmail(cardEmail!) } : {}),
+          ...(byEmail ? { sentTo: masked, sent } : {}),
+          ...(waitMs > 0 ? { retryAfterSec } : {}),
           message: byEmail
-            ? `Этот номер уже есть в базе студии: вас записывали по телефону. Мы отправили код на e-mail ${maskEmail(cardEmail!)} — введите его, и прежние записи появятся в кабинете`
+            ? emailMessage
             : 'Этот номер уже есть в базе студии: вас записывали по телефону. Позвоните в студию — администратор убедится, что это вы, и продиктует код',
           expiresInMin: CODE_TTL_MIN,
         },

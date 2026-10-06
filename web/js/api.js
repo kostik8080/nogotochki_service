@@ -201,8 +201,12 @@ export const startYandexLogin = () => request('GET', '/api/auth/yandex/start');
  * (сценарий 16): тогда тот же запрос повторяется с `code`. 409 PHONE_TAKEN / EMAIL_TAKEN.
  * @param {{ name: string, phone?: string, email?: string, password: string, pdConsent: true,
  *           marketingConsent: boolean, code?: string }} body
+ * У ответа 202 с `delivery: 'email'` есть `sent`: ушло ли письмо именно сейчас. Внутри минуты после
+ * прошлого запроса новый код не создается и письмо не уходит (`sent: false`, `retryAfterSec` — сколько
+ * ждать), а прежний код еще действует. Обещать письмо в этом случае нельзя.
  * @returns {Promise<{ status: 201, user: object, linkedExistingClient?: boolean }
- *                 | { status: 202, delivery: 'email' | 'studio', sentTo?: string, expiresInMin: number }>}
+ *                 | { status: 202, delivery: 'email' | 'studio', sentTo?: string, sent?: boolean,
+ *                     retryAfterSec?: number, expiresInMin: number }>}
  */
 export async function register(body) {
   const data = await request('POST', '/api/auth/register', body);
