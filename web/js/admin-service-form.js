@@ -3,7 +3,8 @@
 // мастера, которые ее оказывают, «Включена»; «Удалить».
 // Данные: GET /api/admin/services, GET /api/admin/masters.
 // Кнопки: «Сохранить» — POST /api/admin/services или PATCH /api/admin/services/:id;
-// «Удалить» — DELETE /api/admin/services/:id: удалить или только отключить, решает сервер.
+// «Удалить» — DELETE /api/admin/services/:id: удалить или только отключить, решает сервер. Перед запросом
+// спрашивает модальное окно раздела (<dialog class="modal">), а не window.confirm браузера.
 // Проверка здесь — для удобства: сервер проверяет те же правила сам (пустое название, цена и длительность > 0).
 import { adminReady, handleAccessError, setFlash } from './admin.js';
 import * as api from './api.js';
@@ -19,6 +20,13 @@ const title = /** @type {HTMLElement} */ (document.querySelector('[data-title]')
 const statusSlot = /** @type {HTMLElement} */ (document.querySelector('[data-status]'));
 const deleteButton = /** @type {HTMLButtonElement} */ (form.querySelector('[data-delete]'));
 const field = (name) => /** @type {HTMLInputElement} */ (form.elements.namedItem(name));
+
+const $ = (selector, root = document) => /** @type {HTMLElement} */ (root.querySelector(selector));
+// Подтверждение удаления — такое же модальное окно, как во всем разделе (A-07, A-01), а не window.confirm
+const deleteDialog = /** @type {HTMLDialogElement} */ ($('[data-delete-dialog]'));
+const deleteWho = $('[data-delete-who]', deleteDialog);
+const deleteError = $('[data-delete-error]', deleteDialog);
+const deleteConfirm = /** @type {HTMLButtonElement} */ ($('[data-delete-confirm]', deleteDialog));
 
 const idParam = new URLSearchParams(window.location.search).get('id');
 const serviceId = idParam && /^\d+$/.test(idParam) ? Number(idParam) : null;
@@ -120,11 +128,23 @@ form.addEventListener('submit', async (event) => {
   }
 });
 
-deleteButton.addEventListener('click', async () => {
+deleteButton.addEventListener('click', () => {
   if (!service) return;
-  if (!window.confirm(`Удалить услугу «${service.name}»?\n\nЕсли у нее есть записи, сервер не удалит ее, а отключит.`)) return;
+  deleteWho.textContent = `Услуга «${service.name}»`;
+  deleteError.hidden = true;
+  deleteConfirm.disabled = false;
+  deleteConfirm.textContent = 'Удалить';
+  deleteDialog.showModal();
+});
+
+$('[data-delete-cancel]', deleteDialog).addEventListener('click', () => deleteDialog.close());
+
+deleteConfirm.addEventListener('click', async () => {
+  if (!service) return;
+  deleteConfirm.disabled = true;
+  deleteConfirm.textContent = 'Удаляем…';
+  deleteError.hidden = true;
   clearErrors(form, alert);
-  const done = setBusy(deleteButton, 'Удаляем…');
   try {
     const answer = await api.deleteService(service.id);
     if (answer.result === 'deleted') {
@@ -136,13 +156,16 @@ deleteButton.addEventListener('click', async () => {
     service = answer.service;
     field('isActive').checked = false;
     showStatus();
+    deleteDialog.close();
     showAlert(alert, 'warning', answer.message);
     alert.scrollIntoView({ block: 'nearest' });
-    done();
   } catch (error) {
-    done();
+    deleteConfirm.disabled = false;
+    deleteConfirm.textContent = 'Удалить';
     if (handleAccessError(error)) return;
-    showServerError(form, alert, error);
+    // Ошибку показываем в самом окне: за ним формы не видно
+    deleteError.textContent = error instanceof api.ApiError ? error.message : 'Не удалось удалить услугу. Попробуйте еще раз.';
+    deleteError.hidden = false;
   }
 });
 

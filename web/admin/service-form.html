@@ -148,5 +148,18 @@
       </div>
     </main>
   </div>
+
+  <!-- Подтверждение удаления: услугу из прайса убирают насовсем, поэтому спрашиваем -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="delete-title" data-delete-dialog>
+    <p class="modal__title modal__title--display" id="delete-title">Удалить услугу?</p>
+    <p class="modal__meta" data-delete-who></p>
+    <p class="modal__text">Услуга пропадет из прайса и из записи у клиентов. Если на нее есть записи или фото работ,
+      сервер ее не удалит, а отключит — название и цена останутся в уже созданных записях.</p>
+    <div class="alert alert--error" role="alert" data-delete-error hidden></div>
+    <div class="modal__actions">
+      <button class="btn btn--outline" type="button" data-delete-cancel>Отмена</button>
+      <button class="btn btn--danger" type="button" data-delete-confirm>Удалить</button>
+    </div>
+  </dialog>
 </body>
 </html>
