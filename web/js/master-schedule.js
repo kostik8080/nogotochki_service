@@ -35,14 +35,41 @@ const shiftDays = (date, days) => studioDate(dayMs(date) + days * 86_400_000, 'U
 /** Понедельник недели, в которую попадает дата: getUTCDay() дает 0 для воскресенья. */
 const mondayOf = (date) => shiftDays(date, -((new Date(dayMs(date)).getUTCDay() + 6) % 7));
 
+/**
+ * Рабочее окно дня минус блокировки. Пустой список — мастер в этот день не работает совсем:
+ * день закрыт отпуском, выходным или больничным. Строки времени приходят от сервера в UTC
+ * в одном формате, поэтому сравниваются как есть, без разбора в даты.
+ */
+function freeTime(day) {
+  if (!day.window) return [];
+  let free = [{ start: day.window.start, end: day.window.end }];
+  for (const block of day.timeBlocks) {
+    free = free.flatMap((part) => {
+      if (block.endsAt <= part.start || block.startsAt >= part.end) return [part];
+      const left = block.startsAt > part.start ? [{ start: part.start, end: block.startsAt }] : [];
+      const right = block.endsAt < part.end ? [{ start: block.endsAt, end: part.end }] : [];
+      return [...left, ...right];
+    });
+  }
+  return free;
+}
+
+/** Чем закрыт день целиком. Если его перекрыла не одна блокировка, а несколько — просто «Не работаете». */
+function blockedLabel(day) {
+  const whole = day.timeBlocks.filter((t) => t.startsAt <= day.window.start && t.endsAt >= day.window.end);
+  return whole.length === 1 ? BLOCK_TYPES[whole[0].type] ?? whole[0].type : 'Не работаете';
+}
+
 function dayRow(day) {
   const rows = [
     ...day.bookings.map((b) => ({ at: b.startsAt, html: bookingRow(b) })),
-    ...day.timeBlocks.map((t) => ({ at: t.startsAt, html: blockRow(t) })),
+    ...day.timeBlocks.map((t) => ({ at: t.startsAt, html: blockRow(t, day) })),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
+  // Смену в заголовке показываем, только если от нее что-то осталось: день под отпуском или выходным
+  // подписывался «11:00–20:00», хотя мастер в этот день не работает (находки прогона, № 17).
   const window = day.window
-    ? `${timeLabel(day.window.start, state.timezone)}–${timeLabel(day.window.end, state.timezone)}`
+    ? freeTime(day).length ? `${timeLabel(day.window.start, state.timezone)}–${timeLabel(day.window.end, state.timezone)}` : blockedLabel(day)
     : day.status === 'studio_closed' ? `Студия закрыта${day.reason ? `: ${day.reason}` : ''}`
       : day.status === 'master_off' ? 'Выходной' : 'Не работаете';
   const count = day.bookings.filter((b) => b.status === 'active').length;
@@ -75,10 +102,24 @@ function bookingRow(b) {
     </article>`;
 }
 
-function blockRow(t) {
+/**
+ * Время блокировки в строке дня. Отпуск, выходной и больничный приходят одной блокировкой от полуночи
+ * до полуночи — и на отпуск со 2 по 8 ноября у каждого дня недели одни и те же концы. Без обрезки
+ * по рабочему окну получалось бессмысленное «00:00–00:00» (находки прогона, № 17), поэтому блокировка,
+ * которая съедает смену целиком, подписывается «Весь день», а остальные — своими часами внутри смены.
+ */
+function blockTime(t, day) {
+  if (!day.window) return 'Весь день';
+  if (t.startsAt <= day.window.start && t.endsAt >= day.window.end) return 'Весь день';
+  const start = t.startsAt > day.window.start ? t.startsAt : day.window.start;
+  const end = t.endsAt < day.window.end ? t.endsAt : day.window.end;
+  return `${timeLabel(start, state.timezone)}–${timeLabel(end, state.timezone)}`;
+}
+
+function blockRow(t, day) {
   return `
     <article class="day-row day-row--block">
-      <p class="day-row__time">${esc(timeLabel(t.startsAt, state.timezone))}–${esc(timeLabel(t.endsAt, state.timezone))}</p>
+      <p class="day-row__time">${esc(blockTime(t, day))}</p>
       <div class="day-row__main">
         <p class="day-row__client">${esc(BLOCK_TYPES[t.type] ?? t.type)}</p>
         ${t.comment ? `<p class="day-row__muted">${esc(t.comment)}</p>` : ''}
