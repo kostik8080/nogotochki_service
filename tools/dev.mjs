@@ -1,4 +1,4 @@
-// Запуск всего сервиса одной командой: сервер API и клиентский интерфейс в одном окне терминала.
+// Запуск всего сервиса одной командой: сервер API и интерфейс в одном окне терминала.
 //
 //   node tools/dev.mjs            # API (3000) и интерфейс web/ (8090)
 //   node tools/dev.mjs --draft    # и тестовый интерфейс web-draft/ (5173)
@@ -102,6 +102,6 @@ for (const signal of ['SIGINT', 'SIGBREAK', 'SIGTERM', 'SIGHUP']) {
 
 console.log(`Запускаю: ${services.map((s) => `${s.title} (${s.port})`).join(', ')}`);
 for (const service of services) {
-  if (service.open) console.log(`Откройте ${service.open}${service.name === 'web' ? ' — клиентский интерфейс' : ''}`);
+  if (service.open) console.log(`Откройте ${service.open}${service.name === 'web' ? ' — сайт студии' : ''}`);
 }
 console.log('Ctrl+C — остановить все.\n');
