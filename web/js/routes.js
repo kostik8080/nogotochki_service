@@ -24,6 +24,8 @@ export const routes = {
   adminServiceForm: (id) => '/admin/services/form' + (id ? '?id=' + encodeURIComponent(String(id)) : ''),
   /** A-22 Карточка мастера: без id — новый мастер. */
   adminMasterCard: (id) => '/admin/masters/form' + (id ? '?id=' + encodeURIComponent(String(id)) : ''),
+  /** Фото работ: загрузка в галерею «Наши работы» и в профиль мастера, подписи и публикация */
+  adminPhotos: '/admin/photos',
   /** Заявки мастеров у администратора */
   adminRequests: '/admin/requests',
   /** A-07 Клиенты: список, поиск и доступ к учетным записям */

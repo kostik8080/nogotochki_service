@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Страницу отдает сервер API по адресу /admin/photos только администратору (server/src/web/admin-pages.ts).
+       Все относительные адреса — от корня сайта: страница открывается не из корня. -->
+  <base href="/">
+  <title>Фото работ — раздел администратора — Ноготочки</title>
+  <!-- Значок вкладки: эмблема студии (favicon.svg), крупная иконка — для закладок и телефона -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="img/app-icon.png" type="image/png" sizes="512x512">
+  <link rel="apple-touch-icon" href="img/app-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/admin-photos.js"></script>
+</head>
+<body class="admin-body">
+  <a class="skip-link" href="/admin/photos#main">К содержимому</a>
+
+  <!-- Общая шапка сервиса: логотип и меню аккаунта — js/header.js -->
+  <client-header></client-header>
+
+  <div class="admin">
+    <!-- Меню раздела: появляется после проверки роли — js/admin.js -->
+    <admin-nav></admin-nav>
+
+    <!-- Фото работ: загрузка в галерею «Наши работы» и в профиль мастера (паспорт, функция 8 администратора) -->
+    <main class="admin__main" id="main" data-theme="admin" data-admin-main>
+      <div class="admin__loading" data-view="loading" aria-busy="true">
+        <span class="skeleton skeleton--heading" aria-hidden="true"></span>
+        <span class="visually-hidden">Загружаем раздел…</span>
+      </div>
+
+      <div class="admin-state" role="alert" data-view="error" hidden>
+        <p class="admin-state__title">Не удалось открыть раздел</p>
+        <p class="admin-state__text" data-error-text></p>
+        <div class="admin-state__actions">
+          <button class="btn btn--primary btn--small" type="button" data-retry>Повторить</button>
+        </div>
+      </div>
+
+      <div data-view="content" hidden>
+        <p class="alert admin-flash" role="status" data-flash hidden></p>
+
+        <div class="admin-head">
+          <div>
+            <p class="admin__eyebrow">Раздел администратора</p>
+            <h1 class="admin__title">Фото работ</h1>
+          </div>
+          <div class="admin-head__actions">
+            <a class="btn btn--outline btn--small" href="index.html#gallery">Посмотреть галерею</a>
+          </div>
+          <p class="admin-head__summary" data-summary></p>
+        </div>
+
+        <!-- Загрузка прямо в галерею: мастер обязателен, услуга и подпись — нет — js/admin-photos.js -->
+        <form class="admin-panel" aria-labelledby="upload-heading" data-upload-form novalidate>
+          <h2 class="admin-panel__title" id="upload-heading">Загрузить фото</h2>
+          <p class="admin-panel__hint">Снимки работ для галереи «Наши работы» на главной и для профиля мастера.
+            JPEG, PNG или WebP, до 10 МБ каждый. Можно выбрать сразу несколько файлов — они загрузятся
+            по очереди с одной подписью.</p>
+
+          <div class="admin-fields">
+            <div class="field">
+              <label class="field__label" for="upload-master">Мастер</label>
+              <select class="input" id="upload-master" name="masterId" data-upload-master></select>
+              <p class="field__hint">Чья это работа: фото появится в профиле мастера.</p>
+              <p class="field__error" data-error-for="masterId" hidden></p>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="upload-service">Услуга</label>
+              <select class="input" id="upload-service" name="serviceId" data-upload-service></select>
+              <p class="field__hint">Необязательно. В списке — услуги выбранного мастера.</p>
+              <p class="field__error" data-error-for="serviceId" hidden></p>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="upload-title">Подпись для галереи</label>
+              <input class="input" id="upload-title" name="title" maxlength="200" autocomplete="off"
+                placeholder="Например: Маникюр с покрытием гель-лаком">
+              <p class="field__hint">Необязательно. Видна клиентам под снимком, до 200 символов.</p>
+              <p class="field__error" data-error-for="title" hidden></p>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="upload-files">Файлы</label>
+              <input class="input" id="upload-files" name="files" type="file" multiple
+                accept="image/jpeg,image/png,image/webp" data-upload-files>
+              <p class="field__error" data-error-for="files" hidden></p>
+            </div>
+          </div>
+
+          <div class="check">
+            <label class="check__label">
+              <input type="checkbox" name="publish" data-upload-publish checked>
+              <span>Сразу показать в галерее «Наши работы»</span>
+            </label>
+          </div>
+
+          <div class="alert" role="status" data-upload-alert hidden></div>
+          <ul class="upload-results" data-upload-results hidden></ul>
+
+          <div class="admin-form__actions">
+            <button class="btn btn--primary" type="submit" data-upload-submit>Загрузить</button>
+          </div>
+        </form>
+
+        <!-- Фильтры: по мастеру и по тому, показано ли фото в галерее -->
+        <div class="admin-toolbar">
+          <div class="field">
+            <label class="field__label" for="filter-master">Мастер</label>
+            <select class="input" id="filter-master" data-filter-master></select>
+          </div>
+        </div>
+
+        <div class="view-switch view-switch--wrap" role="radiogroup" aria-label="Какие фото показывать">
+          <input type="radio" id="filter-all" name="published" value="" checked>
+          <label for="filter-all">Все</label>
+          <input type="radio" id="filter-published" name="published" value="true">
+          <label for="filter-published">В галерее</label>
+          <input type="radio" id="filter-hidden" name="published" value="false">
+          <label for="filter-hidden">Не в галерее</label>
+        </div>
+
+        <p class="alert" role="status" data-action-alert hidden></p>
+
+        <div data-page-loading aria-busy="true">
+          <span class="skeleton skeleton--line" aria-hidden="true"></span>
+          <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>
+          <span class="visually-hidden">Загружаем фото…</span>
+        </div>
+        <div class="alert alert--error" role="alert" data-page-error hidden></div>
+
+        <!-- Снимки с подписью, публикацией и удалением — js/admin-photos.js -->
+        <div data-list></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Подтверждение: фото удаляется вместе с файлом, вернуть его нельзя -->
+  <dialog class="modal" data-theme="powder" aria-labelledby="delete-title" data-delete-dialog>
+    <p class="modal__title modal__title--display" id="delete-title">Удалить фото?</p>
+    <p class="modal__meta" data-delete-what></p>
+    <p class="modal__text">Снимок удалится вместе с файлом на диске — вернуть его не получится, придется
+      загружать заново. Если нужно просто убрать его с сайта, снимите отметку «В галерее».</p>
+    <div class="alert alert--error" role="alert" data-delete-error hidden></div>
+    <div class="modal__actions">
+      <button class="btn btn--outline" type="button" data-delete-cancel>Отмена</button>
+      <button class="btn btn--danger" type="button" data-delete-confirm>Удалить фото</button>
+    </div>
+  </dialog>
+</body>
+</html>

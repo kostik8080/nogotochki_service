@@ -12,6 +12,8 @@
 // «Клиенты» — A-07, «Услуги» — A-23 и форма услуги A-24, «Мастера» — A-19 и карточка мастера A-22.
 // «Заявки» — заявки мастеров на отпуск, отгул, больничный и новый график: в прототипе их нет,
 // это решение заказчика от 30.09.2026. У пункта меню — счетчик новых заявок.
+// «Фото работ» — загрузка снимков в галерею «Наши работы» и в профиль мастера: в прототипе отдельного
+// экрана нет, там фото живут модалкой A-12 у завершенного визита, а загрузки в галерею не было вовсе.
 // Страница раздела ждет adminReady: он дает пользователя, когда роль администратора подтверждена, иначе null.
 import * as api from './api.js';
 import { hasRole } from './roles.js';
@@ -28,6 +30,8 @@ const ICONS = {
   services: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 3v4M17 5h4M5 17v4M3 19h4"/>',
   // Человек — «Мастера» (lucide user-round)
   masters: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+  // Снимок в рамке — «Фото работ» (lucide image)
+  photos: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L3 21"/>',
   // Ползунки — «Настройки» студии (lucide sliders-horizontal)
   settings: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
 };
@@ -40,6 +44,9 @@ const ITEMS = [
   { href: routes.adminClients, label: 'Клиенты', icon: ICONS.clients },
   { href: routes.adminServices, label: 'Услуги', icon: ICONS.services },
   { href: routes.adminMasters, label: 'Мастера', icon: ICONS.masters },
+  // Подпись в одно слово: на телефоне меню превращается в нижнюю полосу, и «Фото работ»
+  // переносилось на две строки, делая пункт выше соседних. Заголовок страницы остался полным.
+  { href: routes.adminPhotos, label: 'Фото', icon: ICONS.photos },
   { href: routes.adminSettings, label: 'Настройки', icon: ICONS.settings },
 ];
 

@@ -1435,3 +1435,97 @@ admin-nav {
 .admin-days__item .text-link {
   margin-left: auto;
 }
+
+/* ======================================================================
+ * «Фото работ»: сетка снимков с подписью, публикацией и удалением,
+ * и список итогов загрузки под формой.
+ * ====================================================================== */
+
+.photo-tiles {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .photo-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .photo-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.photo-tile {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+/* Снимок убран из галереи — карточка приглушена, как отключенный мастер */
+.photo-tile.is-off .photo-tile__image {
+  opacity: 0.6;
+}
+
+/* Высота снимка — по шкале отступов: 96 + 96 = 192px, как в .admin-days__date собрано из токенов */
+.photo-tile__image {
+  display: block;
+  width: 100%;
+  height: calc(var(--space-24) * 2);
+  object-fit: cover;
+  background: var(--color-surface-accent);
+}
+
+.photo-tile__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.photo-tile__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.photo-tile__meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-body-s-line);
+}
+
+.photo-tile__note {
+  color: var(--color-warning-text);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-body-s-line);
+}
+
+/* Итоги загрузки: по строке на файл, видно и успех, и отказ по каждому */
+.upload-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upload-results__item {
+  font-size: var(--text-body-s-size);
+  line-height: var(--text-body-s-line);
+}
+
+.upload-results__item--success {
+  color: var(--color-success-text);
+}
+
+.upload-results__item--error {
+  color: var(--color-error-text);
+}

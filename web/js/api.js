@@ -25,15 +25,11 @@ export class ApiError extends Error {
   }
 }
 
-async function request(method, url, body) {
+/** Запрос с готовым телом: отсюда идут и JSON-запросы, и загрузка файла. */
+async function send(method, url, init) {
   let response;
   try {
-    response = await fetch(url, {
-      method,
-      credentials: 'same-origin',
-      headers: body === undefined ? { Accept: 'application/json' } : { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    response = await fetch(url, { method, credentials: 'same-origin', ...init });
   } catch {
     throw new ApiError(0, 'NETWORK_ERROR', 'Нет соединения с сервером. Проверьте интернет и попробуйте еще раз.');
   }
@@ -52,6 +48,26 @@ async function request(method, url, body) {
     );
   }
   return data;
+}
+
+function request(method, url, body) {
+  return send(method, url, {
+    headers: body === undefined ? { Accept: 'application/json' } : { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+/**
+ * Загрузка изображения: в теле запроса — сам файл, параметры — в адресе.
+ * Так сервер обходится без разбора multipart (server/src/api/photos.ts).
+ * @param {string} url
+ * @param {File} file
+ */
+function requestFile(url, file) {
+  return send('POST', url, {
+    headers: { Accept: 'application/json', 'Content-Type': file.type },
+    body: file,
+  });
 }
 
 // ---------- Витрина (вход не нужен) ----------
@@ -604,6 +620,61 @@ export const blockUser = (userId) => request('PUT', adminPath('/api/admin/users'
 
 /** Открыть доступ обратно: 200. Прежние сессии не возвращаются — человек входит заново. */
 export const unblockUser = (userId) => request('DELETE', adminPath('/api/admin/users', userId) + '/block');
+
+// ---------- Фото работ (паспорт, функция 8 администратора) ----------
+
+/** Сколько байт принимает сервер в одном фото — столько же проверяет MAX_PHOTO_BYTES. */
+export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+
+/** Какие типы принимает сервер (PHOTO_TYPES в server/src/storage/photos.ts). */
+export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+/**
+ * Все фото, включая неопубликованные: `url`, `title`, `isPublished`, `publishConsentAt`,
+ * `bookingId`, `bookingItemId`, `master`, `service`, `createdAt`. Файл — по `url`
+ * (`GET /api/photos/:id/file`): неопубликованное отдается только администратору.
+ * @param {{ masterId?: number, bookingId?: number, clientId?: number, published?: boolean }} [filters]
+ */
+export async function getAdminPhotos(filters = {}) {
+  const query = new URLSearchParams();
+  if (filters.masterId !== undefined) query.set('masterId', String(filters.masterId));
+  if (filters.bookingId !== undefined) query.set('bookingId', String(filters.bookingId));
+  if (filters.clientId !== undefined) query.set('clientId', String(filters.clientId));
+  if (filters.published !== undefined) query.set('published', String(filters.published));
+  const qs = query.toString();
+  return (await request('GET', '/api/admin/photos' + (qs ? '?' + qs : ''))).photos;
+}
+
+/**
+ * Загрузить фото: прямо в галерею (`masterId`, при желании `serviceId`) или к услуге завершенного
+ * визита (`bookingItemId`). Одно из двух обязательно, вместе они не передаются.
+ * Отказы: 413 — файл больше 10 МБ; 415 NOT_AN_IMAGE; 409 VISIT_NOT_COMPLETED — визит не завершен.
+ * Загруженное фото в галерее еще не показывается: публикует его updatePhoto.
+ * @param {File} file
+ * @param {{ masterId?: number, serviceId?: number, bookingItemId?: number, title?: string }} target
+ */
+export async function uploadPhoto(file, target) {
+  const query = new URLSearchParams();
+  if (target.bookingItemId !== undefined) query.set('bookingItemId', String(target.bookingItemId));
+  if (target.masterId !== undefined) query.set('masterId', String(target.masterId));
+  if (target.serviceId !== undefined) query.set('serviceId', String(target.serviceId));
+  if (target.title) query.set('title', target.title);
+  return (await requestFile('/api/admin/photos?' + query.toString(), file)).photo;
+}
+
+/**
+ * Подпись, публикация в галерее, согласие клиента и порядок. Снятое согласие снимает и публикацию.
+ * Отказы: 409 CONSENT_REQUIRED — фото с визита без согласия клиента публиковать нельзя;
+ * 400 CONSENT_NOT_APPLICABLE — у фото галереи согласия не бывает.
+ * @param {number} id
+ * @param {{ title?: string | null, isPublished?: boolean, publishConsent?: boolean, sortOrder?: number }} body
+ */
+export async function updatePhoto(id, body) {
+  return (await request('PATCH', adminPath('/api/admin/photos', id), body)).photo;
+}
+
+/** Удалить фото вместе с файлом: 204. Это не история записей, фото удаляются по-настоящему. */
+export const deletePhoto = (id) => request('DELETE', adminPath('/api/admin/photos', id));
 
 // ---------- Уведомления клиента в кабинете ----------
 
