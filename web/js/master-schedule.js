@@ -111,6 +111,13 @@ function bookingRow(b) {
 function blockTime(t, day) {
   if (!day.window) return 'Весь день';
   if (t.startsAt <= day.window.start && t.endsAt >= day.window.end) return 'Весь день';
+  // Блокировка может целиком лежать вне смены: студия открыта с 10:00, а мастер выходит в 11:00,
+  // и личное время 10:00–10:30 в смену не попадает. Обрезать ее по смене нельзя — концы
+  // поменяются местами и получится «11:00–10:30» (находки прогона, № 18). Показываем как есть:
+  // блокировка с часами всегда создается внутри одних суток, так что время осмысленное.
+  if (t.endsAt <= day.window.start || t.startsAt >= day.window.end) {
+    return `${timeLabel(t.startsAt, state.timezone)}–${timeLabel(t.endsAt, state.timezone)}`;
+  }
   const start = t.startsAt > day.window.start ? t.startsAt : day.window.start;
   const end = t.endsAt < day.window.end ? t.endsAt : day.window.end;
   return `${timeLabel(start, state.timezone)}–${timeLabel(end, state.timezone)}`;
