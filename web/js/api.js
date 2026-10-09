@@ -396,6 +396,17 @@ export const updateMaster = (id, body) => request('PATCH', adminPath('/api/admin
 export const deleteMaster = (id) => request('DELETE', adminPath('/api/admin/masters', id));
 
 /**
+ * Учетная запись мастера: с ней он входит в свой раздел и смотрит расписание. Логин — e-mail или
+ * телефон, хотя бы одно из двух; пароль не короче 8 символов. Повторно у того же мастера запись
+ * не заводится — 409. Паспорт, функция 3 администратора.
+ * @param {number} id номер мастера
+ * @param {{ email?: string, phone?: string, password: string }} body
+ */
+export async function createMasterAccount(id, body) {
+  return (await request('POST', adminPath('/api/admin/masters', id) + '/account', body)).master;
+}
+
+/**
  * Новый недельный график мастера с даты (A-22p): прежний закрывается днем накануне, новая запись
  * графика не создается у каждого дня отдельно. `dryRun: true` — только предпросмотр, график не сохраняется.
  * В ответе `master` и `affectedBookings` — действующие записи с этой даты, которые в новый график не попадают.

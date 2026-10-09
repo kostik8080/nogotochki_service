@@ -6,12 +6,13 @@
 // предстоящие записи мастера); «Удалить» — DELETE /api/admin/masters/:id: удалить или только отключить, решает сервер;
 // «Сохранить график» — PUT /api/admin/masters/:id/schedule, сначала с dryRun: true, чтобы показать записи,
 // которые в новый график не попадают.
-// Блок «Учетная запись»: вход мастера и доступ к нему — PUT и DELETE /api/admin/users/:id/block
+// Блок «Учетная запись»: заводится здесь же (POST /api/admin/masters/:id/account), доступ к ней
+// закрывается и открывается — PUT и DELETE /api/admin/users/:id/block
 // (паспорт, функция 1 администратора). Номер пользователя берется из `account.userId` мастера.
 // Клиентский выбор мастера (BOOK-02) показывает только активных мастеров, у которых отмечены все услуги визита.
 import { adminReady, handleAccessError, schedulePeriods, setFlash, studioToday } from './admin.js';
 import * as api from './api.js';
-import { clearErrors, clearOnInput, setBusy, showAlert, showErrors, showServerError } from './form.js';
+import { clearErrors, clearOnInput, isEmail, setBusy, setFieldError, showAlert, showErrors, showServerError } from './form.js';
 import { dateLabel, duration, escapeHtml as esc, money, timeLabel } from './format.js';
 import { routes } from './routes.js';
 
@@ -32,6 +33,10 @@ const accountAlert = /** @type {HTMLElement} */ (form.querySelector('[data-accou
 const accountActions = /** @type {HTMLElement} */ (form.querySelector('[data-account-actions]'));
 const blockButton = /** @type {HTMLButtonElement} */ (form.querySelector('[data-account-block]'));
 const unblockButton = /** @type {HTMLButtonElement} */ (form.querySelector('[data-account-unblock]'));
+const accountNew = /** @type {HTMLElement} */ (form.querySelector('[data-account-new]'));
+const accountCreate = /** @type {HTMLButtonElement} */ (form.querySelector('[data-account-create]'));
+const accountLogin = /** @type {HTMLInputElement} */ (form.querySelector('[name="accountLogin"]'));
+const accountPassword = /** @type {HTMLInputElement} */ (form.querySelector('[name="accountPassword"]'));
 
 const idParam = new URLSearchParams(window.location.search).get('id');
 const masterId = idParam && /^\d+$/.test(idParam) ? Number(idParam) : null;
@@ -61,10 +66,12 @@ function showAccount() {
   const account = master.account ?? null;
   if (!account) {
     accountText.textContent = 'Учетной записи нет: мастер не может войти и посмотреть свое расписание. '
-      + 'Ее заводит администратор — пока только запросом к API.';
+      + 'Заведите ей логин и пароль — больше ничего не потребуется.';
     accountActions.hidden = true;
+    accountNew.hidden = false;
     return;
   }
+  accountNew.hidden = true;
   const login = [account.email, account.phone].filter(Boolean).join(' · ');
   accountText.textContent = account.isBlocked
     ? `Вход: ${login}. Доступ закрыт — мастер в сервис не войдет, в записях и расписании он остается.`
@@ -210,6 +217,48 @@ function validate(v) {
 form.addEventListener('change', (event) => {
   if (/** @type {HTMLInputElement} */ (event.target).name === 'level') renderServices();
 });
+
+/**
+ * Завести учетную запись мастеру. Логин — e-mail или телефон: что именно, решаем по собачке,
+ * как и на входе. Пароль показывается открытым: его тут же диктуют мастеру, а в базе он хранится
+ * только хешем, и второй раз сервис его не покажет.
+ */
+accountCreate.addEventListener('click', async () => {
+  clearErrors(form);
+  accountAlert.hidden = true;
+  const login = accountLogin.value.trim();
+  const password = accountPassword.value;
+  if (!login) return setFieldError(form, 'accountLogin', 'Укажите e-mail или телефон');
+  if (password.length < 8) return setFieldError(form, 'accountPassword', 'Пароль не короче 8 символов');
+
+  const done = setBusy(accountCreate, 'Создаем…');
+  try {
+    master = await api.createMasterAccount(master.id, {
+      ...(isEmail(login) ? { email: login } : { phone: login }),
+      password,
+    });
+    accountLogin.value = '';
+    accountPassword.value = '';
+    done();
+    showAccount();
+    showAlert(accountAlert, 'success',
+      `Учетная запись создана. ${master.name} входит по этому логину тем паролем, который вы задали, `
+      + 'и попадает в свой раздел — расписание и заявки.');
+  } catch (error) {
+    done();
+    if (handleAccessError(error)) return;
+    showServerError(form, accountAlert, error);
+  }
+});
+
+// Enter в полях учетной записи сохранил бы самого мастера: блок стоит внутри его формы
+for (const input of [accountLogin, accountPassword]) {
+  input.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    accountCreate.click();
+  });
+}
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();

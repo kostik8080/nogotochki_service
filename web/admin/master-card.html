@@ -180,6 +180,33 @@
           <section class="admin-panel" aria-labelledby="master-account" data-account-panel hidden>
             <h2 class="admin-panel__title" id="master-account">Учетная запись</h2>
             <p class="admin-panel__hint" data-account-text></p>
+
+            <!-- Учетной записи еще нет: заводим логин и пароль прямо здесь.
+                 Вложенной формы тут быть не может — блок стоит внутри формы мастера,
+                 поэтому кнопка обычная, а Enter в полях перехватывается в js. -->
+            <div data-account-new hidden>
+              <div class="admin-fields">
+                <div class="field">
+                  <label class="field__label" for="account-login">E-mail или телефон</label>
+                  <input class="input" id="account-login" name="accountLogin" type="text" maxlength="254"
+                         autocomplete="off" placeholder="anna@example.com">
+                  <p class="field__hint">По нему мастер будет входить. Телефон тоже подойдет.</p>
+                  <p class="field__error" data-error-for="accountLogin" hidden></p>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="account-password">Пароль</label>
+                  <input class="input" id="account-password" name="accountPassword" type="text" maxlength="128"
+                         autocomplete="off">
+                  <p class="field__hint">Не короче 8 символов. Передайте его мастеру — показать второй раз
+                    сервис не сможет, пароль хранится только в виде хеша.</p>
+                  <p class="field__error" data-error-for="accountPassword" hidden></p>
+                </div>
+              </div>
+              <div class="admin-form__actions">
+                <button class="btn btn--primary btn--small" type="button" data-account-create>Создать учетную запись</button>
+              </div>
+            </div>
+
             <div class="alert" role="status" data-account-alert hidden></div>
             <div class="admin-form__actions" data-account-actions hidden>
               <button class="btn btn--danger btn--small" type="button" data-account-block>Закрыть доступ</button>
