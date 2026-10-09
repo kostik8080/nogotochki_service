@@ -10,19 +10,23 @@
 // строками master_weekly_hours. Записи под изменением база не трогает: администратор видит их в ответе
 // (`affectedBookings`) и разбирает сам. `dryRun: true` показывает этот список до одобрения.
 import { applyOrPreview, bookingsOutsideWorkingHours, bookingsOverlapping } from '../booking/affected.js';
+import { deletePhotoFile, detectImageType, MAX_PHOTO_BYTES, PHOTO_TYPES, readPhoto, savePhoto } from '../storage/photos.js';
 import { insertTimeBlock, saveWeeklySchedule, type ScheduleDay } from '../booking/schedule-changes.js';
 import type { Db } from '../db/connection.js';
 import { transaction } from '../db/connection.js';
-import { badRequest, conflict, notFound } from '../http/errors.js';
+import { badRequest, conflict, forbidden, HttpError, notFound } from '../http/errors.js';
 import { pathId, type Context, type Result, type Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
 import { addDays, zonedDate, zonedTimeToUtc } from '../lib/studio-time.js';
 import { readSettings } from '../studio/settings.js';
+import { hasRole } from '../auth/sessions.js';
 import { requireMasterProfile, requireRole, requireUser } from './guards.js';
 import { bookingViews } from './views.js';
 
+// Типы, которые мастер подает текстовой формой. Заявка на фото ('photo') приходит файлом
+// на POST /api/master/photo, поэтому в этом списке ее нет.
 const TYPES = ['vacation', 'day_off', 'sick_leave', 'schedule', 'other'] as const;
-type RequestType = (typeof TYPES)[number];
+type RequestType = (typeof TYPES)[number] | 'photo';
 const STATUSES = ['pending', 'approved', 'rejected', 'cancelled'] as const;
 
 /** Заявка на период дат превращается в блокировку времени этого типа. */
@@ -70,7 +74,9 @@ function requestView(r: RequestRow) {
     endsOn: r.ends_on,
     // Новый график: с какой даты и какие дни недели
     validFrom: r.valid_from,
-    days: r.payload === null ? null : (JSON.parse(r.payload) as ScheduleDay[]),
+    days: r.type === 'schedule' && r.payload !== null ? (JSON.parse(r.payload) as ScheduleDay[]) : null,
+    // Заявка на фото: сам файл отдается отдельным адресом, путь внутри UPLOADS_DIR наружу не уходит
+    photoUrl: r.type === 'photo' ? `/api/requests/${r.id}/photo` : null,
     comment: r.comment,
     decision: r.decided_by === null ? null : {
       by: { id: r.decided_by, name: r.decided_by_name },
@@ -124,7 +130,69 @@ function affectedByRequest(db: Db, r: RequestRow): number[] {
   return [];
 }
 
+/** Путь к файлу в заявке на фото: он лежит в payload — отдельной колонки ради одного типа не заводили. */
+const photoPathOf = (r: RequestRow) => (JSON.parse(r.payload!) as { path: string }).path;
+
 export function requestRoutes(router: Router): void {
+  // ---------- Мастер: свое фото в профиле ----------
+
+  // Фото мастера видно всем на сайте, поэтому оно проходит через администратора (решение заказчика
+  // 08.10.2026): загрузка создает обычную заявку, и портрет меняется только при одобрении.
+  // Пока заявка не одобрена, на сайте остается прежнее фото или инициалы.
+  router.post('/api/master/photo', (ctx): Result => {
+    const user = requireRole(ctx, 'master');
+    const master = requireMasterProfile(ctx, user);
+    Input.query(ctx.query).done();
+
+    const data = ctx.rawBody!.data;
+    const type = detectImageType(data);
+    if (!type) throw new HttpError(415, 'NOT_AN_IMAGE', 'Файл не похож на изображение JPEG, PNG или WebP');
+
+    // Одна заявка на фото за раз: иначе администратор рассматривал бы очередь из снимков одного мастера,
+    // а неодобренные файлы копились бы на диске.
+    const pending = ctx.db.prepare("SELECT id FROM master_requests WHERE master_id = ? AND type = 'photo' AND status = 'pending'")
+      .get(master.id) as { id: number } | undefined;
+    if (pending) throw conflict('PHOTO_REQUEST_PENDING', 'Прошлое фото еще на рассмотрении: отзовите заявку или дождитесь решения');
+
+    const filePath = savePhoto(ctx.services.uploadsDir, data, type, ctx.now);
+    try {
+      const id = Number(ctx.db.prepare(`
+        INSERT INTO master_requests (master_id, created_by, type, payload, created_at) VALUES (?, ?, 'photo', ?, ?)
+      `).run(master.id, user.id, JSON.stringify({ path: filePath }), ctx.now.toISOString()).lastInsertRowid);
+      return { status: 201, body: { request: requestView(getRequest(ctx.db, id)!) } };
+    } catch (error) {
+      deletePhotoFile(ctx.services.uploadsDir, filePath);
+      throw error;
+    }
+  }, { types: PHOTO_TYPES, maxBytes: MAX_PHOTO_BYTES });
+
+  // Убрать свой портрет с сайта. Одобрения не требует: снять фото — не то же самое, что поставить,
+  // плохого на страницу студии так не попадет. Мастер возвращается к инициалам.
+  router.delete('/api/master/photo', (ctx): Result => {
+    const user = requireRole(ctx, 'master');
+    const master = requireMasterProfile(ctx, user);
+    const row = ctx.db.prepare('SELECT photo_path FROM masters WHERE id = ?').get(master.id) as { photo_path: string | null };
+    if (row.photo_path === null) throw notFound('Фото нет');
+    ctx.db.prepare("UPDATE masters SET photo_path = NULL, updated_at = ? WHERE id = ?").run(ctx.now.toISOString(), master.id);
+    deletePhotoFile(ctx.services.uploadsDir, row.photo_path);
+    return { status: 204 };
+  });
+
+  // Файл из заявки на фото: его смотрит администратор перед решением и сам мастер в своих заявках.
+  // Путь адресом не управляет: он берется из заявки, наружу не уходит и за папку загрузок не выводит.
+  router.get('/api/requests/:id/photo', (ctx): Result => {
+    const user = requireUser(ctx);
+    const request = getRequest(ctx.db, pathId(ctx));
+    if (!request || request.type !== 'photo') throw notFound('Фото не найдено');
+    if (!hasRole(user, 'admin')) {
+      const master = requireMasterProfile(ctx, user);
+      if (request.master_id !== master.id) throw forbidden('Это чужая заявка');
+    }
+    const file = readPhoto(ctx.services.uploadsDir, photoPathOf(request));
+    if (!file) throw notFound('Файл фото не найден');
+    return { status: 200, file: { ...file, cache: 'private' } };
+  });
+
   // ---------- Мастер: свои заявки ----------
 
   router.get('/api/master/requests', (ctx): Result => {
@@ -176,6 +244,9 @@ export function requestRoutes(router: Router): void {
     if (!request || request.master_id !== master.id) throw notFound('Заявка не найдена');
     if (request.status !== 'pending') throw conflict('REQUEST_ALREADY_DECIDED', 'Заявка уже рассмотрена');
     ctx.db.prepare("UPDATE master_requests SET status = 'cancelled' WHERE id = ?").run(id);
+    // Отозванное фото уже никому не покажут — файл с диска убираем. Отклоненное администратором
+    // остается: мастер должен видеть, какой снимок не подошел, рядом с причиной отказа.
+    if (request.type === 'photo') deletePhotoFile(ctx.services.uploadsDir, photoPathOf(request));
     return { status: 200, body: { request: requestView(getRequest(ctx.db, id)!) } };
   });
 
@@ -214,6 +285,8 @@ export function requestRoutes(router: Router): void {
     const dryRun = input.bool('dryRun', { optional: true }) ?? false;
     input.done();
 
+    /** Портреты, которые заменило одобренное фото: файлы удаляются после фиксации транзакции. */
+    const replaced: string[] = [];
     const affected = applyOrPreview(ctx.db, dryRun, () => {
       const request = getRequest(ctx.db, id);
       if (!request) throw notFound('Заявка не найдена');
@@ -228,6 +301,13 @@ export function requestRoutes(router: Router): void {
         });
       } else if (request.type === 'schedule') {
         saveWeeklySchedule(ctx.db, request.master_id, request.valid_from!, JSON.parse(request.payload!) as ScheduleDay[]);
+      } else if (request.type === 'photo') {
+        const previous = (ctx.db.prepare('SELECT photo_path FROM masters WHERE id = ?')
+          .get(request.master_id) as { photo_path: string | null }).photo_path;
+        ctx.db.prepare('UPDATE masters SET photo_path = ?, updated_at = ? WHERE id = ?')
+          .run(photoPathOf(request), ctx.now.toISOString(), request.master_id);
+        // Прежний портрет больше нигде не показывается — файл удаляем после фиксации транзакции
+        if (previous !== null) replaced.push(previous);
       }
       // Свободная заявка ничего не применяет: администратор делает нужное сам и просто отмечает решение
 
@@ -237,6 +317,9 @@ export function requestRoutes(router: Router): void {
       `).run(user.id, ctx.now.toISOString(), reason, timeBlockId, id);
       return affectedByRequest(ctx.db, getRequest(ctx.db, id)!);
     });
+
+    // Файлы удаляются после фиксации: откатись транзакция — строки и файлы остались бы согласованными
+    if (!dryRun) for (const file of replaced) deletePhotoFile(ctx.services.uploadsDir, file);
 
     return {
       status: 200,

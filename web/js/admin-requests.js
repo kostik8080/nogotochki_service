@@ -11,7 +11,7 @@ import { adminReady, handleAccessError, setFlash } from './admin.js';
 import * as api from './api.js';
 import { clearErrors, clearOnInput, setBusy, showErrors, showServerError } from './form.js';
 import { dateLabel, escapeHtml as esc, plural, timeLabel } from './format.js';
-import { dayLabel, decisionText, periodText, statusBadge, TYPE_LABEL } from './requests-view.js';
+import { dayLabel, decisionText, periodText, photoPreview, statusBadge, TYPE_LABEL } from './requests-view.js';
 
 const $ = (selector, root = document) => /** @type {HTMLElement} */ (root.querySelector(selector));
 
@@ -55,6 +55,7 @@ function requestCard(r) {
         ${r.comment ? `<p class="day-row__meta">${esc(r.comment)}</p>` : ''}
         <p class="day-row__muted">Подана ${esc(dayLabel(r.createdAt.slice(0, 10)))}</p>
         ${decision ? `<p class="day-row__muted">${esc(decision)}</p>` : ''}
+        ${photoPreview(r)}
       </div>
       <p class="day-row__status">${statusBadge(r.status)}</p>
       <div class="day-row__actions">
@@ -167,7 +168,10 @@ approveForm.addEventListener('submit', async (event) => {
     const affected = answer.affectedBookings?.length ?? 0;
     setFlash(affected ? 'warning' : 'success', affected
       ? `Заявка одобрена. На это время осталось ${affected} ${plural(affected, 'запись', 'записи', 'записей')} — перенесите или отмените их на странице «Записи».`
-      : 'Заявка одобрена, расписание мастера обновлено.');
+      // У заявки на фото расписание ни при чем: меняется портрет мастера на сайте
+      : current.type === 'photo'
+        ? 'Фото одобрено: оно появилось в профиле мастера и на главной.'
+        : 'Заявка одобрена, расписание мастера обновлено.');
     window.location.reload();
   } catch (error) {
     done();

@@ -66,6 +66,29 @@
             <div class="profile-card">
               <h2 class="profile-card__title">Личные данные</h2>
 
+              <!-- Свое фото → POST /api/profile/photo (файл в теле), убрать → DELETE того же адреса -->
+              <form class="form profile-row" data-photo-form novalidate>
+                <div class="alert" role="alert" data-photo-alert hidden></div>
+                <div class="photo-me">
+                  <span class="photo-me__shot" data-photo-current></span>
+                  <div class="photo-me__fields">
+                    <div class="field">
+                      <label class="field__label" for="photo">Фото</label>
+                      <input class="input" id="photo" name="photo" type="file"
+                             accept="image/jpeg,image/png,image/webp" aria-describedby="photo-hint photo-error"
+                             data-photo-file>
+                      <p class="field__hint" id="photo-hint">Его видите вы, администратор студии и мастер,
+                        к которому вы записаны. На сайте оно не показывается. JPEG, PNG или WebP, до 10 МБ.</p>
+                      <p class="field__error" id="photo-error" data-error-for="photo" hidden></p>
+                    </div>
+                    <div class="profile-inline">
+                      <button class="btn btn--primary btn--small" type="submit" data-photo-save>Сохранить фото</button>
+                      <button class="btn btn--outline btn--small" type="button" data-photo-remove hidden>Убрать фото</button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+
               <!-- Имя → PATCH /api/profile { name } -->
               <form class="form profile-row" data-name-form novalidate>
                 <div class="alert" role="alert" data-alert hidden></div>

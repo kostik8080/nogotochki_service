@@ -1529,3 +1529,19 @@ admin-nav {
 .upload-results__item--error {
   color: var(--color-error-text);
 }
+
+/* ======================================================================
+ * Снимок в заявке на фото. Сам блок «Фото в профиле» — в forms.css: его делят
+ * раздел мастера и профиль клиента.
+ * ====================================================================== */
+
+
+/* Снимок из заявки: его смотрят администратор перед решением и мастер в своих заявках */
+.request-photo {
+  width: var(--space-16);
+  height: var(--space-16);
+  margin-top: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  object-fit: cover;
+}

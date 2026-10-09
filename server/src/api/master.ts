@@ -42,7 +42,7 @@ function dayView(db: Db, masterId: number, date: string, timezone: string) {
 
   const bookings = db.prepare(`
     SELECT b.id, b.starts_at, b.ends_at, b.busy_until, b.status, b.is_overbooking, b.comment,
-           u.name AS client_name, cp.important_note
+           b.client_id, u.name AS client_name, cp.important_note, cp.photo_path AS client_photo
     FROM bookings b
     JOIN users u ON u.id = b.client_id
     LEFT JOIN client_profiles cp ON cp.user_id = b.client_id
@@ -51,7 +51,8 @@ function dayView(db: Db, masterId: number, date: string, timezone: string) {
     ORDER BY b.starts_at
   `).all(masterId, dayFrom, dayTo) as {
     id: number; starts_at: string; ends_at: string; busy_until: string; status: string; is_overbooking: number;
-    comment: string | null; client_name: string; important_note: string | null;
+    comment: string | null; client_id: number; client_name: string; important_note: string | null;
+    client_photo: string | null;
   }[];
   const items = bookings.length === 0 ? [] : db.prepare(`
     SELECT booking_id, service_name, quantity, duration_min FROM booking_items
@@ -73,7 +74,12 @@ function dayView(db: Db, masterId: number, date: string, timezone: string) {
       isOverbooking: b.is_overbooking === 1,
       services: items.filter((i) => i.booking_id === b.id).map((i) => ({ name: i.service_name, quantity: i.quantity, durationMin: i.duration_min })),
       comment: b.comment,
-      client: { name: b.client_name, importantNote: b.important_note },
+      // Фото клиента мастер видит, телефон и e-mail — нет: для визита нужно узнать человека, а не звонить ему
+      client: {
+        name: b.client_name,
+        importantNote: b.important_note,
+        photoUrl: b.client_photo === null ? null : `/api/clients/${b.client_id}/photo`,
+      },
     })),
     timeBlocks: blocks.map((t) => ({ type: t.block_type, startsAt: t.starts_at, endsAt: t.ends_at, comment: t.comment })),
   };

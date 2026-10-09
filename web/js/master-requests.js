@@ -3,13 +3,18 @@
 // блокировкой времени, новый график — недельным графиком с даты. Пока заявка на рассмотрении,
 // расписание не меняется, и мастер может ее отозвать.
 //
-// Данные: GET /api/master/requests. Кнопки: «Отправить заявку» — POST /api/master/requests;
-// «Отозвать» — POST /api/master/requests/:id/cancel.
+// Здесь же мастер меняет свое фото в профиле: на сайте оно видно всем, поэтому проходит через
+// администратора и отправляется такой же заявкой (тип photo). Пока она на рассмотрении, на сайте
+// остается прежний портрет или инициалы.
+//
+// Данные: GET /api/master/requests, GET /api/master/schedule (имя и свое текущее фото).
+// Кнопки: «Отправить заявку» — POST /api/master/requests; «Отозвать» — POST /api/master/requests/:id/cancel;
+// «Отправить на одобрение» — POST /api/master/photo (файл в теле); «Убрать фото» — DELETE /api/master/photo.
 import * as api from './api.js';
-import { clearErrors, clearOnInput, setBusy, showErrors, showServerError } from './form.js';
-import { escapeHtml as esc, plural, studioDate } from './format.js';
+import { clearErrors, clearOnInput, setBusy, setFieldError, showErrors, showServerError } from './form.js';
+import { escapeHtml as esc, initials, plural, studioDate } from './format.js';
 import { handleAccessError, masterReady, setFlash } from './master-shell.js';
-import { dayLabel, decisionText, periodText, statusBadge, TYPE_LABEL, WEEKDAYS } from './requests-view.js';
+import { dayLabel, decisionText, periodText, photoPreview, statusBadge, TYPE_LABEL, WEEKDAYS } from './requests-view.js';
 
 const $ = (selector, root = document) => /** @type {HTMLElement} */ (root.querySelector(selector));
 
@@ -24,6 +29,13 @@ const fromInput = /** @type {HTMLInputElement} */ ($('[data-from]', form));
 const toInput = /** @type {HTMLInputElement} */ ($('[data-to]', form));
 const validFromInput = /** @type {HTMLInputElement} */ ($('[data-valid-from]', form));
 const commentInput = /** @type {HTMLTextAreaElement} */ ($('[data-comment]', form));
+
+const photoForm = /** @type {HTMLFormElement} */ ($('[data-photo-form]'));
+const photoCurrent = $('[data-photo-current]', photoForm);
+const photoFile = /** @type {HTMLInputElement} */ ($('[data-photo-file]', photoForm));
+const photoSubmit = /** @type {HTMLButtonElement} */ ($('[data-photo-submit]', photoForm));
+const photoRemove = /** @type {HTMLButtonElement} */ ($('[data-photo-remove]', photoForm));
+const photoAlert = $('[data-photo-alert]', photoForm);
 
 /** Сегодняшняя дата студии: раньше нее заявку подавать нельзя, это же проверяет сервер. */
 let today = studioDate(Date.now(), 'Europe/Moscow');
@@ -44,6 +56,7 @@ function requestCard(r) {
         ${r.comment ? `<p class="day-row__meta">${esc(r.comment)}</p>` : ''}
         <p class="day-row__muted">Подана ${esc(dayLabel(r.createdAt.slice(0, 10)))}</p>
         ${decision ? `<p class="day-row__muted">${esc(decision)}</p>` : ''}
+        ${photoPreview(r)}
       </div>
       <p class="day-row__status">${statusBadge(r.status)}</p>
       <div class="day-row__actions">
@@ -188,11 +201,84 @@ form.addEventListener('submit', async (event) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Свое фото в профиле
+// ---------------------------------------------------------------------------
+
+/** Что стоит в профиле сейчас: одобренный портрет или инициалы, как на сайте. */
+function showMyPhoto(master) {
+  const has = Boolean(master.photoUrl);
+  photoCurrent.innerHTML = has
+    ? `<img class="photo-me__image" src="${esc(master.photoUrl)}" alt="Ваше фото в профиле" width="120" height="120">`
+    : `<span class="avatar" aria-hidden="true">${esc(initials(master.name))}</span>`;
+  photoRemove.hidden = !has;
+}
+
+function showPhotoAlert(kind, text) {
+  photoAlert.className = `alert alert--${kind}`;
+  photoAlert.textContent = text;
+  photoAlert.hidden = false;
+}
+
+photoForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  clearErrors(photoForm);
+  photoAlert.hidden = true;
+  const file = photoFile.files?.[0];
+  if (!file) {
+    setFieldError(photoForm, 'photo', 'Выберите файл');
+    return;
+  }
+  // Тип и размер сервер проверит еще раз; здесь — чтобы не отправлять зря большой файл
+  if (!api.PHOTO_TYPES.includes(file.type)) {
+    setFieldError(photoForm, 'photo', 'Подойдет JPEG, PNG или WebP');
+    return;
+  }
+  if (file.size > api.MAX_PHOTO_BYTES) {
+    setFieldError(photoForm, 'photo', 'Файл больше 10 МБ');
+    return;
+  }
+  const done = setBusy(photoSubmit, 'Отправляем…');
+  try {
+    await api.uploadMyPhoto(file);
+    setFlash('success', 'Фото отправлено администратору. Пока он не одобрит, в профиле остается прежнее.');
+    window.location.reload();
+  } catch (error) {
+    done();
+    if (handleAccessError(error)) return;
+    showPhotoAlert('error', error instanceof api.ApiError ? error.message : 'Не удалось отправить фото. Попробуйте еще раз.');
+  }
+});
+
+photoRemove.addEventListener('click', async () => {
+  const done = setBusy(photoRemove, 'Убираем…');
+  photoAlert.hidden = true;
+  try {
+    await api.deleteMyPhoto();
+    setFlash('success', 'Фото убрано: в профиле снова ваши инициалы.');
+    window.location.reload();
+  } catch (error) {
+    done();
+    if (handleAccessError(error)) return;
+    showPhotoAlert('error', error instanceof api.ApiError ? error.message : 'Не удалось убрать фото.');
+  }
+});
+
+clearOnInput(photoForm);
+
 async function start() {
   try {
     today = studioDate(Date.now(), (await api.getStudio()).timezone);
   } catch {
     // Часовой пояс не загрузился — даты проверит сервер
+  }
+  try {
+    // Имя и свое текущее фото: расписание отдает профиль мастера, отдельного эндпоинта для него нет
+    const { master } = await api.getMasterSchedule();
+    showMyPhoto(master);
+  } catch (error) {
+    if (handleAccessError(error)) return;
+    showPhotoAlert('error', 'Не удалось загрузить ваше фото. Отправить новое все равно можно.');
   }
   load();
 }

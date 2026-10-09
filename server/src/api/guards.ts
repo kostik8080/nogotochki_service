@@ -54,11 +54,13 @@ export function requireAdmin(session: SessionState): SessionUser {
  * Профиль мастера, привязанный к учетной записи (`masters.user_id`). Без связи мастеру смотреть нечего:
  * учетная запись есть, а расписания у нее нет — это заводит администратор.
  */
-export function requireMasterProfile(ctx: Context, user: SessionUser): { id: number; name: string; level: string } {
-  const master = ctx.db.prepare('SELECT id, name, level FROM masters WHERE user_id = ?').get(user.id) as
-    { id: number; name: string; level: string } | undefined;
+export function requireMasterProfile(ctx: Context, user: SessionUser): { id: number; name: string; level: string; photoUrl: string | null } {
+  const master = ctx.db.prepare('SELECT id, name, level, photo_path FROM masters WHERE user_id = ?').get(user.id) as
+    { id: number; name: string; level: string; photo_path: string | null } | undefined;
   if (!master) throw forbidden('Учетная запись не связана с профилем мастера. Обратитесь к администратору', 'MASTER_NOT_LINKED');
-  return master;
+  // Свой одобренный портрет: мастер видит в разделе, что сейчас стоит у него на сайте
+  const { photo_path, ...rest } = master;
+  return { ...rest, photoUrl: photo_path === null ? null : `/api/masters/${master.id}/photo` };
 }
 
 /**

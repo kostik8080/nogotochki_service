@@ -731,6 +731,30 @@ export async function cancelMyRequest(id) {
   return (await request('POST', `/api/master/requests/${encodeURIComponent(String(id))}/cancel`)).request;
 }
 
+/**
+ * Свое фото мастера. Загрузка не меняет профиль сразу: создается заявка, и портрет появляется на сайте,
+ * только когда администратор ее одобрит. 409 PHOTO_REQUEST_PENDING — прошлое фото еще на рассмотрении.
+ * @param {File} file
+ */
+export async function uploadMyPhoto(file) {
+  return (await requestFile('/api/master/photo', file)).request;
+}
+
+/** Убрать свой портрет с сайта: одобрения не требует, мастер возвращается к инициалам. 204. */
+export const deleteMyPhoto = () => request('DELETE', '/api/master/photo');
+
+/**
+ * Свое фото клиента в профиле. Видят его сам клиент, администратор и мастер, у которого есть запись
+ * этого клиента. Повторная загрузка заменяет прежнее. 415 NOT_AN_IMAGE — файл не изображение.
+ * @param {File} file
+ */
+export async function uploadMyAvatar(file) {
+  return (await requestFile('/api/profile/photo', file)).photoUrl;
+}
+
+/** Убрать свое фото: в кабинете снова инициалы. 204. */
+export const deleteMyAvatar = () => request('DELETE', '/api/profile/photo');
+
 // ---------- Заявки мастеров у администратора ----------
 
 /** Все заявки и число новых одним ответом: `{ pendingCount, requests }`. `status` — фильтр по состоянию. */

@@ -2,6 +2,8 @@
 // «Безопасность» (пароль, выход, удаление аккаунта), «Уведомления» (что сообщает сервис, рассылка). Данные: GET /api/auth/me
 // (name, phone, email, emailVerified, marketingConsent), GET /api/studio — телефон студии в подсказке.
 //   Имя → PATCH /api/profile { name }; согласие на новости → PATCH /api/profile { marketingConsent } сразу по флажку;
+//   свое фото → POST /api/profile/photo (сам файл в теле запроса), «Убрать фото» → DELETE того же адреса:
+//     фото видят клиент, администратор и мастер, к которому клиент записан; на сайте оно не показывается;
 //   новый e-mail и «Подтвердить» у неподтвержденного → POST /api/profile/email { email } → код в окне AUTH-02
 //     → POST /api/profile/email/confirm { code }; до кода в профиле остается прежний адрес;
 //   смена пароля → POST /api/profile/password: 204 — остальные сессии закрыты, 403 WRONG_PASSWORD;
@@ -14,7 +16,7 @@ import {
   bindPasswordHints, clearErrors, clearOnInput, isEmail, passwordError, retryText, setBusy, setFieldError,
   showAlert, showErrors, showServerError,
 } from './form.js';
-import { phone as formatPhone, phoneHref, plural } from './format.js';
+import { escapeHtml as esc, initials, phone as formatPhone, phoneHref, plural } from './format.js';
 import { updateAccountName } from './header.js';
 import { hasRole } from './roles.js';
 import { routes } from './routes.js';
@@ -92,6 +94,7 @@ const nameSave = /** @type {HTMLButtonElement} */ ($('[data-name-save]'));
 function renderUser() {
   input(nameForm, 'name').value = user.name;
   nameSave.disabled = true;
+  renderPhoto();
 
   $('[data-phone]').textContent = user.phone ? formatPhone(user.phone) : 'Не указан';
 
@@ -431,6 +434,65 @@ deleteForm.addEventListener('submit', async (event) => {
     }
   }
 });
+
+// ---------- Свое фото ----------
+
+const photoForm = $('[data-photo-form]');
+const photoCurrent = $('[data-photo-current]');
+const photoFile = $('[data-photo-file]');
+const photoSave = $('[data-photo-save]');
+const photoRemove = $('[data-photo-remove]');
+const photoAlert = $('[data-photo-alert]', photoForm);
+
+/** Что стоит сейчас: загруженное фото или инициалы — те же, что в шапке сайта. */
+function renderPhoto() {
+  photoCurrent.innerHTML = user.photoUrl
+    ? `<img class="photo-me__image" src="${esc(user.photoUrl)}" alt="Ваше фото" width="120" height="120">`
+    : `<span class="avatar" aria-hidden="true">${esc(initials(user.name))}</span>`;
+  photoRemove.hidden = !user.photoUrl;
+}
+
+photoForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  clearErrors(photoForm);
+  photoAlert.hidden = true;
+  const file = photoFile.files?.[0];
+  if (!file) return setFieldError(photoForm, 'photo', 'Выберите файл');
+  // Тип и размер проверяет и сервер; здесь — чтобы не отправлять зря большой файл
+  if (!api.PHOTO_TYPES.includes(file.type)) return setFieldError(photoForm, 'photo', 'Подойдет JPEG, PNG или WebP');
+  if (file.size > api.MAX_PHOTO_BYTES) return setFieldError(photoForm, 'photo', 'Файл больше 10 МБ');
+
+  const done = setBusy(photoSave, 'Сохраняем…');
+  try {
+    user.photoUrl = await api.uploadMyAvatar(file);
+    // Адрес фото не меняется при замене — заставляем браузер перечитать файл
+    user.photoUrl += `?v=${Date.now()}`;
+    photoFile.value = '';
+    renderPhoto();
+    showAlert(photoAlert, 'success', 'Фото сохранено.');
+  } catch (error) {
+    showServerError(photoForm, photoAlert, error);
+  } finally {
+    done();
+  }
+});
+
+photoRemove.addEventListener('click', async () => {
+  const done = setBusy(photoRemove, 'Убираем…');
+  photoAlert.hidden = true;
+  try {
+    await api.deleteMyAvatar();
+    user.photoUrl = null;
+    renderPhoto();
+    showAlert(photoAlert, 'success', 'Фото убрано: снова показываются ваши инициалы.');
+  } catch (error) {
+    showServerError(photoForm, photoAlert, error);
+  } finally {
+    done();
+  }
+});
+
+clearOnInput(photoForm);
 
 // ---------- Загрузка ----------
 

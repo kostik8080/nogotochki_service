@@ -7,6 +7,7 @@ import type { Db } from '../db/connection.js';
 import { notFound } from '../http/errors.js';
 import { pathId, type Context, type Result, type Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
+import { readPhoto } from '../storage/photos.js';
 import { readSettings } from '../studio/settings.js';
 import { requireChangeableBooking, requireUser } from './guards.js';
 
@@ -18,9 +19,16 @@ interface MasterRow {
   experience_years: number | null;
   bio: string | null;
   photo_url: string | null;
+  photo_path: string | null;
 }
 
-const MASTER_FIELDS = 'id, name, level, specialty, experience_years, bio, photo_url';
+const MASTER_FIELDS = 'id, name, level, specialty, experience_years, bio, photo_url, photo_path';
+
+/**
+ * Что показывать в профиле: загруженный мастером портрет (после одобрения администратора) или ссылку,
+ * которую вписал администратор. Файл важнее ссылки — он и новее, и лежит у нас.
+ */
+const photoUrlOf = (m: MasterRow) => (m.photo_path === null ? m.photo_url : `/api/masters/${m.id}/photo`);
 
 function masterView(db: Db, m: MasterRow) {
   const serviceIds = (db.prepare(`
@@ -29,7 +37,7 @@ function masterView(db: Db, m: MasterRow) {
   `).all(m.id) as { service_id: number }[]).map((r) => r.service_id);
   return {
     id: m.id, name: m.name, level: m.level, specialty: m.specialty,
-    experienceYears: m.experience_years, bio: m.bio, photoUrl: m.photo_url, serviceIds,
+    experienceYears: m.experience_years, bio: m.bio, photoUrl: photoUrlOf(m), serviceIds,
   };
 }
 
@@ -126,6 +134,16 @@ export function catalogRoutes(router: Router): void {
         ...(visit ? { visit: { durationMin: visit.durationMin, priceKop: visitPrice(visit, m.level) } } : {}),
       }));
     return { status: 200, body: { masters } };
+  });
+
+  // Портрет мастера: его видят все, как и сам профиль. Сюда попадает только одобренное фото —
+  // неодобренное лежит в заявке и отдается по другому адресу (api/requests.ts).
+  router.get('/api/masters/:id/photo', (ctx): Result => {
+    const master = activeMaster(ctx.db, pathId(ctx));
+    if (master.photo_path === null) throw notFound('Фото мастера нет');
+    const file = readPhoto(ctx.services.uploadsDir, master.photo_path);
+    if (!file) throw notFound('Файл фото не найден');
+    return { status: 200, file: { ...file, cache: 'public' } };
   });
 
   // Профиль мастера (PUB-05): услуги с ценой по его уровню.

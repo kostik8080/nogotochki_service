@@ -5,11 +5,12 @@ import { consumeCode, issueCode, lastCodeAt, RESEND_INTERVAL_MS, CODE_TTL_MIN, t
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { clearSessionCookie, revokeUserSessions } from '../auth/sessions.js';
 import { transaction } from '../db/connection.js';
-import { badRequest, conflict, forbidden, HttpError } from '../http/errors.js';
-import type { Context, Result, Router } from '../http/router.js';
+import { badRequest, conflict, forbidden, HttpError, notFound } from '../http/errors.js';
+import { hasRole } from '../auth/sessions.js';
+import { pathId, type Context, type Result, type Router } from '../http/router.js';
 import { Input } from '../http/validate.js';
 import { cancelBooking } from '../booking/booking-service.js';
-import { deletePhotoFile } from '../storage/photos.js';
+import { deletePhotoFile, detectImageType, MAX_PHOTO_BYTES, PHOTO_TYPES, readPhoto, savePhoto } from '../storage/photos.js';
 import { requireRole, requireUser } from './guards.js';
 import { selfView } from './views.js';
 
@@ -29,7 +30,73 @@ function requirePassword(ctx: Context, userId: number, password: string): void {
 const readCode = (input: Input) => input.field<string>('code', undefined, (raw) =>
   typeof raw === 'string' && /^\d{6}$/.test(raw.trim()) ? { value: raw.trim() } : { error: 'Код — 6 цифр' });
 
+/** Карточка клиента заводится, когда понадобилась: до первого фото или заметки строки может не быть. */
+function ensureClientProfile(ctx: Context, userId: number): void {
+  ctx.db.prepare('INSERT INTO client_profiles (user_id, updated_at) VALUES (?, ?) ON CONFLICT (user_id) DO NOTHING')
+    .run(userId, ctx.now.toISOString());
+}
+
+const clientPhotoPath = (ctx: Context, userId: number) =>
+  (ctx.db.prepare('SELECT photo_path FROM client_profiles WHERE user_id = ?').get(userId) as { photo_path: string | null } | undefined)?.photo_path ?? null;
+
 export function profileRoutes(router: Router): void {
+  // ---------- Свое фото клиента ----------
+
+  // Фото клиент ставит себе сам, без одобрения: на витрину студии оно не попадает. Видят его сам клиент,
+  // администратор в карточке и мастер, у которого есть запись этого клиента (решение заказчика 08.10.2026).
+  router.post('/api/profile/photo', (ctx): Result => {
+    const user = requireRole(ctx, 'client');
+    Input.query(ctx.query).done();
+    const data = ctx.rawBody!.data;
+    const type = detectImageType(data);
+    if (!type) throw new HttpError(415, 'NOT_AN_IMAGE', 'Файл не похож на изображение JPEG, PNG или WebP');
+
+    const previous = clientPhotoPath(ctx, user.id);
+    const filePath = savePhoto(ctx.services.uploadsDir, data, type, ctx.now);
+    try {
+      transaction(ctx.db, () => {
+        ensureClientProfile(ctx, user.id);
+        ctx.db.prepare('UPDATE client_profiles SET photo_path = ?, updated_at = ? WHERE user_id = ?')
+          .run(filePath, ctx.now.toISOString(), user.id);
+      });
+    } catch (error) {
+      deletePhotoFile(ctx.services.uploadsDir, filePath);
+      throw error;
+    }
+    // Прежнее фото больше нигде не показывается — убираем файл после фиксации
+    if (previous !== null) deletePhotoFile(ctx.services.uploadsDir, previous);
+    return { status: 200, body: { photoUrl: `/api/clients/${user.id}/photo` } };
+  }, { types: PHOTO_TYPES, maxBytes: MAX_PHOTO_BYTES });
+
+  router.delete('/api/profile/photo', (ctx): Result => {
+    const user = requireRole(ctx, 'client');
+    const previous = clientPhotoPath(ctx, user.id);
+    if (previous === null) throw notFound('Фото нет');
+    ctx.db.prepare('UPDATE client_profiles SET photo_path = NULL, updated_at = ? WHERE user_id = ?')
+      .run(ctx.now.toISOString(), user.id);
+    deletePhotoFile(ctx.services.uploadsDir, previous);
+    return { status: 204 };
+  });
+
+  // Файл фото клиента. Это персональные данные, поэтому доступ узкий: сам клиент, администратор
+  // и мастер, у которого есть запись этого клиента, — тот самый мастер, который и так видит его имя.
+  router.get('/api/clients/:id/photo', (ctx): Result => {
+    const user = requireUser(ctx);
+    const clientId = pathId(ctx);
+    if (user.id !== clientId && !hasRole(user, 'admin')) {
+      const allowed = hasRole(user, 'master') && ctx.db.prepare(`
+        SELECT 1 FROM bookings b JOIN masters m ON m.id = b.master_id
+        WHERE b.client_id = ? AND m.user_id = ? LIMIT 1
+      `).get(clientId, user.id) !== undefined;
+      if (!allowed) throw forbidden('Это фото чужого клиента');
+    }
+    const path = clientPhotoPath(ctx, clientId);
+    if (path === null) throw notFound('Фото нет');
+    const file = readPhoto(ctx.services.uploadsDir, path);
+    if (!file) throw notFound('Файл фото не найден');
+    return { status: 200, file: { ...file, cache: 'private' } };
+  });
+
   router.patch('/api/profile', (ctx): Result => {
     const user = requireUser(ctx);
     const input = Input.body(ctx.body);
@@ -166,6 +233,8 @@ export function profileRoutes(router: Router): void {
       // В тексте уведомления есть время визита клиента — оно стирается вместе с остальными его данными
       ctx.db.prepare('DELETE FROM notifications WHERE user_id = ?').run(user.id);
       ctx.db.prepare('DELETE FROM client_notes WHERE client_id = ?').run(user.id);
+      // Фото клиента — его персональные данные: удаляется вместе с карточкой (152-ФЗ, сценарий 17)
+      const ownPhoto = clientPhotoPath(ctx, user.id);
       ctx.db.prepare('DELETE FROM client_profiles WHERE user_id = ?').run(user.id);
       ctx.db.prepare('DELETE FROM auth_codes WHERE user_id = ?').run(user.id);
       ctx.db.prepare('DELETE FROM slot_holds WHERE owner_id = ?').run(user.id);
@@ -177,7 +246,7 @@ export function profileRoutes(router: Router): void {
                          failed_login_attempts = 0, locked_until = NULL, deleted_at = ?, updated_at = ?
         WHERE id = ?
       `).run(DELETED_CLIENT_NAME, now, now, user.id);
-      return photos.map((p) => p.file_path);
+      return [...photos.map((p) => p.file_path), ...(ownPhoto === null ? [] : [ownPhoto])];
     });
     // Файлы удаляются после фиксации: если транзакция откатится, строки и файлы останутся согласованными.
     for (const file of files) deletePhotoFile(ctx.services.uploadsDir, file);

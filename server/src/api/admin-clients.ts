@@ -97,10 +97,10 @@ function cardView(ctx: Context, id: number) {
   const user = ctx.db.prepare('SELECT phone_verified_at, email_verified_at, marketing_consent_at FROM users WHERE id = ?').get(id) as
     { phone_verified_at: string | null; email_verified_at: string | null; marketing_consent_at: string | null };
   const profile = ctx.db.prepare(`
-    SELECT cp.birth_date, cp.acquisition_source, cp.important_note, cp.blacklisted_at, cp.blacklist_reason, cp.blacklisted_by, u.name AS blacklisted_by_name
+    SELECT cp.birth_date, cp.acquisition_source, cp.important_note, cp.photo_path, cp.blacklisted_at, cp.blacklist_reason, cp.blacklisted_by, u.name AS blacklisted_by_name
     FROM client_profiles cp LEFT JOIN users u ON u.id = cp.blacklisted_by WHERE cp.user_id = ?
   `).get(id) as {
-    birth_date: string | null; acquisition_source: string | null; important_note: string | null;
+    birth_date: string | null; acquisition_source: string | null; important_note: string | null; photo_path: string | null;
     blacklisted_at: string | null; blacklist_reason: string | null; blacklisted_by: number | null; blacklisted_by_name: string | null;
   } | undefined;
   const counts = ctx.db.prepare(`
@@ -133,6 +133,8 @@ function cardView(ctx: Context, id: number) {
       birthDate: profile?.birth_date ?? null,
       acquisitionSource: profile?.acquisition_source ?? null,
       importantNote: profile?.important_note ?? null,
+      // Фото ставит себе сам клиент; администратор его только видит
+      photoUrl: profile?.photo_path ? `/api/clients/${id}/photo` : null,
     },
     blacklist: profile?.blacklisted_at ? {
       at: profile.blacklisted_at, reason: profile.blacklist_reason, by: { id: profile.blacklisted_by, name: profile.blacklisted_by_name },

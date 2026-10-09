@@ -25,8 +25,12 @@ export function selfView(db: Db, userId: number) {
     password_hash: string | null; provider: string | null;
     phone_verified_at: string | null; email_verified_at: string | null; marketing_consent_at: string | null;
   };
+  // Свое фото клиента: его он ставит себе сам в профиле. У администратора и мастера карточки клиента нет
+  const photo = db.prepare('SELECT photo_path FROM client_profiles WHERE user_id = ?')
+    .get(userId) as { photo_path: string | null } | undefined;
   return {
     id: u.id, roles: rolesOf(u.role), role: u.role, name: u.name, phone: u.phone, email: u.email,
+    photoUrl: photo?.photo_path ? `/api/clients/${u.id}/photo` : null,
     phoneVerified: u.phone_verified_at !== null, emailVerified: u.email_verified_at !== null,
     marketingConsent: u.marketing_consent_at !== null,
     // Через какой внешний сервис человек входит (`yandex`) и есть ли у него пароль: по ним профиль

@@ -63,6 +63,31 @@
             Пока заявка на рассмотрении, расписание не меняется.</p>
         </div>
 
+        <!-- Свое фото в профиле: отправляется такой же заявкой и ждет решения администратора -->
+        <form class="admin-panel" aria-labelledby="photo-heading" data-photo-form novalidate>
+          <h2 class="admin-panel__title" id="photo-heading">Фото в профиле</h2>
+          <p class="admin-panel__hint">Ваш портрет на сайте студии: он виден всем на главной и в вашем профиле.
+            Фото показывается только после того, как его одобрит администратор, — до этого остается прежнее.
+            JPEG, PNG или WebP, до 10 МБ.</p>
+
+          <div class="photo-me">
+            <span class="photo-me__shot" data-photo-current></span>
+            <div class="photo-me__fields">
+              <div class="field">
+                <label class="field__label" for="photo-file">Новое фото</label>
+                <input class="input" id="photo-file" name="photo" type="file"
+                  accept="image/jpeg,image/png,image/webp" data-photo-file>
+                <p class="field__error" data-error-for="photo" hidden></p>
+              </div>
+              <div class="admin-form__actions">
+                <button class="btn btn--primary btn--small" type="submit" data-photo-submit>Отправить на одобрение</button>
+                <button class="btn btn--outline btn--small" type="button" data-photo-remove hidden>Убрать фото</button>
+              </div>
+            </div>
+          </div>
+          <div class="alert" role="status" data-photo-alert hidden></div>
+        </form>
+
         <div data-page-loading aria-busy="true">
           <span class="skeleton skeleton--line" aria-hidden="true"></span>
           <span class="skeleton skeleton--line skeleton--short" aria-hidden="true"></span>

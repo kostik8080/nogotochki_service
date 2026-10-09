@@ -205,3 +205,34 @@
 .btn--primary:disabled:hover {
   background: var(--color-button-bg);
 }
+
+/* ----------------------------------------------------------------------
+ * Свое фото: блок «Фото в профиле» у мастера (/master/requests) и у клиента
+ * (CAB-07). Снимок рядом с полем выбора файла, на телефоне — друг под другом.
+ * -------------------------------------------------------------------- */
+
+.photo-me {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.photo-me__shot .avatar,
+.photo-me__image {
+  width: var(--space-16);
+  height: var(--space-16);
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+}
+
+.photo-me__shot .avatar {
+  font-size: var(--text-h3-size);
+}
+
+.photo-me__fields {
+  display: flex;
+  flex: 1 1 var(--space-24);
+  flex-direction: column;
+  gap: var(--space-3);
+}

@@ -49,6 +49,8 @@ describe('регистрация, вход и выход', () => {
     assert.deepEqual(res.body.user, {
       id: res.body.user.id, roles: ['client'], role: 'client', name: 'Иван Петров', phone: '+79165551234', email: 'ivan@example.com',
       phoneVerified: false, emailVerified: false, marketingConsent: false,
+      // Свое фото клиент ставит сам в профиле; у нового аккаунта его еще нет
+      photoUrl: null,
       // Вход по паролю: внешнего сервиса у аккаунта нет (вход через Яндекс — test/yandex-login.test.ts)
       provider: null, hasPassword: true,
     });

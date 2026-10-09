@@ -8,6 +8,7 @@ export const TYPE_LABEL = {
   sick_leave: 'Больничный',
   schedule: 'Новый график работы',
   other: 'Просьба',
+  photo: 'Фото в профиль',
 };
 
 export const STATUS_LABEL = {
@@ -41,6 +42,17 @@ export function periodText(request) {
       (hours.size === 1 ? [...hours][0] : request.days.map((d) => `${WEEKDAYS_SHORT[d.weekday - 1]} ${d.start}–${d.end}`).join('; '));
   }
   return '';
+}
+
+/**
+ * Снимок из заявки на фото — его смотрят и мастер, и администратор перед решением.
+ * Файл отдается по `photoUrl` заявки и виден только им двоим (неодобренное фото публичным не бывает).
+ * @param {{ type: string, photoUrl: string | null }} request
+ */
+export function photoPreview(request) {
+  if (request.type !== 'photo' || !request.photoUrl) return '';
+  return `<img class="request-photo" src="${esc(request.photoUrl)}" alt="Фото, предложенное мастером"
+    loading="lazy" width="160" height="160">`;
 }
 
 /** Бейдж состояния заявки. */
