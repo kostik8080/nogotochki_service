@@ -85,11 +85,19 @@ nextButton.addEventListener('click', () => {
 
 // ---------- Отрисовка ----------
 
+/**
+ * Кружок мастера: его портрет, если он есть, иначе инициалы — как на лендинге и в профиле мастера.
+ * Фото одобряет администратор, неодобренное сюда не попадает (api/requests.ts).
+ */
+const masterAvatar = (m) => (m.photoUrl
+  ? `<span class="master-option__avatar" aria-hidden="true"><img src="${esc(m.photoUrl)}" alt="" loading="lazy"></span>`
+  : `<span class="master-option__avatar" aria-hidden="true">${esc(initials(m.name))}</span>`);
+
 function masterOption(m, checked) {
   return `
     <label class="master-option">
       <input type="radio" name="master" value="${m.id}" ${checked ? 'checked' : ''}>
-      <span class="master-option__avatar" aria-hidden="true">${esc(initials(m.name))}</span>
+      ${masterAvatar(m)}
       <span class="master-option__body">
         <span class="master-option__head"><span>${esc(m.name)}</span><span class="master-option__price">${esc(money(m.visit.priceKop))}</span></span>
         <span class="master-option__specialty">${esc([LEVELS[m.level], m.specialty].filter(Boolean).join(' · '))}</span>
@@ -102,7 +110,7 @@ function masterOption(m, checked) {
 function unavailableOption(m, missing) {
   return `
     <div class="master-option master-option--unavailable" aria-disabled="true">
-      <span class="master-option__avatar" aria-hidden="true">${esc(initials(m.name))}</span>
+      ${masterAvatar(m)}
       <span class="master-option__body">
         <span class="master-option__head"><span>${esc(m.name)}</span></span>
         ${m.specialty ? `<span class="master-option__meta">${esc(m.specialty)}</span>` : ''}

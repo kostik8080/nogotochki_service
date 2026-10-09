@@ -533,6 +533,7 @@
 
 .master-option__avatar {
   display: flex;
+  overflow: hidden;
   align-items: center;
   justify-content: center;
   width: var(--space-12);
@@ -542,6 +543,14 @@
   background: var(--color-avatar-bg);
   color: var(--color-text-accent);
   font-weight: var(--text-button-weight);
+}
+
+/* Портрет мастера вместо инициалов: кружок тот же, кадр подрезается по центру */
+.master-option__avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .master-option__avatar--any {
